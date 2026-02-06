@@ -327,10 +327,11 @@ async function main(): Promise<void> {
         });
       }
     } catch (err) {
+      log.error(`Chat failed for ${clientId}: ${formatError(err)}`);
       if (client.ws.readyState === WebSocket.OPEN) {
         client.ws.send(JSON.stringify({
           type: "error",
-          message: formatError(err),
+          message: "An internal error occurred",
         }));
       }
     } finally {
@@ -372,11 +373,15 @@ async function main(): Promise<void> {
       });
 
       if (response.text) {
-        webMonitor.broadcast(JSON.stringify({
-          type: "message",
-          text: response.text,
-          timestamp: Date.now(),
-        }));
+        // Send response only to the originating client, not all clients
+        const originClient = webMonitor.clients.get(clientId);
+        if (originClient && originClient.ws.readyState === WebSocket.OPEN) {
+          originClient.ws.send(JSON.stringify({
+            type: "message",
+            text: response.text,
+            timestamp: Date.now(),
+          }));
+        }
 
         // Persist exchange (non-fatal)
         if (memoryManager) {

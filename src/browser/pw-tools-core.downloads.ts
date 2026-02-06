@@ -215,6 +215,11 @@ export async function downloadViaPlaywright(opts: {
   if (!outPath) {
     throw new Error("path is required");
   }
+  const resolvedOut = path.resolve(outPath);
+  const BLOCKED_PREFIXES = ["/etc/", "/usr/", "/bin/", "/sbin/", "/var/", "/sys/", "/proc/", "/dev/"];
+  if (BLOCKED_PREFIXES.some((p) => resolvedOut.startsWith(p)) || resolvedOut.includes("\0")) {
+    throw new Error("Download path is not allowed");
+  }
 
   state.armIdDownload = bumpDownloadArmId();
   const armId = state.armIdDownload;

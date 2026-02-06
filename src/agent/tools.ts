@@ -23,7 +23,7 @@ export function createMemorySearchTool(memoryManager: MemorySearchManager): Agen
       try {
         const results = await memoryManager.search({
           query: String(params.query),
-          limit: typeof params.limit === "number" ? params.limit : 5,
+          limit: typeof params.limit === "number" ? Math.max(1, Math.min(100, Math.floor(params.limit))) : 5,
         });
 
         if (results.length === 0) {

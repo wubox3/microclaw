@@ -25,8 +25,13 @@ async function writeJSONAtomic(filePath: string, value: unknown): Promise<void> 
   const dir = path.dirname(filePath);
   await fs.mkdir(dir, { recursive: true });
   const tmp = `${filePath}.${randomUUID()}.tmp`;
-  await fs.writeFile(tmp, JSON.stringify(value, null, 2), "utf8");
-  await fs.rename(tmp, filePath);
+  try {
+    await fs.writeFile(tmp, JSON.stringify(value, null, 2), "utf8");
+    await fs.rename(tmp, filePath);
+  } catch (err) {
+    await fs.unlink(tmp).catch(() => {});
+    throw err;
+  }
 }
 
 let lock: Promise<void> = Promise.resolve();

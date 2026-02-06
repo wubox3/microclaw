@@ -24,7 +24,7 @@ function createSkillApi(
   return {
     id: skillId,
     name: skillId,
-    config,
+    config: structuredClone(config),
     skillConfig,
     logger: createSkillLogger(skillId),
     registerTool: (tool: AgentTool | SkillToolFactory) => {

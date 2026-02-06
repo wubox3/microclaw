@@ -163,6 +163,10 @@ export async function navigateViaPlaywright(opts: {
   if (!url) {
     throw new Error("url is required");
   }
+  const urlLower = url.toLowerCase();
+  if (urlLower.startsWith("javascript:") || urlLower.startsWith("data:") || urlLower.startsWith("vbscript:")) {
+    throw new Error(`Unsafe URL scheme: "${url.slice(0, url.indexOf(":") + 1)}"`);
+  }
   const page = await getPageForTargetId(opts);
   ensurePageState(page);
   await page.goto(url, {

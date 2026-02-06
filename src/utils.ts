@@ -16,6 +16,9 @@ export function truncate(text: string, maxLength: number): string {
 }
 
 export function chunk<T>(array: readonly T[], size: number): T[][] {
+  if (size < 1) {
+    throw new Error("chunk size must be at least 1");
+  }
   const chunks: T[][] = [];
   for (let i = 0; i < array.length; i += size) {
     chunks.push(array.slice(i, i + size));
@@ -24,12 +27,11 @@ export function chunk<T>(array: readonly T[], size: number): T[][] {
 }
 
 export function normalizeE164(phone: string): string {
-  const hasPlus = phone.trimStart().startsWith("+");
   const digits = phone.replace(/\D/g, "");
   if (digits.length === 0) {
     return "";
   }
-  return hasPlus ? `+${digits}` : `+${digits}`;
+  return `+${digits}`;
 }
 
 export function hashString(str: string): number {

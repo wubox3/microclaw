@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
-import { resolve, basename } from "node:path";
+import path, { resolve, basename } from "node:path";
 import { readSkillManifest, validateManifest } from "./manifest.js";
 
 export const VALID_DIR_NAME = /^(?!\.$)(?!\.\.$)[a-zA-Z0-9._-]+$/;
@@ -47,8 +47,8 @@ export function deriveNameFromUrl(url: string): string {
 }
 
 export function isWithinDir(parent: string, child: string): boolean {
-  const normalizedParent = parent.endsWith("/") ? parent : parent + "/";
-  return child.startsWith(normalizedParent);
+  const rel = path.relative(path.resolve(parent), path.resolve(child));
+  return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
 }
 
 export function cloneRepo(url: string, targetDir: string): void {

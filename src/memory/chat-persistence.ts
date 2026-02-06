@@ -140,14 +140,21 @@ async function generateEmbeddings(
   const texts = chunks.map((c) => c.content);
   const embeddings = await provider.embed(texts);
 
-  for (let i = 0; i < chunks.length; i++) {
-    const chunk = chunks[i]!;
-    const result = embeddings[i];
-    if (result) {
-      const blob = Buffer.from(new Float32Array(result.embedding).buffer);
-      db.prepare(
-        "INSERT OR REPLACE INTO embedding_cache (chunk_id, provider_model, embedding, dimensions) VALUES (?, ?, ?, ?)"
-      ).run(chunk.id, pKey, blob, result.dimensions);
+  db.exec("BEGIN");
+  try {
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i]!;
+      const result = embeddings[i];
+      if (result) {
+        const blob = Buffer.from(new Float32Array(result.embedding).buffer);
+        db.prepare(
+          "INSERT OR REPLACE INTO embedding_cache (chunk_id, provider_model, embedding, dimensions) VALUES (?, ?, ?, ?)"
+        ).run(chunk.id, pKey, blob, result.dimensions);
+      }
     }
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
   }
 }

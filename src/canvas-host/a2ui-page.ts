@@ -271,13 +271,20 @@ export function generateA2uiPage(): string {
           allEls[e].removeAttribute(attrs[a].name);
         }
       }
-      // Remove javascript: and data: (non-image) href/src/action attributes
+      // Remove javascript:, vbscript:, and data: (non-image) href/src/action attributes
       var urlAttrs = ['href', 'src', 'action', 'formaction', 'xlink:href'];
       for (var u = 0; u < urlAttrs.length; u++) {
         var val = allEls[e].getAttribute(urlAttrs[u]);
         if (val) {
           var trimmedVal = val.trim().toLowerCase();
           if (trimmedVal.startsWith('javascript:') || trimmedVal.startsWith('vbscript:')) {
+            allEls[e].removeAttribute(urlAttrs[u]);
+          }
+          // Block data: URIs except data:image/ (but not SVG which can contain scripts)
+          if (trimmedVal.startsWith('data:') && !trimmedVal.startsWith('data:image/')) {
+            allEls[e].removeAttribute(urlAttrs[u]);
+          }
+          if (trimmedVal.startsWith('data:image/svg')) {
             allEls[e].removeAttribute(urlAttrs[u]);
           }
         }
@@ -525,10 +532,14 @@ export function generateA2uiPage(): string {
     return el;
   }
 
+  function escapeSurfaceSelector(id) {
+    return typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(id) : id.replace(/["\\]/g, '');
+  }
+
   function renderSurface(surfaceId, root) {
     surfaces[surfaceId] = root;
     // Targeted update: replace only the affected surface
-    var existing = a2uiRoot.querySelector('[data-surface="' + surfaceId + '"]');
+    var existing = a2uiRoot.querySelector('[data-surface="' + escapeSurfaceSelector(surfaceId) + '"]');
     var newEl = renderComponent(root, 0);
     if (newEl.nodeType === 1) {
       newEl.dataset.surface = surfaceId;
@@ -552,7 +563,7 @@ export function generateA2uiPage(): string {
 
   function deleteSurface(surfaceId) {
     delete surfaces[surfaceId];
-    var existing = a2uiRoot.querySelector('[data-surface="' + surfaceId + '"]');
+    var existing = a2uiRoot.querySelector('[data-surface="' + escapeSurfaceSelector(surfaceId) + '"]');
     if (existing) existing.remove();
     if (Object.keys(surfaces).length === 0) {
       a2uiRoot.innerHTML = '<div class="empty-state">Canvas ready</div>';

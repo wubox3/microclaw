@@ -21,7 +21,7 @@ export function syncMemoryFiles(
     fileContents.set(file.path, { content, hash: hashContent(content) });
   }
 
-  const existingFiles = db.prepare("SELECT id, path, hash FROM memory_files").all() as Array<{
+  const existingFiles = db.prepare("SELECT id, path, hash FROM memory_files WHERE source = 'file'").all() as Array<{
     id: number;
     path: string;
     hash: string;
@@ -81,8 +81,11 @@ function collectFiles(dir: string): Array<{ path: string }> {
         // skip inaccessible files
       }
     }
-  } catch {
-    // directory doesn't exist or not readable
+  } catch (err) {
+    // Log directory access errors rather than silently returning empty
+    if (err instanceof Error && (err as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw err;
+    }
   }
   return files;
 }

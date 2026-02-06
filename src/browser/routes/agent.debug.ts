@@ -133,7 +133,14 @@ export function registerBrowserAgentDebugRoutes(
       const id = crypto.randomUUID();
       const dir = "/tmp/microclaw";
       await fs.mkdir(dir, { recursive: true });
-      const tracePath = out.trim() || path.join(dir, `browser-trace-${id}.zip`);
+      const rawTrace = out.trim() || path.join(dir, `browser-trace-${id}.zip`);
+      const resolvedTrace = path.resolve(rawTrace);
+      const BLOCKED_PREFIXES = ["/etc/", "/usr/", "/bin/", "/sbin/", "/var/", "/sys/", "/proc/", "/dev/"];
+      if (BLOCKED_PREFIXES.some((p) => resolvedTrace.startsWith(p)) || resolvedTrace.includes("\0")) {
+        res.status(400).json({ ok: false, error: "Trace output path is not allowed" });
+        return;
+      }
+      const tracePath = resolvedTrace;
       await pw.traceStopViaPlaywright({
         cdpUrl: profileCtx.profile.cdpUrl,
         targetId: tab.targetId,

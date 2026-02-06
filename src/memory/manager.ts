@@ -45,6 +45,9 @@ export function createMemoryManager(params: {
 
   return {
     search: async (searchParams: MemorySearchParams): Promise<MemorySearchResult[]> => {
+      if (closed) {
+        throw new Error("Memory manager is closed");
+      }
       const vectorWeight = searchParams.vectorWeight ?? backendConfig.vectorWeight;
       const keywordWeight = searchParams.keywordWeight ?? backendConfig.keywordWeight;
       const limit = searchParams.limit ?? backendConfig.maxResults;
@@ -87,7 +90,12 @@ export function createMemoryManager(params: {
       ready: true,
     }),
 
-    syncFiles: async (dir: string) => syncMemoryFiles(db, dir),
+    syncFiles: async (dir: string) => {
+      if (closed) {
+        throw new Error("Memory manager is closed");
+      }
+      return syncMemoryFiles(db, dir);
+    },
 
     saveExchange: chatPersistence.saveExchange,
 

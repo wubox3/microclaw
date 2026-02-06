@@ -78,7 +78,19 @@ function buildStreamMessages(
     if (m.role === "tool") {
       messages.push({ role: "tool", content: m.content, tool_call_id: m.toolCallId });
     } else if (m.role === "assistant") {
-      messages.push({ role: "assistant", content: m.content });
+      if (m.toolCalls && m.toolCalls.length > 0) {
+        messages.push({
+          role: "assistant",
+          content: m.content || null,
+          tool_calls: m.toolCalls.map((tc) => ({
+            id: tc.id,
+            type: "function" as const,
+            function: { name: tc.name, arguments: JSON.stringify(tc.input) },
+          })),
+        });
+      } else {
+        messages.push({ role: "assistant", content: m.content });
+      }
     } else {
       messages.push({ role: "user", content: m.content });
     }

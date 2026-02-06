@@ -306,8 +306,11 @@ function observeBrowser(browser: Browser) {
 
 async function connectBrowser(cdpUrl: string): Promise<ConnectedBrowser> {
   const normalized = normalizeCdpUrl(cdpUrl);
-  if (cached?.cdpUrl === normalized) {
+  if (cached?.cdpUrl === normalized && cached.browser.isConnected()) {
     return cached;
+  }
+  if (cached?.cdpUrl === normalized && !cached.browser.isConnected()) {
+    cached = null;
   }
   if (connecting && connectingUrl === normalized) {
     return await connecting;

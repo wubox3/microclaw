@@ -19,7 +19,14 @@ export function readSkillManifest(skillDir: string): SkillManifest | null {
   }
   try {
     const raw = readFileSync(manifestPath, "utf-8");
-    return JSON.parse(raw) as SkillManifest;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      return null;
+    }
+    if (typeof parsed.id !== "string" || typeof parsed.name !== "string") {
+      return null;
+    }
+    return parsed as unknown as SkillManifest;
   } catch {
     return null;
   }

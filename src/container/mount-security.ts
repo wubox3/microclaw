@@ -166,6 +166,9 @@ function isValidContainerPath(containerPath: string): boolean {
   if (!containerPath || containerPath.trim() === "") {
     return false;
   }
+  if (containerPath.includes("\0")) {
+    return false;
+  }
   if (containerPath.startsWith("/")) {
     return false;
   }

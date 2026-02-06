@@ -69,7 +69,7 @@ export function createAnthropicClient(options: AnthropicClientOptions): LlmClien
 
   const client = isOAuth
     ? new Anthropic({
-        apiKey: null as unknown as string,
+        apiKey: "" as string,
         authToken: options.auth.authToken,
         defaultHeaders: OAUTH_BETA_HEADERS,
       })

@@ -63,6 +63,13 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
           for (const file of messageFiles) {
             const filePath = path.join(messagesDir, file);
             try {
+              // Guard against symlink attacks from malicious containers
+              const stat = fs.lstatSync(filePath);
+              if (stat.isSymbolicLink()) {
+                log.warn(`Skipping symlink in IPC messages: ${file}`);
+                try { fs.unlinkSync(filePath); } catch { /* best-effort */ }
+                continue;
+              }
               const data = JSON.parse(fs.readFileSync(filePath, "utf-8"));
 
               if (data.type === "message") {
@@ -114,6 +121,13 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
           for (const file of taskFiles) {
             const filePath = path.join(tasksDir, file);
             try {
+              // Guard against symlink attacks from malicious containers
+              const taskStat = fs.lstatSync(filePath);
+              if (taskStat.isSymbolicLink()) {
+                log.warn(`Skipping symlink in IPC tasks: ${file}`);
+                try { fs.unlinkSync(filePath); } catch { /* best-effort */ }
+                continue;
+              }
               const data = JSON.parse(fs.readFileSync(filePath, "utf-8"));
 
               if (
@@ -200,7 +214,11 @@ export function writeFilteredEnvFile(): void {
   for (const varName of allowedVars) {
     const value = process.env[varName];
     if (value) {
-      lines.push(`${varName}=${value}`);
+      // Strip newlines to prevent env variable injection
+      const sanitized = value.replace(/[\r\n]/g, "");
+      if (sanitized.length > 0) {
+        lines.push(`${varName}=${sanitized}`);
+      }
     }
   }
 

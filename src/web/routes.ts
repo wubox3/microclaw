@@ -237,11 +237,19 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
   app.route("/canvas", canvasApp);
 
   // Static files (read once at startup, not per-request)
-  const cssContent = readFileSync(resolve(publicDir, "styles.css"), "utf-8");
-  const jsContent = readFileSync(resolve(publicDir, "app.js"), "utf-8");
-  const voiceJsContent = readFileSync(resolve(publicDir, "voice.js"), "utf-8");
-  const canvasJsContent = readFileSync(resolve(publicDir, "canvas.js"), "utf-8");
-  const htmlContent = readFileSync(resolve(publicDir, "index.html"), "utf-8");
+  const safeReadFile = (filePath: string): string => {
+    try {
+      return readFileSync(filePath, "utf-8");
+    } catch (err) {
+      log.warn(`Static file not found: ${filePath}`);
+      return "";
+    }
+  };
+  const cssContent = safeReadFile(resolve(publicDir, "styles.css"));
+  const jsContent = safeReadFile(resolve(publicDir, "app.js"));
+  const voiceJsContent = safeReadFile(resolve(publicDir, "voice.js"));
+  const canvasJsContent = safeReadFile(resolve(publicDir, "canvas.js"));
+  const htmlContent = safeReadFile(resolve(publicDir, "index.html"));
 
   app.get("/styles.css", (c) => {
     return c.text(cssContent, 200, { "Content-Type": "text/css" });

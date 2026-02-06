@@ -1,4 +1,9 @@
 import type { ChannelPlugin } from "../../../src/channels/plugins/types.js";
+import type { MicroClawConfig } from "../../../src/config/types.js";
+
+function resolvePhoneNumber(cfg: MicroClawConfig): string | undefined {
+  return process.env.WHATSAPP_PHONE_NUMBER || cfg.channels?.whatsapp?.accountId || undefined;
+}
 
 export function createWhatsAppPlugin(): ChannelPlugin {
   return {
@@ -16,12 +21,13 @@ export function createWhatsAppPlugin(): ChannelPlugin {
       media: true,
     },
     config: {
-      isConfigured: () => true,
+      isConfigured: (cfg) => Boolean(resolvePhoneNumber(cfg)),
       isEnabled: (cfg) => cfg.channels?.whatsapp?.enabled !== false,
     },
     outbound: {
       textChunkLimit: 4000,
-      sendText: async ({ to, text }) => {
+      sendText: async ({ config, to, text }) => {
+        const _phone = resolvePhoneNumber(config);
         // TODO: Implement via Baileys
         return { ok: false };
       },

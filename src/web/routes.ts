@@ -47,15 +47,55 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
   app.post("/api/chat", async (c) => {
     const body = await c.req.json();
     const messages = body.messages ?? [];
+    const timestamp = Date.now();
+    const userText = messages.length > 0 ? messages[messages.length - 1]?.content ?? "" : "";
+
     const response = await deps.agent.chat({
       messages: messages.map((m: { role: string; content: string }) => ({
         role: m.role,
         content: m.content,
-        timestamp: Date.now(),
+        timestamp,
       })),
       channelId: "web",
     });
+
+    // Persist the exchange (non-fatal)
+    if (deps.memoryManager && userText) {
+      try {
+        await deps.memoryManager.saveExchange({
+          channelId: "web",
+          userMessage: userText,
+          assistantMessage: response.text,
+          timestamp,
+        });
+      } catch {
+        // Best-effort persistence
+      }
+    }
+
     return c.json({ success: true, data: { text: response.text } });
+  });
+
+  app.get("/api/chat/history", async (c) => {
+    if (!deps.memoryManager) {
+      return c.json({ success: true, data: [] });
+    }
+
+    const channelId = c.req.query("channelId") ?? "web";
+    const limit = Math.max(1, Math.min(Number(c.req.query("limit")) || 50, 200));
+    const beforeParam = c.req.query("before");
+    const before = beforeParam ? Number(beforeParam) : undefined;
+
+    try {
+      const messages = await deps.memoryManager.loadChatHistory({
+        channelId,
+        limit,
+        before,
+      });
+      return c.json({ success: true, data: messages });
+    } catch {
+      return c.json({ success: false, error: "Failed to load chat history" }, 500);
+    }
   });
 
   // Static files

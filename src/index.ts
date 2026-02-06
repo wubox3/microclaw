@@ -184,11 +184,24 @@ async function main(): Promise<void> {
       });
 
       // Send response
+      const responseTimestamp = Date.now();
       client.ws.send(JSON.stringify({
         type: "message",
         text: response.text,
-        timestamp: Date.now(),
+        timestamp: responseTimestamp,
       }));
+
+      // Persist exchange (non-fatal)
+      if (memoryManager) {
+        memoryManager.saveExchange({
+          channelId: "web",
+          userMessage: message.text,
+          assistantMessage: response.text,
+          timestamp: message.timestamp,
+        }).catch(() => {
+          // Best-effort persistence
+        });
+      }
     } catch (err) {
       client.ws.send(JSON.stringify({
         type: "error",

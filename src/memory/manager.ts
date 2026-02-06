@@ -3,9 +3,10 @@ import type { MicroClawConfig } from "../config/types.js";
 import type { AuthCredentials } from "../infra/auth.js";
 import type { MemorySearchManager, MemorySearchParams, MemorySearchResult, MemoryProviderStatus } from "./types.js";
 import { openDatabase, closeDatabase } from "./sqlite.js";
-import { MEMORY_SCHEMA, FTS_SYNC_TRIGGERS } from "./memory-schema.js";
+import { MEMORY_SCHEMA, FTS_SYNC_TRIGGERS, CHAT_SCHEMA } from "./memory-schema.js";
 import { resolveMemoryBackendConfig } from "./backend-config.js";
 import { createAnthropicEmbeddingProvider, providerKey, type EmbeddingProvider } from "./embeddings.js";
+import { createChatPersistence } from "./chat-persistence.js";
 import { vectorSearch, keywordSearch } from "./manager-search.js";
 import { mergeSearchResults } from "./hybrid.js";
 import { syncMemoryFiles } from "./sync-memory-files.js";
@@ -24,6 +25,7 @@ export function createMemoryManager(params: {
   const db = openDatabase(backendConfig.dbPath);
   db.exec(MEMORY_SCHEMA);
   db.exec(FTS_SYNC_TRIGGERS);
+  db.exec(CHAT_SCHEMA);
 
   // Embeddings require an API key (Voyage API); OAuth tokens don't work with Voyage
   let embeddingProvider: EmbeddingProvider | undefined;
@@ -33,6 +35,8 @@ export function createMemoryManager(params: {
     embeddingProvider = createAnthropicEmbeddingProvider(params.auth.apiKey);
     pKey = providerKey(embeddingProvider);
   }
+
+  const chatPersistence = createChatPersistence({ db, embeddingProvider });
 
   return {
     search: async (searchParams: MemorySearchParams): Promise<MemorySearchResult[]> => {
@@ -79,6 +83,10 @@ export function createMemoryManager(params: {
     }),
 
     syncFiles: async (dir: string) => syncMemoryFiles(db, dir),
+
+    saveExchange: chatPersistence.saveExchange,
+
+    loadChatHistory: chatPersistence.loadHistory,
 
     close: () => closeDatabase(db),
   };

@@ -50,9 +50,30 @@ export type EmbeddingResult = {
   dimensions: number;
 };
 
+export type ChatMessageRecord = {
+  id: number;
+  channelId: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: number;
+  memoryFileId: number | null;
+  createdAt: number;
+};
+
 export type MemorySearchManager = {
   search: (params: MemorySearchParams) => Promise<MemorySearchResult[]>;
   getStatus: () => Promise<MemoryProviderStatus>;
   syncFiles: (dir: string) => Promise<{ added: number; updated: number; removed: number }>;
+  saveExchange: (params: {
+    channelId: string;
+    userMessage: string;
+    assistantMessage: string;
+    timestamp: number;
+  }) => Promise<void>;
+  loadChatHistory: (params: {
+    channelId?: string;
+    limit?: number;
+    before?: number;
+  }) => Promise<ChatMessageRecord[]>;
   close: () => void;
 };

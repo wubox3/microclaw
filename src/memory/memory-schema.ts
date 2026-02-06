@@ -41,6 +41,19 @@ export const MEMORY_SCHEMA = `
   );
 `;
 
+export const CHAT_SCHEMA = `
+  CREATE TABLE IF NOT EXISTS chat_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    channel_id TEXT NOT NULL DEFAULT 'web',
+    role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
+    content TEXT NOT NULL,
+    timestamp INTEGER NOT NULL,
+    memory_file_id INTEGER REFERENCES memory_files(id) ON DELETE SET NULL,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  );
+  CREATE INDEX IF NOT EXISTS idx_chat_channel_ts ON chat_messages(channel_id, timestamp);
+`;
+
 export const FTS_SYNC_TRIGGERS = `
   CREATE TRIGGER IF NOT EXISTS memory_chunks_ai AFTER INSERT ON memory_chunks BEGIN
     INSERT INTO memory_chunks_fts(rowid, content) VALUES (new.id, new.content);

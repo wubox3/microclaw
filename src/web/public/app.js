@@ -87,6 +87,25 @@
     connectionStatus.className = 'status-dot ' + (connected ? 'connected' : 'disconnected');
   }
 
+  function loadHistory() {
+    fetch('/api/chat/history?channelId=web&limit=50')
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data.success && data.data && data.data.length > 0) {
+          messagesEl.innerHTML = '';
+          messageHistory = [];
+          for (var i = 0; i < data.data.length; i++) {
+            var msg = data.data[i];
+            addMessage(msg.role, msg.content, msg.timestamp);
+            messageHistory.push({ role: msg.role, content: msg.content, timestamp: msg.timestamp });
+          }
+        }
+      })
+      .catch(function() {
+        // History loading is best-effort
+      });
+  }
+
   function connectWebSocket() {
     var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     var wsUrl = protocol + '//' + window.location.host + '/ws';
@@ -95,6 +114,7 @@
 
     ws.onopen = function() {
       setConnected(true);
+      loadHistory();
     };
 
     ws.onmessage = function(event) {

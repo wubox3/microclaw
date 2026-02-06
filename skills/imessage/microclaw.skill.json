@@ -1,0 +1,7 @@
+{
+  "id": "imessage",
+  "name": "iMessage Channel",
+  "description": "iMessage integration (macOS only)",
+  "version": "0.1.0",
+  "entry": "index.ts"
+}

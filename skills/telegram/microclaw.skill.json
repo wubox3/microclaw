@@ -1,0 +1,7 @@
+{
+  "id": "telegram",
+  "name": "Telegram Channel",
+  "description": "Telegram Bot API channel integration",
+  "version": "0.1.0",
+  "entry": "index.ts"
+}

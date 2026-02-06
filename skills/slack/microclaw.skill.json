@@ -1,0 +1,7 @@
+{
+  "id": "slack",
+  "name": "Slack Channel",
+  "description": "Slack Bot with Socket Mode",
+  "version": "0.1.0",
+  "entry": "index.ts"
+}

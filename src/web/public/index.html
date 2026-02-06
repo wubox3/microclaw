@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MicroClaw</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <div class="sidebar-header">
+        <h1 class="logo">MicroClaw</h1>
+      </div>
+      <nav id="channel-list">
+        <div class="nav-section-label">Channels</div>
+      </nav>
+      <div id="memory-panel" class="sidebar-section">
+        <div class="nav-section-label">Memory</div>
+        <div id="memory-status" class="memory-status">Initializing...</div>
+      </div>
+    </aside>
+    <main id="chat-area">
+      <header id="chat-header">
+        <span id="chat-title">Web Chat</span>
+        <span id="connection-status" class="status-dot disconnected"></span>
+      </header>
+      <div id="messages"></div>
+      <div id="typing-indicator" class="typing-indicator hidden">
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+      </div>
+      <form id="input-form">
+        <textarea id="message-input" placeholder="Type a message..." rows="1"></textarea>
+        <button type="submit" id="send-btn">Send</button>
+      </form>
+    </main>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>

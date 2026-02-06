@@ -1,0 +1,57 @@
+import { createHash } from "node:crypto";
+
+const CHUNK_SIZE = 512;
+const CHUNK_OVERLAP = 64;
+
+export function hashContent(content: string): string {
+  return createHash("sha256").update(content).digest("hex").slice(0, 16);
+}
+
+export function chunkText(text: string, chunkSize = CHUNK_SIZE, overlap = CHUNK_OVERLAP): string[] {
+  const lines = text.split("\n");
+  const chunks: string[] = [];
+  let currentChunk: string[] = [];
+  let currentSize = 0;
+
+  for (const line of lines) {
+    currentChunk.push(line);
+    currentSize += line.length + 1;
+
+    if (currentSize >= chunkSize) {
+      chunks.push(currentChunk.join("\n"));
+      // Keep overlap lines
+      const overlapLines = Math.max(1, Math.floor(overlap / 40));
+      currentChunk = currentChunk.slice(-overlapLines);
+      currentSize = currentChunk.reduce((sum, l) => sum + l.length + 1, 0);
+    }
+  }
+
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk.join("\n"));
+  }
+
+  return chunks;
+}
+
+export function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length) {
+    return 0;
+  }
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dotProduct += a[i]! * b[i]!;
+    normA += a[i]! * a[i]!;
+    normB += b[i]! * b[i]!;
+  }
+  const denominator = Math.sqrt(normA) * Math.sqrt(normB);
+  return denominator === 0 ? 0 : dotProduct / denominator;
+}
+
+export function truncateSnippet(text: string, maxLength = 200): string {
+  if (text.length <= maxLength) {
+    return text;
+  }
+  return text.slice(0, maxLength) + "...";
+}

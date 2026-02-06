@@ -1,0 +1,7 @@
+{
+  "id": "discord",
+  "name": "Discord Channel",
+  "description": "Discord Bot API channel integration",
+  "version": "0.1.0",
+  "entry": "index.ts"
+}

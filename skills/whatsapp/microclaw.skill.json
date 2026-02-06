@@ -1,0 +1,7 @@
+{
+  "id": "whatsapp",
+  "name": "WhatsApp Channel",
+  "description": "WhatsApp Web channel integration via Baileys",
+  "version": "0.1.0",
+  "entry": "index.ts"
+}

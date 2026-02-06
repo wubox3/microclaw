@@ -98,7 +98,10 @@ export function buildFtsQuery(query: string): string {
   if (tokens.length === 0) {
     // Sanitize: strip all non-alphanumeric to avoid FTS5 syntax errors
     const sanitized = query.replace(/[^\w\s]/g, "").trim();
-    return sanitized.length > 0 ? `"${sanitized}"` : '""';
+    if (sanitized.length === 0) {
+      return "";
+    }
+    return `"${sanitized}"`;
   }
   return tokens.map((t) => `"${t}"`).join(" AND ");
 }

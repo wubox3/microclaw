@@ -12,7 +12,9 @@ export function vectorSearch(
 ): VectorSearchResult[] {
   const limit = params.limit ?? 10;
 
-  // Fetch all embeddings for the provider model and compute similarity in JS
+  const MAX_VECTOR_CANDIDATES = 1000;
+
+  // Fetch embeddings for the provider model and compute similarity in JS
   const stmt = db.prepare(`
     SELECT
       ec.chunk_id,
@@ -28,13 +30,15 @@ export function vectorSearch(
     JOIN memory_files mf ON mf.id = mc.file_id
     WHERE ec.provider_model = ?
     ${params.source ? "AND mf.source = ?" : ""}
-    ORDER BY ec.chunk_id
+    ORDER BY ec.created_at DESC
+    LIMIT ?
   `);
 
   const args: (string | number | null)[] = [providerModel];
   if (params.source) {
     args.push(params.source);
   }
+  args.push(MAX_VECTOR_CANDIDATES);
 
   const rows = stmt.all(...args) as Array<{
     chunk_id: number;
@@ -75,6 +79,10 @@ export function keywordSearch(
 ): KeywordSearchResult[] {
   const limit = params.limit ?? 10;
   const ftsQuery = buildFtsQuery(query);
+
+  if (ftsQuery === "") {
+    return [];
+  }
 
   try {
     const stmt = db.prepare(`

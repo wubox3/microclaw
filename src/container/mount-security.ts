@@ -156,13 +156,15 @@ function findAllowedRoot(
 }
 
 function isValidContainerPath(containerPath: string): boolean {
-  if (containerPath.includes("..")) {
+  if (!containerPath || containerPath.trim() === "") {
     return false;
   }
   if (containerPath.startsWith("/")) {
     return false;
   }
-  if (!containerPath || containerPath.trim() === "") {
+  // Normalize to resolve sequences like foo/./../../bar -> ../bar
+  const normalized = path.normalize(containerPath);
+  if (normalized.startsWith("..") || path.isAbsolute(normalized)) {
     return false;
   }
   return true;

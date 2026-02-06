@@ -3,6 +3,9 @@ import type { EmbeddingProvider } from "./embeddings.js";
 import type { ChatMessageRecord } from "./types.js";
 import { hashContent, chunkText } from "./internal.js";
 import { providerKey } from "./embeddings.js";
+import { createLogger } from "../logging.js";
+
+const log = createLogger("chat-persistence");
 
 export type ChatPersistence = {
   saveExchange: (params: {
@@ -41,14 +44,20 @@ export function createChatPersistence(params: {
 
         // Insert chunks (auto-triggers FTS5 sync)
         const chunks = chunkText(exchangeContent);
-        let lineOffset = 0;
+        let searchFrom = 0;
         for (const chunk of chunks) {
-          const chunkLines = chunk.split("\n").length;
+          const pos = exchangeContent.indexOf(chunk, searchFrom);
+          const startLine = pos >= 0
+            ? exchangeContent.slice(0, pos).split("\n").length - 1
+            : 0;
+          const chunkLineCount = chunk.split("\n").length;
           const chunkHash = hashContent(chunk);
           db.prepare(
             "INSERT INTO memory_chunks (file_id, content, start_line, end_line, hash) VALUES (?, ?, ?, ?, ?)"
-          ).run(fileId, chunk, lineOffset, lineOffset + chunkLines - 1, chunkHash);
-          lineOffset += chunkLines;
+          ).run(fileId, chunk, startLine, startLine + chunkLineCount - 1, chunkHash);
+          if (pos >= 0) {
+            searchFrom = pos + 1;
+          }
         }
 
         // Insert into chat_messages for chronological history
@@ -66,12 +75,14 @@ export function createChatPersistence(params: {
         throw err;
       }
 
-      // Fire-and-forget embedding generation (outside transaction)
+      // Await embedding generation (outside transaction) to prevent races with sync operations
       if (embeddingProvider) {
         const pKey = providerKey(embeddingProvider);
-        generateEmbeddings(db, fileId, embeddingProvider, pKey).catch(() => {
-          // Embedding generation is best-effort
-        });
+        try {
+          await generateEmbeddings(db, fileId, embeddingProvider, pKey);
+        } catch (err) {
+          log.warn(`Embedding generation failed for file ${fileId}: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
     },
 

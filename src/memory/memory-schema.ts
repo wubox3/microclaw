@@ -32,7 +32,7 @@ export const MEMORY_SCHEMA = `
   );
 
   CREATE TABLE IF NOT EXISTS embedding_cache (
-    chunk_id INTEGER NOT NULL,
+    chunk_id INTEGER NOT NULL REFERENCES memory_chunks(id) ON DELETE CASCADE,
     provider_model TEXT NOT NULL,
     embedding BLOB NOT NULL,
     dimensions INTEGER NOT NULL,

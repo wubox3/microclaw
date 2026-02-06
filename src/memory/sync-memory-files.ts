@@ -86,15 +86,20 @@ function insertFile(db: SqliteDb, path: string, source: string, hash: string, co
 
 function insertChunks(db: SqliteDb, fileId: number, content: string): void {
   const chunks = chunkText(content);
-  const lines = content.split("\n");
-  let lineOffset = 0;
+  let searchFrom = 0;
 
   for (const chunk of chunks) {
-    const chunkLines = chunk.split("\n").length;
+    const pos = content.indexOf(chunk, searchFrom);
+    const startLine = pos >= 0
+      ? content.slice(0, pos).split("\n").length - 1
+      : 0;
+    const chunkLineCount = chunk.split("\n").length;
     const hash = hashContent(chunk);
     db.prepare(
       "INSERT INTO memory_chunks (file_id, content, start_line, end_line, hash) VALUES (?, ?, ?, ?, ?)"
-    ).run(fileId, chunk, lineOffset, lineOffset + chunkLines - 1, hash);
-    lineOffset += chunkLines;
+    ).run(fileId, chunk, startLine, startLine + chunkLineCount - 1, hash);
+    if (pos >= 0) {
+      searchFrom = pos + 1;
+    }
   }
 }

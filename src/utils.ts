@@ -3,8 +3,14 @@ export function sleep(ms: number): Promise<void> {
 }
 
 export function truncate(text: string, maxLength: number): string {
+  if (maxLength < 1) {
+    return "";
+  }
   if (text.length <= maxLength) {
     return text;
+  }
+  if (maxLength < 4) {
+    return text.slice(0, maxLength);
   }
   return text.slice(0, maxLength - 3) + "...";
 }

@@ -138,6 +138,23 @@ async function main(): Promise<void> {
     hostname: host,
   });
 
+  // 12a. Graceful shutdown -- close SQLite to checkpoint WAL
+  const shutdown = () => {
+    log.info("Shutting down...");
+    if (memoryManager) {
+      try {
+        memoryManager.close();
+        log.info("Memory database closed");
+      } catch (err) {
+        log.error(`Failed to close memory database: ${formatError(err)}`);
+      }
+    }
+    server.close();
+    process.exit(0);
+  };
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
+
   // 12. Attach WebSocket
   const wss = new WebSocketServer({ server: server as unknown as import("http").Server });
   let clientIdCounter = 0;
@@ -150,10 +167,12 @@ async function main(): Promise<void> {
     // Send memory status on connect
     if (memoryManager) {
       memoryManager.getStatus().then((status) => {
-        ws.send(JSON.stringify({
-          type: "memory_status",
-          status: `${status.provider}/${status.model} (${status.dimensions}d)`,
-        }));
+        if (ws.readyState === 1) {
+          ws.send(JSON.stringify({
+            type: "memory_status",
+            status: `${status.provider}/${status.model} (${status.dimensions}d)`,
+          }));
+        }
       }).catch(() => {
         // ignore
       });

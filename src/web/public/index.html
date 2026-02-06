@@ -15,6 +15,13 @@
       <nav id="channel-list">
         <div class="nav-section-label">Channels</div>
       </nav>
+      <div id="voice-panel" class="sidebar-section">
+        <div class="nav-section-label">Voice</div>
+        <div class="voice-controls">
+          <button id="wake-toggle" class="voice-btn" title="Toggle wake word detection">Wake</button>
+          <button id="talk-btn" class="voice-btn" title="Toggle talk mode">Talk</button>
+        </div>
+      </div>
       <div id="memory-panel" class="sidebar-section">
         <div class="nav-section-label">Memory</div>
         <div id="memory-status" class="memory-status">Initializing...</div>
@@ -24,6 +31,10 @@
       <header id="chat-header">
         <span id="chat-title">Web Chat</span>
         <span id="connection-status" class="status-dot disconnected"></span>
+        <div id="voice-orb" class="voice-orb hidden">
+          <span class="orb-ring"></span>
+          <span class="orb-core"></span>
+        </div>
       </header>
       <div id="messages"></div>
       <div id="typing-indicator" class="typing-indicator hidden">
@@ -31,12 +42,22 @@
         <span class="typing-dot"></span>
         <span class="typing-dot"></span>
       </div>
+      <div id="voice-status" class="voice-status hidden"></div>
       <form id="input-form">
+        <button type="button" id="mic-btn" class="mic-btn" title="Hold to speak">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </button>
         <textarea id="message-input" placeholder="Type a message..." rows="1"></textarea>
         <button type="submit" id="send-btn">Send</button>
       </form>
     </main>
   </div>
+  <script src="/voice.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

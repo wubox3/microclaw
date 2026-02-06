@@ -6,6 +6,8 @@ import type { MemorySearchManager } from "../memory/types.js";
 import type { Agent } from "../agent/agent.js";
 import type { WebMonitor } from "../channels/web/monitor.js";
 import { listChatChannels } from "../channels/registry.js";
+import { textToSpeech } from "../voice/tts.js";
+import { loadVoiceWakeConfig, setVoiceWakeTriggers } from "../voice/voicewake.js";
 import { createLogger } from "../logging.js";
 
 const log = createLogger("web-routes");
@@ -15,6 +17,7 @@ export type WebAppDeps = {
   agent: Agent;
   memoryManager?: MemorySearchManager;
   webMonitor: WebMonitor;
+  dataDir: string;
 };
 
 export function createWebRoutes(deps: WebAppDeps): Hono {
@@ -146,9 +149,92 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     }
   });
 
+  // Voice wake word endpoints
+  app.get("/api/voicewake", async (c) => {
+    try {
+      const cfg = await loadVoiceWakeConfig(deps.dataDir);
+      return c.json({ success: true, data: { triggers: cfg.triggers } });
+    } catch (err) {
+      log.error(`Failed to load voice wake config: ${err instanceof Error ? err.message : String(err)}`);
+      return c.json({ success: false, error: "Failed to load voice wake config" }, 500);
+    }
+  });
+
+  app.post("/api/voicewake", async (c) => {
+    let body: Record<string, unknown>;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: "Invalid JSON body" }, 400);
+    }
+    if (!Array.isArray(body.triggers)) {
+      return c.json({ success: false, error: "triggers must be a string array" }, 400);
+    }
+    const triggers = body.triggers.filter(
+      (t: unknown): t is string => typeof t === "string" && t.trim().length > 0,
+    );
+    if (triggers.length === 0) {
+      return c.json({ success: false, error: "triggers must contain at least one non-empty string" }, 400);
+    }
+    try {
+      const cfg = await setVoiceWakeTriggers(triggers, deps.dataDir);
+      return c.json({ success: true, data: { triggers: cfg.triggers } });
+    } catch (err) {
+      log.error(`Failed to set voice wake triggers: ${err instanceof Error ? err.message : String(err)}`);
+      return c.json({ success: false, error: "Failed to set voice wake triggers" }, 500);
+    }
+  });
+
+  // TTS endpoint
+  app.post("/api/tts", async (c) => {
+    let body: Record<string, unknown>;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: "Invalid JSON body" }, 400);
+    }
+    if (typeof body.text !== "string" || body.text.trim().length === 0) {
+      return c.json({ success: false, error: "text must be a non-empty string" }, 400);
+    }
+    const VALID_VOICES = new Set(["alloy", "ash", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer"]);
+    let voice: string | undefined;
+    if (typeof body.voice === "string" && body.voice.trim().length > 0) {
+      const trimmed = body.voice.trim();
+      if (!VALID_VOICES.has(trimmed)) {
+        return c.json({ success: false, error: `Invalid voice. Must be one of: ${[...VALID_VOICES].join(", ")}` }, 400);
+      }
+      voice = trimmed;
+    }
+
+    try {
+      const result = await textToSpeech({
+        text: body.text.trim(),
+        config: deps.config,
+        voice: voice || undefined,
+      });
+
+      if (!result.success || !result.audioBuffer) {
+        return c.json({ success: false, error: result.error ?? "TTS conversion failed" }, 500);
+      }
+
+      return new Response(new Uint8Array(result.audioBuffer), {
+        status: 200,
+        headers: {
+          "Content-Type": result.contentType ?? "audio/mpeg",
+          "Content-Length": String(result.audioBuffer.length),
+          "Cache-Control": "no-cache",
+        },
+      });
+    } catch (err) {
+      log.error(`TTS request failed: ${err instanceof Error ? err.message : String(err)}`);
+      return c.json({ success: false, error: "TTS request failed" }, 500);
+    }
+  });
+
   // Static files (read once at startup, not per-request)
   const cssContent = readFileSync(resolve(publicDir, "styles.css"), "utf-8");
   const jsContent = readFileSync(resolve(publicDir, "app.js"), "utf-8");
+  const voiceJsContent = readFileSync(resolve(publicDir, "voice.js"), "utf-8");
   const htmlContent = readFileSync(resolve(publicDir, "index.html"), "utf-8");
 
   app.get("/styles.css", (c) => {
@@ -157,6 +243,10 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
 
   app.get("/app.js", (c) => {
     return c.text(jsContent, 200, { "Content-Type": "application/javascript" });
+  });
+
+  app.get("/voice.js", (c) => {
+    return c.text(voiceJsContent, 200, { "Content-Type": "application/javascript" });
   });
 
   app.get("/", (c) => {

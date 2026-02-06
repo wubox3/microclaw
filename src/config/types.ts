@@ -49,6 +49,28 @@ export type ContainerConfigOptions = {
   }>;
 };
 
+export type TtsConfig = {
+  enabled?: boolean;
+  provider?: "openai";
+  openai?: {
+    apiKey?: string;
+    model?: string;
+    voice?: string;
+  };
+  maxTextLength?: number;
+  timeoutMs?: number;
+};
+
+export type VoiceWakeConfigOptions = {
+  enabled?: boolean;
+  triggers?: string[];
+};
+
+export type VoiceConfig = {
+  tts?: TtsConfig;
+  wake?: VoiceWakeConfigOptions;
+};
+
 export type MicroClawConfig = {
   channels?: Partial<Record<ChatChannelId, ChannelConfig>>;
   memory?: MemoryConfig;
@@ -56,4 +78,5 @@ export type MicroClawConfig = {
   skills?: SkillConfig;
   web?: WebConfig;
   container?: ContainerConfigOptions;
+  voice?: VoiceConfig;
 };

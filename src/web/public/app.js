@@ -144,6 +144,11 @@
           addMessage('assistant', data.text, data.timestamp);
           messageHistory.push({ role: 'assistant', content: data.text, timestamp: data.timestamp });
           trimHistory();
+
+          // Notify voice module of assistant response for TTS
+          if (window.MicroClawVoice && window.MicroClawVoice.onAssistantMessage) {
+            window.MicroClawVoice.onAssistantMessage(data.text);
+          }
         } else if (data.type === 'typing') {
           showTyping();
         } else if (data.type === 'memory_status') {
@@ -191,6 +196,10 @@
     showTyping();
   }
 
+  // Expose sendMessage for voice module
+  window.MicroClaw = window.MicroClaw || {};
+  window.MicroClaw.sendMessage = sendMessage;
+
   // Auto-resize textarea
   messageInput.addEventListener('input', function() {
     this.style.height = 'auto';
@@ -218,4 +227,9 @@
   // Initialize
   renderChannels();
   connectWebSocket();
+
+  // Initialize voice module
+  if (window.MicroClawVoice && window.MicroClawVoice.init) {
+    window.MicroClawVoice.init();
+  }
 })();

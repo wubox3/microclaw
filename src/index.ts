@@ -160,6 +160,7 @@ async function main(): Promise<void> {
     agent,
     memoryManager,
     webMonitor,
+    dataDir,
   });
 
   // 12. Start server

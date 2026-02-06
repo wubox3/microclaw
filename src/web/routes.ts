@@ -8,6 +8,7 @@ import type { WebMonitor } from "../channels/web/monitor.js";
 import { listChatChannels } from "../channels/registry.js";
 import { textToSpeech } from "../voice/tts.js";
 import { loadVoiceWakeConfig, setVoiceWakeTriggers } from "../voice/voicewake.js";
+import { createCanvasRoutes } from "../canvas-host/server.js";
 import { createLogger } from "../logging.js";
 
 const log = createLogger("web-routes");
@@ -231,10 +232,15 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     }
   });
 
+  // Mount canvas routes
+  const canvasApp = createCanvasRoutes(deps.dataDir);
+  app.route("/canvas", canvasApp);
+
   // Static files (read once at startup, not per-request)
   const cssContent = readFileSync(resolve(publicDir, "styles.css"), "utf-8");
   const jsContent = readFileSync(resolve(publicDir, "app.js"), "utf-8");
   const voiceJsContent = readFileSync(resolve(publicDir, "voice.js"), "utf-8");
+  const canvasJsContent = readFileSync(resolve(publicDir, "canvas.js"), "utf-8");
   const htmlContent = readFileSync(resolve(publicDir, "index.html"), "utf-8");
 
   app.get("/styles.css", (c) => {
@@ -247,6 +253,10 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
 
   app.get("/voice.js", (c) => {
     return c.text(voiceJsContent, 200, { "Content-Type": "application/javascript" });
+  });
+
+  app.get("/canvas.js", (c) => {
+    return c.text(canvasJsContent, 200, { "Content-Type": "application/javascript" });
   });
 
   app.get("/", (c) => {

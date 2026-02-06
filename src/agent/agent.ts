@@ -18,6 +18,7 @@ export type AgentContext = {
   memoryManager?: MemorySearchManager;
   additionalTools?: AgentTool[];
   containerEnabled?: boolean;
+  canvasEnabled?: boolean;
   sessions?: Map<string, string>;
 };
 
@@ -141,6 +142,7 @@ async function runDirectChat(params: {
     config: context.config,
     memoryResults,
     channelId,
+    canvasEnabled: context.canvasEnabled,
   });
 
   const llmMessages: LlmMessage[] = messages

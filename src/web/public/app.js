@@ -157,6 +157,12 @@
           if (data.enabled && (memoryStatus.textContent || '').indexOf('[container]') === -1) {
             memoryStatus.textContent = (memoryStatus.textContent || '') + ' [container]';
           }
+        } else if (data.type === 'canvas_present' || data.type === 'canvas_hide' ||
+                   data.type === 'canvas_update' || data.type === 'canvas_eval' ||
+                   data.type === 'canvas_a2ui' || data.type === 'canvas_a2ui_reset') {
+          if (window.MicroClawCanvas && window.MicroClawCanvas.handleMessage) {
+            window.MicroClawCanvas.handleMessage(data);
+          }
         } else if (data.type === 'error') {
           hideTyping();
           addMessage('assistant', 'Error: ' + data.message, Date.now());
@@ -200,6 +206,13 @@
   window.MicroClaw = window.MicroClaw || {};
   window.MicroClaw.sendMessage = sendMessage;
 
+  // Expose sendCanvasAction for canvas module
+  window.MicroClaw.sendCanvasAction = function(actionData) {
+    if (ws && isConnected) {
+      ws.send(JSON.stringify(actionData));
+    }
+  };
+
   // Auto-resize textarea
   messageInput.addEventListener('input', function() {
     this.style.height = 'auto';
@@ -227,6 +240,11 @@
   // Initialize
   renderChannels();
   connectWebSocket();
+
+  // Initialize canvas module
+  if (window.MicroClawCanvas && window.MicroClawCanvas.init) {
+    window.MicroClawCanvas.init();
+  }
 
   // Initialize voice module
   if (window.MicroClawVoice && window.MicroClawVoice.init) {

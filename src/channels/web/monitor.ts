@@ -1,5 +1,6 @@
 import type { WebSocket } from "ws";
 import type { WebInboundMessage } from "./types.js";
+import type { CanvasActionMessage } from "../../canvas-host/types.js";
 
 export type WebSocketClient = {
   ws: WebSocket;
@@ -7,17 +8,21 @@ export type WebSocketClient = {
   connectedAt: number;
 };
 
+export type CanvasActionHandler = (clientId: string, action: CanvasActionMessage) => void;
+
 export type WebMonitor = {
   clients: Map<string, WebSocketClient>;
   addClient: (id: string, ws: WebSocket) => void;
   removeClient: (id: string) => void;
   broadcast: (message: string) => void;
   onMessage: (handler: (clientId: string, message: WebInboundMessage) => void) => void;
+  onCanvasAction: (handler: CanvasActionHandler) => void;
 };
 
 export function createWebMonitor(): WebMonitor {
   const clients = new Map<string, WebSocketClient>();
   const messageHandlers: Array<(clientId: string, message: WebInboundMessage) => void> = [];
+  const canvasActionHandlers: CanvasActionHandler[] = [];
 
   return {
     clients,
@@ -26,6 +31,26 @@ export function createWebMonitor(): WebMonitor {
       ws.on("message", (data) => {
         try {
           const parsed = JSON.parse(String(data)) as Record<string, unknown>;
+
+          // Handle canvas action messages
+          if (parsed.type === "canvas_action" && typeof parsed.action === "string") {
+            const action: CanvasActionMessage = {
+              type: "canvas_action",
+              action: parsed.action,
+              componentId: typeof parsed.componentId === "string" ? parsed.componentId : undefined,
+              value: parsed.value,
+              surfaceId: typeof parsed.surfaceId === "string" ? parsed.surfaceId : undefined,
+            };
+            for (const handler of canvasActionHandlers) {
+              try {
+                handler(id, action);
+              } catch {
+                // Prevent one handler failure from blocking others
+              }
+            }
+            return;
+          }
+
           if (typeof parsed.text !== "string" || parsed.text.trim().length === 0) {
             return;
           }
@@ -72,6 +97,9 @@ export function createWebMonitor(): WebMonitor {
     },
     onMessage: (handler) => {
       messageHandlers.push(handler);
+    },
+    onCanvasAction: (handler) => {
+      canvasActionHandlers.push(handler);
     },
   };
 }

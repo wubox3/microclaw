@@ -31,6 +31,7 @@
       <header id="chat-header">
         <span id="chat-title">Web Chat</span>
         <span id="connection-status" class="status-dot disconnected"></span>
+        <button id="canvas-toggle-btn" class="canvas-toggle-btn" title="Toggle canvas panel">Canvas</button>
         <div id="voice-orb" class="voice-orb hidden">
           <span class="orb-ring"></span>
           <span class="orb-core"></span>
@@ -56,8 +57,17 @@
         <button type="submit" id="send-btn">Send</button>
       </form>
     </main>
+    <aside id="canvas-panel" class="hidden">
+      <div id="canvas-resize-handle"></div>
+      <div id="canvas-header">
+        <span class="canvas-title">Canvas</span>
+        <button id="canvas-close-btn" title="Close canvas">&times;</button>
+      </div>
+      <iframe id="canvas-iframe" src="/canvas/a2ui" sandbox="allow-scripts"></iframe>
+    </aside>
   </div>
   <script src="/voice.js"></script>
+  <script src="/canvas.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

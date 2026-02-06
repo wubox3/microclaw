@@ -13,6 +13,10 @@ import { createAgent } from "./agent/agent.js";
 import { createWebRoutes } from "./web/routes.js";
 import { createWebMonitor } from "./channels/web/monitor.js";
 import { startIpcWatcher, stopIpcWatcher, writeFilteredEnvFile, removeFilteredEnvFile } from "./container/ipc.js";
+import { createCanvasState } from "./canvas-host/types.js";
+import { createCanvasTool } from "./agent/canvas-tool.js";
+import { startBrowserServer, stopBrowserServer } from "./browser/server.js";
+import { createBrowserTool } from "./browser/browser-tool.js";
 import type { MemorySearchManager } from "./memory/types.js";
 import type { AgentTool } from "./agent/types.js";
 import type { SkillToolFactory } from "./skills/types.js";
@@ -88,8 +92,32 @@ async function main(): Promise<void> {
     log.info("Container mode: disabled");
   }
 
-  // 7. Adapt skill-registered tools to agent tool format
+  // 7. Create web monitor and canvas state (needed before agent for canvas tool)
+  const webMonitor = createWebMonitor();
+  const canvasState = createCanvasState();
+
+  // 8. Adapt skill-registered tools to agent tool format
   const additionalTools: AgentTool[] = [];
+
+  // Add canvas tool
+  additionalTools.push(createCanvasTool({ webMonitor, canvasState }));
+  log.info("Canvas tool registered");
+
+  // Start browser control server
+  if (config.browser?.enabled !== false) {
+    try {
+      const browserState = await startBrowserServer({
+        browserConfig: config.browser,
+      });
+      if (browserState) {
+        additionalTools.push(createBrowserTool());
+        log.info(`Browser control on http://127.0.0.1:${browserState.port}/`);
+      }
+    } catch (err) {
+      log.warn(`Browser server failed to start: ${formatError(err)}`);
+    }
+  }
+
   for (const reg of skillRegistry.tools) {
     if ("factory" in reg.tool && (reg.tool as SkillToolFactory).factory) {
       // Factory tools need runtime context; skip for now
@@ -113,18 +141,16 @@ async function main(): Promise<void> {
     });
   }
 
-  // 8. Create agent
+  // 9. Create agent
   const agent = createAgent({
     config,
     auth,
     memoryManager,
     containerEnabled,
+    canvasEnabled: true,
     additionalTools: additionalTools.length > 0 ? additionalTools : undefined,
   });
   log.info("Agent initialized");
-
-  // 9. Create web monitor
-  const webMonitor = createWebMonitor();
 
   // 10. Start IPC watcher if container mode active
   if (containerEnabled) {
@@ -173,6 +199,7 @@ async function main(): Promise<void> {
   // 13a. Graceful shutdown -- close SQLite to checkpoint WAL
   const shutdown = () => {
     log.info("Shutting down...");
+    stopBrowserServer().catch(() => {});
     if (containerEnabled) {
       stopIpcWatcher();
       removeFilteredEnvFile();
@@ -303,6 +330,65 @@ async function main(): Promise<void> {
           message: formatError(err),
         }));
       }
+    } finally {
+      processingClients.delete(clientId);
+    }
+  });
+
+  // 15. Handle canvas actions -> agent (with concurrency guard and history context)
+  webMonitor.onCanvasAction(async (clientId, action) => {
+    // Reuse same concurrency guard as regular messages
+    if (processingClients.has(clientId)) {
+      return;
+    }
+    processingClients.add(clientId);
+
+    const actionText = `[Canvas Action] User ${action.action}${action.componentId ? ` on "${action.componentId}"` : ""}${action.value !== undefined ? ` with value: ${JSON.stringify(action.value)}` : ""}`;
+
+    try {
+      // Load conversation history for context
+      const historyMessages: Array<{ role: "user" | "assistant"; content: string; timestamp: number }> = [];
+      if (memoryManager) {
+        try {
+          const history = await memoryManager.loadChatHistory({ channelId: "web", limit: 20 });
+          for (const msg of history) {
+            historyMessages.push({ role: msg.role, content: msg.content, timestamp: msg.timestamp });
+          }
+        } catch {
+          // Non-fatal
+        }
+      }
+
+      const now = Date.now();
+      const response = await agent.chat({
+        messages: [
+          ...historyMessages,
+          { role: "user", content: actionText, timestamp: now },
+        ],
+        channelId: "web",
+      });
+
+      if (response.text) {
+        webMonitor.broadcast(JSON.stringify({
+          type: "message",
+          text: response.text,
+          timestamp: Date.now(),
+        }));
+
+        // Persist exchange (non-fatal)
+        if (memoryManager) {
+          memoryManager.saveExchange({
+            channelId: "web",
+            userMessage: actionText,
+            assistantMessage: response.text,
+            timestamp: now,
+          }).catch(() => {
+            // Best-effort persistence
+          });
+        }
+      }
+    } catch (err) {
+      log.error(`Canvas action handling failed: ${formatError(err)}`);
     } finally {
       processingClients.delete(clientId);
     }

@@ -1,15 +1,5 @@
-import { test, expect, type Page } from '@playwright/test'
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Wait until the WebSocket connection indicator turns green. */
-async function waitForConnection(page: Page) {
-  await expect(
-    page.locator('#connection-status.connected'),
-  ).toBeVisible({ timeout: 10_000 })
-}
+import { test, expect } from '@playwright/test'
+import { waitForConnection } from './helpers.js'
 
 // ---------------------------------------------------------------------------
 // 1. Page loads correctly
@@ -156,10 +146,10 @@ test.describe('Send Message', () => {
     await input.fill('Hello from Playwright')
     await sendBtn.click()
 
-    // A user message bubble should appear in #messages
+    // A user message bubble should appear in #messages (use last() in case history exists)
     const userMessage = page.locator('#messages .message.user .message-bubble')
-    await expect(userMessage.first()).toBeVisible()
-    await expect(userMessage.first()).toHaveText('Hello from Playwright')
+    await expect(userMessage.last()).toBeVisible()
+    await expect(userMessage.last()).toHaveText('Hello from Playwright')
   })
 
   test('pressing Enter sends the message (without Shift)', async ({ page }) => {
@@ -168,18 +158,22 @@ test.describe('Send Message', () => {
     await input.press('Enter')
 
     const userMessage = page.locator('#messages .message.user .message-bubble')
-    await expect(userMessage.first()).toBeVisible()
-    await expect(userMessage.first()).toHaveText('Enter key test')
+    await expect(userMessage.last()).toBeVisible()
+    await expect(userMessage.last()).toHaveText('Enter key test')
   })
 
   test('Shift+Enter does not send the message (allows newline)', async ({ page }) => {
+    // Count existing user messages from history
+    const userMessages = page.locator('#messages .message.user')
+    const countBefore = await userMessages.count()
+
     const input = page.locator('#message-input')
     await input.fill('Line one')
     await input.press('Shift+Enter')
 
-    // No message bubble should appear -- only one textarea still containing text
-    const userMessages = page.locator('#messages .message.user')
-    await expect(userMessages).toHaveCount(0)
+    // No new message bubble should appear
+    const countAfter = await userMessages.count()
+    expect(countAfter).toBe(countBefore)
   })
 
   test('input is cleared after sending', async ({ page }) => {
@@ -191,19 +185,27 @@ test.describe('Send Message', () => {
   })
 
   test('empty input does not send a message', async ({ page }) => {
+    const userMessages = page.locator('#messages .message.user')
+    const countBefore = await userMessages.count()
+
     await page.locator('#send-btn').click()
 
-    const userMessages = page.locator('#messages .message.user')
-    await expect(userMessages).toHaveCount(0)
+    // No new message should appear
+    const countAfter = await userMessages.count()
+    expect(countAfter).toBe(countBefore)
   })
 
   test('whitespace-only input does not send a message', async ({ page }) => {
+    const userMessages = page.locator('#messages .message.user')
+    const countBefore = await userMessages.count()
+
     const input = page.locator('#message-input')
     await input.fill('   ')
     await page.locator('#send-btn').click()
 
-    const userMessages = page.locator('#messages .message.user')
-    await expect(userMessages).toHaveCount(0)
+    // No new message should appear
+    const countAfter = await userMessages.count()
+    expect(countAfter).toBe(countBefore)
   })
 
   test('message bubble shows a timestamp', async ({ page }) => {
@@ -212,9 +214,9 @@ test.describe('Send Message', () => {
     await page.locator('#send-btn').click()
 
     const timeEl = page.locator('#messages .message.user .message-time')
-    await expect(timeEl.first()).toBeVisible()
+    await expect(timeEl.last()).toBeVisible()
     // Timestamp should match HH:MM pattern (locale-dependent but always digits)
-    const timeText = await timeEl.first().textContent()
+    const timeText = await timeEl.last().textContent()
     expect(timeText?.trim()).toMatch(/\d{1,2}:\d{2}/)
   })
 
@@ -224,7 +226,7 @@ test.describe('Send Message', () => {
     await page.locator('#send-btn').click()
 
     await expect(
-      page.locator('#messages .message.user .message-bubble'),
+      page.locator('#messages .message.user .message-bubble').last(),
     ).toHaveText('Screenshot test message')
 
     await page.screenshot({
@@ -288,7 +290,7 @@ test.describe('Typing Indicator', () => {
 
     // Wait for assistant response (the server sends a WS message back)
     const assistantBubble = page.locator('#messages .message.assistant .message-bubble')
-    await expect(assistantBubble.first()).toBeVisible({ timeout: 30_000 })
+    await expect(assistantBubble.last()).toBeVisible({ timeout: 30_000 })
 
     // After the response, the typing indicator should be hidden again
     await expect(indicator).toHaveClass(/hidden/)

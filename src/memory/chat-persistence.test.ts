@@ -303,11 +303,10 @@ describe("createChatPersistence", () => {
     it("combines limit and before for windowed pagination", async () => {
       const history = await persistence.loadHistory({ channelId: "web", limit: 2, before: 3000 });
 
-      // Messages with timestamp < 3000, limit 2, ASC order
+      // Returns the 2 most recent messages before timestamp 3000, in chronological order
       expect(history).toHaveLength(2);
-      // The before query uses ASC, so it returns the first 2 matching
-      expect(history[0]!.content).toBe("First");
-      expect(history[1]!.content).toBe("Reply 1");
+      expect(history[0]!.content).toBe("Second");
+      expect(history[1]!.content).toBe("Reply 2");
     });
   });
 });

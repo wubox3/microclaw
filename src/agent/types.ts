@@ -9,11 +9,15 @@ export type AgentMessage = {
   };
 };
 
+export type AgentToolContext = {
+  channelId: string;
+};
+
 export type AgentTool = {
   name: string;
   description: string;
   input_schema: Record<string, unknown>;
-  execute: (params: Record<string, unknown>) => Promise<AgentToolResult>;
+  execute: (params: Record<string, unknown>, context?: AgentToolContext) => Promise<AgentToolResult>;
 };
 
 export type AgentToolResult = {

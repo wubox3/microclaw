@@ -176,6 +176,8 @@ export function stopIpcWatcher(): void {
   log.info("IPC watcher stopped");
 }
 
+const ENV_FILE_PATH = path.join(DATA_DIR, "env", "env");
+
 /**
  * Write filtered environment variables for container consumption.
  * Only exposes auth-related variables needed by the Claude Agent SDK.
@@ -195,8 +197,22 @@ export function writeFilteredEnvFile(): void {
   }
 
   if (lines.length > 0) {
-    fs.writeFileSync(path.join(envDir, "env"), lines.join("\n") + "\n", {
+    fs.writeFileSync(ENV_FILE_PATH, lines.join("\n") + "\n", {
       mode: 0o600,
     });
+  }
+}
+
+/**
+ * Remove the filtered env file on shutdown to avoid leaving credentials on disk.
+ */
+export function removeFilteredEnvFile(): void {
+  try {
+    if (fs.existsSync(ENV_FILE_PATH)) {
+      fs.unlinkSync(ENV_FILE_PATH);
+      log.info("Removed filtered env file");
+    }
+  } catch (err) {
+    log.warn(`Failed to remove env file: ${err instanceof Error ? err.message : String(err)}`);
   }
 }

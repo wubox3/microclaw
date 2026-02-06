@@ -87,8 +87,10 @@ export function createChatPersistence(params: {
     },
 
     loadHistory: async ({ channelId = "web", limit = 50, before }) => {
+      // Always query DESC to get the most recent N messages (optionally before a cursor),
+      // then reverse to chronological ASC order for the caller.
       const query = before
-        ? "SELECT id, channel_id, role, content, timestamp, memory_file_id, created_at FROM chat_messages WHERE channel_id = ? AND timestamp < ? ORDER BY timestamp ASC LIMIT ?"
+        ? "SELECT id, channel_id, role, content, timestamp, memory_file_id, created_at FROM chat_messages WHERE channel_id = ? AND timestamp < ? ORDER BY timestamp DESC LIMIT ?"
         : "SELECT id, channel_id, role, content, timestamp, memory_file_id, created_at FROM chat_messages WHERE channel_id = ? ORDER BY timestamp DESC LIMIT ?";
 
       const params = before
@@ -115,12 +117,8 @@ export function createChatPersistence(params: {
         createdAt: row.created_at,
       }));
 
-      // When no `before` cursor, we queried DESC to get the latest N; reverse to ASC
-      if (!before) {
-        messages.reverse();
-      }
-
-      return messages;
+      // DESC gives newest-first; reverse to chronological ASC for the caller
+      return [...messages].reverse();
     },
   };
 }

@@ -178,12 +178,13 @@ async function runDirectChat(params: {
     });
 
     // Execute tools and append each result
+    const toolContext = { channelId: channelId ?? "web" };
     for (const toolCall of response.toolCalls) {
       const tool = tools.find((t) => t.name === toolCall.name);
       let resultContent: string;
       if (tool) {
         try {
-          resultContent = (await tool.execute(toolCall.input)).content;
+          resultContent = (await tool.execute(toolCall.input, toolContext)).content;
         } catch (err) {
           resultContent = `Tool execution error: ${err instanceof Error ? err.message : String(err)}`;
         }

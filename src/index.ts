@@ -12,8 +12,10 @@ import { createMemoryManager } from "./memory/manager.js";
 import { createAgent } from "./agent/agent.js";
 import { createWebRoutes } from "./web/routes.js";
 import { createWebMonitor } from "./channels/web/monitor.js";
-import { startIpcWatcher, writeFilteredEnvFile } from "./container/ipc.js";
+import { startIpcWatcher, stopIpcWatcher, writeFilteredEnvFile, removeFilteredEnvFile } from "./container/ipc.js";
 import type { MemorySearchManager } from "./memory/types.js";
+import type { AgentTool } from "./agent/types.js";
+import type { SkillToolFactory } from "./skills/types.js";
 
 const log = createLogger("main");
 
@@ -86,19 +88,45 @@ async function main(): Promise<void> {
     log.info("Container mode: disabled");
   }
 
-  // 7. Create agent
+  // 7. Adapt skill-registered tools to agent tool format
+  const additionalTools: AgentTool[] = [];
+  for (const reg of skillRegistry.tools) {
+    if ("factory" in reg.tool && (reg.tool as SkillToolFactory).factory) {
+      // Factory tools need runtime context; skip for now
+      continue;
+    }
+    const skillTool = reg.tool as import("./skills/types.js").AgentTool;
+    if (typeof skillTool.name !== "string" || typeof skillTool.execute !== "function") {
+      log.warn(`Skipping malformed skill tool from ${reg.skillId}`);
+      continue;
+    }
+    additionalTools.push({
+      name: skillTool.name,
+      description: skillTool.description,
+      input_schema: skillTool.parameters ?? { type: "object", properties: {} },
+      execute: (params, runtimeCtx) => skillTool.execute(params, {
+        sessionKey: "",
+        channelId: runtimeCtx?.channelId ?? "web",
+        chatId: "",
+        config,
+      }),
+    });
+  }
+
+  // 8. Create agent
   const agent = createAgent({
     config,
     auth,
     memoryManager,
     containerEnabled,
+    additionalTools: additionalTools.length > 0 ? additionalTools : undefined,
   });
   log.info("Agent initialized");
 
-  // 8. Create web monitor
+  // 9. Create web monitor
   const webMonitor = createWebMonitor();
 
-  // 9. Start IPC watcher if container mode active
+  // 10. Start IPC watcher if container mode active
   if (containerEnabled) {
     startIpcWatcher({
       onMessage: (channelId, _chatId, text) => {
@@ -126,7 +154,7 @@ async function main(): Promise<void> {
     });
   }
 
-  // 10. Create web routes
+  // 11. Create web routes
   const app = createWebRoutes({
     config,
     agent,
@@ -134,16 +162,20 @@ async function main(): Promise<void> {
     webMonitor,
   });
 
-  // 11. Start server
+  // 12. Start server
   const server = serve({
     fetch: app.fetch,
     port,
     hostname: host,
   });
 
-  // 12a. Graceful shutdown -- close SQLite to checkpoint WAL
+  // 13a. Graceful shutdown -- close SQLite to checkpoint WAL
   const shutdown = () => {
     log.info("Shutting down...");
+    if (containerEnabled) {
+      stopIpcWatcher();
+      removeFilteredEnvFile();
+    }
     if (memoryManager) {
       try {
         memoryManager.close();
@@ -164,8 +196,11 @@ async function main(): Promise<void> {
   process.on("SIGTERM", shutdown);
   process.on("SIGINT", shutdown);
 
-  // 12. Attach WebSocket
-  const wss = new WebSocketServer({ server: server as unknown as import("http").Server });
+  // 13b. Attach WebSocket
+  const wss = new WebSocketServer({
+    server: server as unknown as import("http").Server,
+    path: "/ws",
+  });
   let clientIdCounter = 0;
 
   wss.on("connection", (ws) => {
@@ -196,7 +231,7 @@ async function main(): Promise<void> {
     }
   });
 
-  // 13. Handle WebSocket messages -> agent
+  // 14. Handle WebSocket messages -> agent
   const processingClients = new Set<string>();
   webMonitor.onMessage(async (clientId, message) => {
     const client = webMonitor.clients.get(clientId);
@@ -286,6 +321,8 @@ process.on("unhandledRejection", (err) => {
 
 process.on("uncaughtException", (err) => {
   log.error(`Uncaught exception: ${formatError(err)}`);
+  // Best-effort credential cleanup (no-op if file doesn't exist)
+  removeFilteredEnvFile();
   process.exit(1);
 });
 

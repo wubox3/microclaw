@@ -83,29 +83,15 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     const timestamp = Date.now();
     const userText = messages[messages.length - 1]?.content ?? "";
 
-    // Load recent chat history for conversation context
-    const historyMessages: Array<{ role: string; content: string; timestamp: number }> = [];
-    if (deps.memoryManager) {
-      try {
-        const history = await deps.memoryManager.loadChatHistory({ channelId: "web", limit: 20 });
-        for (const msg of history) {
-          historyMessages.push({ role: msg.role, content: msg.content, timestamp: msg.timestamp });
-        }
-      } catch {
-        // History loading is non-fatal
-      }
-    }
-
+    // REST clients send the full conversation in the request body,
+    // so we do NOT also load DB history (that would duplicate messages).
     try {
       const response = await deps.agent.chat({
-        messages: [
-          ...historyMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content, timestamp: m.timestamp })),
-          ...messages.map((m: { role: string; content: string }) => ({
-            role: m.role as "user" | "assistant",
-            content: m.content,
-            timestamp,
-          })),
-        ],
+        messages: messages.map((m: { role: string; content: string }) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+          timestamp,
+        })),
         channelId: "web",
       });
 

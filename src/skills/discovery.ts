@@ -1,6 +1,9 @@
 import { readdirSync, statSync, existsSync } from "node:fs";
 import { resolve, join } from "node:path";
-import { readSkillManifest, type SkillManifest } from "./manifest.js";
+import { readSkillManifest, validateManifest, type SkillManifest } from "./manifest.js";
+import { createLogger } from "../logging.js";
+
+const log = createLogger("skill:discovery");
 
 export type DiscoveredSkill = {
   dir: string;
@@ -25,6 +28,14 @@ export function discoverSkills(skillsDir: string): DiscoveredSkill[] {
 
     const manifest = readSkillManifest(skillDir);
     if (!manifest) {
+      continue;
+    }
+
+    const errors = validateManifest(manifest);
+    if (errors.length > 0) {
+      for (const err of errors) {
+        log.warn(`Skill ${entry}: ${err}`);
+      }
       continue;
     }
 

@@ -19,9 +19,14 @@ export function chunkText(text: string, chunkSize = CHUNK_SIZE, overlap = CHUNK_
 
     if (currentSize >= chunkSize) {
       chunks.push(currentChunk.join("\n"));
-      // Keep overlap lines
-      const overlapLines = Math.max(1, Math.floor(overlap / 40));
-      currentChunk = currentChunk.slice(-overlapLines);
+      // Keep enough trailing lines to cover the overlap in characters
+      let overlapSize = 0;
+      let overlapLines = 0;
+      for (let i = currentChunk.length - 1; i >= 0 && overlapSize < overlap; i--) {
+        overlapSize += currentChunk[i]!.length + 1;
+        overlapLines++;
+      }
+      currentChunk = currentChunk.slice(-Math.max(1, overlapLines));
       currentSize = currentChunk.reduce((sum, l) => sum + l.length + 1, 0);
     }
   }

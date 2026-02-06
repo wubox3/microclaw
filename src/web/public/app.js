@@ -2,6 +2,8 @@
 (function() {
   'use strict';
 
+  var MAX_HISTORY_SIZE = 200;
+
   var messagesEl = document.getElementById('messages');
   var inputForm = document.getElementById('input-form');
   var messageInput = document.getElementById('message-input');
@@ -13,7 +15,10 @@
 
   var ws = null;
   var isConnected = false;
+  var isFirstConnect = true;
   var messageHistory = [];
+  var reconnectDelay = 1000;
+  var MAX_RECONNECT_DELAY = 30000;
 
   // Channels
   var channels = [
@@ -27,6 +32,12 @@
     { id: 'imessage', label: 'iMessage' },
   ];
 
+  function trimHistory() {
+    if (messageHistory.length > MAX_HISTORY_SIZE) {
+      messageHistory = messageHistory.slice(-MAX_HISTORY_SIZE);
+    }
+  }
+
   function renderChannels() {
     var label = channelList.querySelector('.nav-section-label');
     channelList.innerHTML = '';
@@ -36,7 +47,10 @@
       var ch = channels[i];
       var el = document.createElement('div');
       el.className = 'channel-item' + (ch.active ? ' active' : '');
-      el.innerHTML = '<span class="channel-dot"></span>' + ch.label;
+      var dot = document.createElement('span');
+      dot.className = 'channel-dot';
+      el.appendChild(dot);
+      el.appendChild(document.createTextNode(ch.label));
       el.addEventListener('click', (function(channel, element) {
         return function() {
           document.querySelectorAll('.channel-item').forEach(function(item) {
@@ -99,6 +113,7 @@
             addMessage(msg.role, msg.content, msg.timestamp);
             messageHistory.push({ role: msg.role, content: msg.content, timestamp: msg.timestamp });
           }
+          trimHistory();
         }
       })
       .catch(function() {
@@ -114,7 +129,11 @@
 
     ws.onopen = function() {
       setConnected(true);
-      loadHistory();
+      reconnectDelay = 1000;
+      if (isFirstConnect) {
+        loadHistory();
+        isFirstConnect = false;
+      }
     };
 
     ws.onmessage = function(event) {
@@ -124,10 +143,15 @@
           hideTyping();
           addMessage('assistant', data.text, data.timestamp);
           messageHistory.push({ role: 'assistant', content: data.text, timestamp: data.timestamp });
+          trimHistory();
         } else if (data.type === 'typing') {
           showTyping();
         } else if (data.type === 'memory_status') {
           memoryStatus.textContent = data.status;
+        } else if (data.type === 'container_status') {
+          if (data.enabled && (memoryStatus.textContent || '').indexOf('[container]') === -1) {
+            memoryStatus.textContent = (memoryStatus.textContent || '') + ' [container]';
+          }
         } else if (data.type === 'error') {
           hideTyping();
           addMessage('assistant', 'Error: ' + data.message, Date.now());
@@ -139,7 +163,9 @@
 
     ws.onclose = function() {
       setConnected(false);
-      setTimeout(connectWebSocket, 3000);
+      var delay = Math.min(reconnectDelay + Math.random() * 500, MAX_RECONNECT_DELAY);
+      setTimeout(connectWebSocket, delay);
+      reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
     };
 
     ws.onerror = function() {
@@ -150,14 +176,16 @@
   function sendMessage(text) {
     if (!text.trim() || !isConnected) return;
 
-    addMessage('user', text, Date.now());
-    messageHistory.push({ role: 'user', content: text, timestamp: Date.now() });
+    var now = Date.now();
+    addMessage('user', text, now);
+    messageHistory.push({ role: 'user', content: text, timestamp: now });
+    trimHistory();
 
     ws.send(JSON.stringify({
       type: 'message',
       text: text,
-      id: Date.now().toString(),
-      timestamp: Date.now(),
+      id: now.toString(),
+      timestamp: now,
     }));
 
     showTyping();

@@ -140,7 +140,8 @@ export function createAnthropicClient(options: AnthropicClientOptions): LlmClien
         model,
         max_tokens: maxTokens,
         system,
-        messages: params.messages,
+        messages: toAnthropicMessages(params.messages),
+        tools: params.tools as Anthropic.Messages.Tool[] | undefined,
         temperature: params.temperature,
       });
 

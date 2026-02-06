@@ -2,6 +2,7 @@ import { mkdirSync, existsSync } from "node:fs";
 import type { MicroClawConfig } from "../config/types.js";
 import type { AuthCredentials } from "../infra/auth.js";
 import type { MemorySearchManager, MemorySearchParams, MemorySearchResult, MemoryProviderStatus } from "./types.js";
+import { createLogger } from "../logging.js";
 import { openDatabase, closeDatabase } from "./sqlite.js";
 import { MEMORY_SCHEMA, FTS_SYNC_TRIGGERS, CHAT_SCHEMA } from "./memory-schema.js";
 import { resolveMemoryBackendConfig } from "./backend-config.js";
@@ -10,6 +11,8 @@ import { createChatPersistence } from "./chat-persistence.js";
 import { vectorSearch, keywordSearch } from "./manager-search.js";
 import { mergeSearchResults } from "./hybrid.js";
 import { syncMemoryFiles } from "./sync-memory-files.js";
+
+const memLog = createLogger("memory-manager");
 
 export function createMemoryManager(params: {
   config: MicroClawConfig;
@@ -38,6 +41,7 @@ export function createMemoryManager(params: {
   }
 
   const chatPersistence = createChatPersistence({ db, embeddingProvider });
+  let closed = false;
 
   return {
     search: async (searchParams: MemorySearchParams): Promise<MemorySearchResult[]> => {
@@ -62,8 +66,8 @@ export function createMemoryManager(params: {
               source: searchParams.source,
             });
           }
-        } catch {
-          // Fall back to keyword-only search
+        } catch (err) {
+          memLog.warn(`Vector search embedding failed, falling back to keyword-only: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
 
@@ -89,6 +93,10 @@ export function createMemoryManager(params: {
 
     loadChatHistory: chatPersistence.loadHistory,
 
-    close: () => closeDatabase(db),
+    close: () => {
+      if (closed) return;
+      closed = true;
+      closeDatabase(db);
+    },
   };
 }

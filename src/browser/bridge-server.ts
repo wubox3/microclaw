@@ -63,7 +63,7 @@ export async function startBrowserBridgeServer(params: {
   const resolvedPort = address?.port ?? port;
   state.server = server;
   state.port = resolvedPort;
-  state.resolved.controlPort = resolvedPort;
+  state.resolved = { ...state.resolved, controlPort: resolvedPort };
 
   const baseUrl = `http://${host}:${resolvedPort}`;
   return { server, port: resolvedPort, baseUrl, state };

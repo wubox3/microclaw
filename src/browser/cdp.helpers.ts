@@ -57,20 +57,36 @@ export function appendCdpPath(cdpUrl: string, path: string): string {
   return url.toString();
 }
 
+const CDP_COMMAND_TIMEOUT_MS = 30_000;
+
 function createCdpSender(ws: WebSocket) {
   let nextId = 1;
   const pending = new Map<number, Pending>();
+  const timers = new Map<number, ReturnType<typeof setTimeout>>();
 
   const send: CdpSendFn = (method: string, params?: Record<string, unknown>) => {
     const id = nextId++;
     const msg = { id, method, params };
     ws.send(JSON.stringify(msg));
     return new Promise<unknown>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const p = pending.get(id);
+        if (p) {
+          pending.delete(id);
+          timers.delete(id);
+          p.reject(new Error(`CDP command "${method}" timed out after ${CDP_COMMAND_TIMEOUT_MS}ms`));
+        }
+      }, CDP_COMMAND_TIMEOUT_MS);
+      timers.set(id, timer);
       pending.set(id, { resolve, reject });
     });
   };
 
   const closeWithError = (err: Error) => {
+    for (const [, timer] of timers) {
+      clearTimeout(timer);
+    }
+    timers.clear();
     for (const [, p] of pending) {
       p.reject(err);
     }
@@ -93,6 +109,11 @@ function createCdpSender(ws: WebSocket) {
         return;
       }
       pending.delete(parsed.id);
+      const timer = timers.get(parsed.id);
+      if (timer) {
+        clearTimeout(timer);
+        timers.delete(parsed.id);
+      }
       if (parsed.error?.message) {
         p.reject(new Error(parsed.error.message));
         return;

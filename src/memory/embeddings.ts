@@ -39,6 +39,10 @@ export function createAnthropicEmbeddingProvider(apiKey: string): EmbeddingProvi
         model: string;
       };
 
+      if (!data.data || !Array.isArray(data.data)) {
+        throw new Error("Voyage embedding API returned unexpected response format");
+      }
+
       return data.data.map((item) => ({
         embedding: item.embedding,
         model: data.model,

@@ -100,6 +100,7 @@ const MAX_NETWORK_REQUESTS = 500;
 
 let cached: ConnectedBrowser | null = null;
 let connecting: Promise<ConnectedBrowser> | null = null;
+let connectingUrl: string | null = null;
 
 function normalizeCdpUrl(raw: string) {
   return raw.replace(/\/$/, "");
@@ -244,38 +245,26 @@ export function ensurePageState(page: Page): PageState {
       if (!id) {
         return;
       }
-      let rec: BrowserNetworkRequest | undefined;
       for (let i = state.requests.length - 1; i >= 0; i -= 1) {
         const candidate = state.requests[i];
         if (candidate && candidate.id === id) {
-          rec = candidate;
+          state.requests[i] = { ...candidate, status: resp.status(), ok: resp.ok() };
           break;
         }
       }
-      if (!rec) {
-        return;
-      }
-      rec.status = resp.status();
-      rec.ok = resp.ok();
     });
     page.on("requestfailed", (req: Request) => {
       const id = state.requestIds.get(req);
       if (!id) {
         return;
       }
-      let rec: BrowserNetworkRequest | undefined;
       for (let i = state.requests.length - 1; i >= 0; i -= 1) {
         const candidate = state.requests[i];
         if (candidate && candidate.id === id) {
-          rec = candidate;
+          state.requests[i] = { ...candidate, failureText: req.failure()?.errorText, ok: false };
           break;
         }
       }
-      if (!rec) {
-        return;
-      }
-      rec.failureText = req.failure()?.errorText;
-      rec.ok = false;
     });
     page.on("close", () => {
       pageStates.delete(page);
@@ -320,7 +309,7 @@ async function connectBrowser(cdpUrl: string): Promise<ConnectedBrowser> {
   if (cached?.cdpUrl === normalized) {
     return cached;
   }
-  if (connecting) {
+  if (connecting && connectingUrl === normalized) {
     return await connecting;
   }
 
@@ -355,8 +344,10 @@ async function connectBrowser(cdpUrl: string): Promise<ConnectedBrowser> {
     throw new Error(message);
   };
 
+  connectingUrl = normalized;
   connecting = connectWithRetry().finally(() => {
     connecting = null;
+    connectingUrl = null;
   });
 
   return await connecting;
@@ -444,7 +435,7 @@ export async function getPageForTargetId(opts: {
   if (!pages.length) {
     throw new Error("No pages available in the connected browser.");
   }
-  const first = pages[0];
+  const first = pages[0]!;
   if (!opts.targetId) {
     return first;
   }

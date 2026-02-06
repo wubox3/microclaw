@@ -159,11 +159,19 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
     }
 
     if (watcherRunning) {
-      watcherTimeout = setTimeout(processIpcFiles, IPC_POLL_INTERVAL);
+      watcherTimeout = setTimeout(() => {
+        processIpcFiles().catch((err) => {
+          log.error(`IPC watcher fatal error: ${err instanceof Error ? err.message : String(err)}`);
+          watcherRunning = false;
+        });
+      }, IPC_POLL_INTERVAL);
     }
   };
 
-  processIpcFiles();
+  processIpcFiles().catch((err) => {
+    log.error(`IPC watcher fatal error: ${err instanceof Error ? err.message : String(err)}`);
+    watcherRunning = false;
+  });
   log.info("IPC watcher started");
 }
 

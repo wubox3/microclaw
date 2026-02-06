@@ -101,6 +101,10 @@ function buildDockerArgs(
   ];
 
   for (const mount of mounts) {
+    // Reject paths with characters that could break Docker mount syntax
+    if (/[,:]/.test(mount.hostPath) || /[,:]/.test(mount.containerPath)) {
+      throw new Error(`Mount path contains unsafe characters (colon or comma): ${mount.hostPath} -> ${mount.containerPath}`);
+    }
     if (mount.readonly) {
       args.push(
         "--mount",
@@ -146,6 +150,9 @@ export async function runContainerAgent(
     let stdoutTruncated = false;
     let stderrTruncated = false;
 
+    container.stdin.on("error", (err) => {
+      log.warn(`Container stdin error: ${err.message}`);
+    });
     container.stdin.write(JSON.stringify(input));
     container.stdin.end();
 
@@ -191,7 +198,7 @@ export async function runContainerAgent(
       });
     }, timeout);
 
-    container.on("close", (code) => {
+    container.on("close", (code: number | null) => {
       clearTimeout(timeoutHandle);
       const duration = Date.now() - startTime;
 

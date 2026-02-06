@@ -12,6 +12,15 @@ export function syncMemoryFiles(
   let removed = 0;
 
   const currentFiles = collectFiles(dir);
+
+  // Read all file contents BEFORE opening the transaction to avoid holding
+  // the SQLite write lock during synchronous I/O
+  const fileContents = new Map<string, { content: string; hash: string }>();
+  for (const file of currentFiles) {
+    const content = readFileSync(resolve(dir, file.path), "utf-8");
+    fileContents.set(file.path, { content, hash: hashContent(content) });
+  }
+
   const existingFiles = db.prepare("SELECT id, path, hash FROM memory_files").all() as Array<{
     id: number;
     path: string;
@@ -33,18 +42,17 @@ export function syncMemoryFiles(
 
     // Add or update files
     for (const file of currentFiles) {
-      const content = readFileSync(resolve(dir, file.path), "utf-8");
-      const hash = hashContent(content);
+      const entry = fileContents.get(file.path)!;
       const existing = existingByPath.get(file.path);
 
       if (!existing) {
-        insertFile(db, file.path, "file", hash, content);
+        insertFile(db, file.path, "file", entry.hash, entry.content);
         added++;
-      } else if (existing.hash !== hash) {
+      } else if (existing.hash !== entry.hash) {
         // CASCADE on memory_chunks deletes embedding_cache entries automatically
         db.prepare("DELETE FROM memory_chunks WHERE file_id = ?").run(existing.id);
-        db.prepare("UPDATE memory_files SET hash = ?, updated_at = unixepoch() WHERE id = ?").run(hash, existing.id);
-        insertChunks(db, existing.id, content);
+        db.prepare("UPDATE memory_files SET hash = ?, updated_at = unixepoch() WHERE id = ?").run(entry.hash, existing.id);
+        insertChunks(db, existing.id, entry.content);
         updated++;
       }
     }
@@ -107,7 +115,7 @@ function insertChunks(db: SqliteDb, fileId: number, content: string): void {
       "INSERT INTO memory_chunks (file_id, content, start_line, end_line, hash) VALUES (?, ?, ?, ?, ?)"
     ).run(fileId, chunk, startLine, startLine + chunkLineCount - 1, hash);
     if (pos >= 0) {
-      searchFrom = pos + 1;
+      searchFrom = pos + chunk.length;
     }
   }
 }

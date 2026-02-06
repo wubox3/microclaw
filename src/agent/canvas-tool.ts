@@ -17,6 +17,7 @@ function validateA2uiMessages(messages: unknown[]): A2uiMessage[] {
     if (typeof m.kind !== "string" || !VALID_A2UI_KINDS.has(m.kind)) continue;
     if (typeof m.surfaceId !== "string") continue;
     if (m.kind === "surfaceUpdate" && (typeof m.root !== "object" || m.root === null)) continue;
+    if (m.kind === "dataModelUpdate" && (typeof m.data !== "object" || m.data === null)) continue;
     valid.push(m as A2uiMessage);
   }
   return valid;
@@ -99,12 +100,7 @@ Example a2ui_push message:
         }
 
         case "eval": {
-          const code = params.code;
-          if (typeof code !== "string") {
-            return { content: "Error: 'code' parameter required for eval action.", isError: true };
-          }
-          broadcast({ type: "canvas_eval", code });
-          return { content: "JavaScript executed in canvas." };
+          return { content: "Error: 'eval' action is disabled for security reasons. Use 'update' with HTML or 'a2ui_push' with structured components instead.", isError: true };
         }
 
         case "a2ui_push": {

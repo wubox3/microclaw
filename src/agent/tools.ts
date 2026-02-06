@@ -54,13 +54,20 @@ export function createChannelListTool(): AgentTool {
       properties: {},
     },
     execute: async () => {
-      // Import dynamically to avoid circular deps
-      const { listChatChannels } = await import("../channels/registry.js");
-      const channels = listChatChannels();
-      const formatted = channels.map((ch) =>
-        `- ${ch.label}: ${ch.blurb ?? "Available"}`
-      ).join("\n");
-      return { content: `Available channels:\n${formatted}` };
+      try {
+        // Import dynamically to avoid circular deps
+        const { listChatChannels } = await import("../channels/registry.js");
+        const channels = listChatChannels();
+        const formatted = channels.map((ch) =>
+          `- ${ch.label}: ${ch.blurb ?? "Available"}`
+        ).join("\n");
+        return { content: `Available channels:\n${formatted}` };
+      } catch (err) {
+        return {
+          content: `Failed to list channels: ${err instanceof Error ? err.message : String(err)}`,
+          isError: true,
+        };
+      }
     },
   };
 }

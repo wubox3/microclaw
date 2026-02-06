@@ -121,7 +121,10 @@ export function createBrowserProfilesService(ctx: BrowserRouteContext) {
 
     await writeConfigFile(nextConfig);
 
-    state.resolved.profiles[name] = profileConfig;
+    state.resolved = {
+      ...state.resolved,
+      profiles: { ...state.resolved.profiles, [name]: profileConfig },
+    };
     const resolved = resolveProfile(state.resolved, name);
     if (!resolved) {
       throw new Error(`profile "${name}" not found after creation`);
@@ -189,7 +192,11 @@ export function createBrowserProfilesService(ctx: BrowserRouteContext) {
 
     await writeConfigFile(nextConfig);
 
-    delete state.resolved.profiles[name];
+    const { [name]: _removedProfile, ...remainingResolvedProfiles } = state.resolved.profiles;
+    state.resolved = {
+      ...state.resolved,
+      profiles: remainingResolvedProfiles,
+    };
     state.profiles.delete(name);
 
     return { ok: true, profile: name, deleted };

@@ -56,7 +56,7 @@ export function createChatPersistence(params: {
             "INSERT INTO memory_chunks (file_id, content, start_line, end_line, hash) VALUES (?, ?, ?, ?, ?)"
           ).run(fileId, chunk, startLine, startLine + chunkLineCount - 1, chunkHash);
           if (pos >= 0) {
-            searchFrom = pos + 1;
+            searchFrom = pos + chunk.length;
           }
         }
 

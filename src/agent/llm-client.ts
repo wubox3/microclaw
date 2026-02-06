@@ -19,8 +19,9 @@ export type LlmSendParams = {
 };
 
 export type LlmStreamParams = {
-  messages: Array<{ role: "user" | "assistant"; content: string }>;
+  messages: LlmMessage[];
   system?: string;
+  tools?: LlmToolDefinition[];
   temperature?: number;
 };
 

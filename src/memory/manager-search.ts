@@ -3,6 +3,9 @@ import type { MemorySearchParams } from "./types.js";
 import type { VectorSearchResult, KeywordSearchResult } from "./hybrid.js";
 import { buildFtsQuery } from "./hybrid.js";
 import { cosineSimilarity, truncateSnippet } from "./internal.js";
+import { createLogger } from "../logging.js";
+
+const searchLog = createLogger("memory-search");
 
 export function vectorSearch(
   db: SqliteDb,
@@ -136,7 +139,8 @@ export function keywordSearch(
       endLine: row.end_line,
       bm25Score: Math.abs(row.bm25_score),
     }));
-  } catch {
+  } catch (err) {
+    searchLog.warn(`FTS5 keyword search failed: ${err instanceof Error ? err.message : String(err)}`);
     return [];
   }
 }

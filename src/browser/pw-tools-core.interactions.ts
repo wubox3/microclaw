@@ -418,18 +418,14 @@ export async function screenshotWithLabelsViaPlaywright(opts: {
       const y0 = box.y;
       const x1 = box.x + box.width;
       const y1 = box.y + box.height;
-      const vx0 = viewport.scrollX;
-      const vy0 = viewport.scrollY;
-      const vx1 = viewport.scrollX + viewport.width;
-      const vy1 = viewport.scrollY + viewport.height;
-      if (x1 < vx0 || x0 > vx1 || y1 < vy0 || y0 > vy1) {
+      if (x1 < 0 || x0 > viewport.width || y1 < 0 || y0 > viewport.height) {
         skipped += 1;
         continue;
       }
       boxes.push({
         ref,
-        x: x0 - viewport.scrollX,
-        y: y0 - viewport.scrollY,
+        x: x0,
+        y: y0,
         w: Math.max(1, box.width),
         h: Math.max(1, box.height),
       });

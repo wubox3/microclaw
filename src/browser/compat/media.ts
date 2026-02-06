@@ -94,7 +94,9 @@ export async function resizeToJpeg(params: {
 // --- Basic screenshot storage ---
 
 export function storeScreenshot(data: Buffer, filename?: string): string {
-  ensureMediaDir();
+  if (!existsSync(MEDIA_DIR)) {
+    mkdirSync(MEDIA_DIR, { recursive: true });
+  }
   const name = filename ?? `screenshot-${Date.now()}.png`;
   const filePath = join(MEDIA_DIR, name);
   writeFileSync(filePath, data);

@@ -176,6 +176,9 @@ function detectDefaultChromiumExecutableMac(): BrowserExecutable | null {
     return null;
   }
 
+  if (/[^a-zA-Z0-9.\-]/.test(bundleId)) {
+    return null;
+  }
   const appPathRaw = execText("/usr/bin/osascript", [
     "-e",
     `POSIX path of (path to application id "${bundleId}")`,
@@ -436,7 +439,7 @@ function extractWindowsExecutablePath(command: string): string | null {
   if (quoted?.[1]) {
     return quoted[1];
   }
-  const unquoted = command.match(/([^\\s]+\\.exe)/i);
+  const unquoted = command.match(/([^\s]+\.exe)/i);
   if (unquoted?.[1]) {
     return unquoted[1];
   }

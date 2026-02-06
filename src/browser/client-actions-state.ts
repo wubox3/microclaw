@@ -281,7 +281,7 @@ export async function browserSetDevice(
   });
 }
 
-export async function browserClearPermissions(
+export async function browserClearGeolocation(
   baseUrl: string | undefined,
   opts: { targetId?: string; profile?: string } = {},
 ): Promise<BrowserActionOk> {

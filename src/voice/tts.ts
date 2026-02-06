@@ -101,6 +101,13 @@ export async function textToSpeech(params: {
 }): Promise<TtsResult> {
   const resolved = resolveTtsConfig(params.config);
 
+  if (!resolved.enabled) {
+    return {
+      success: false,
+      error: "TTS is not enabled in configuration",
+    };
+  }
+
   if (params.text.length > resolved.maxTextLength) {
     return {
       success: false,

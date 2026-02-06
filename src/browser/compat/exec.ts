@@ -21,7 +21,7 @@ export function runExec(
         maxBuffer: 10 * 1024 * 1024,
       },
       (err, stdout, stderr) => {
-        if (err && !("code" in err)) {
+        if (err && typeof (err as NodeJS.ErrnoException).code === "string") {
           reject(err);
           return;
         }

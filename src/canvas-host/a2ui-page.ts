@@ -241,22 +241,28 @@ export function generateA2uiPage(): string {
   var htmlRoot = document.getElementById('html-root');
   var surfaces = {};
 
+  var PARENT_ORIGIN = location.origin || '*';
+
   function sendAction(action, componentId, value) {
     parent.postMessage({
       type: 'canvas_action',
       action: action,
       componentId: componentId || undefined,
       value: value !== undefined ? value : undefined
-    }, '*');
+    }, PARENT_ORIGIN);
   }
+
+  var DANGEROUS_TAGS = ['script', 'style', 'iframe', 'object', 'embed', 'form', 'base', 'link', 'meta'];
 
   function sanitizeHtml(html) {
     var temp = document.createElement('div');
     temp.innerHTML = html || '';
-    // Remove script tags
-    var scripts = temp.querySelectorAll('script');
-    for (var s = 0; s < scripts.length; s++) scripts[s].remove();
-    // Remove event handler attributes
+    // Remove dangerous tags
+    for (var dt = 0; dt < DANGEROUS_TAGS.length; dt++) {
+      var dangerous = temp.querySelectorAll(DANGEROUS_TAGS[dt]);
+      for (var d = 0; d < dangerous.length; d++) dangerous[d].remove();
+    }
+    // Remove event handler attributes and dangerous URIs
     var allEls = temp.querySelectorAll('*');
     for (var e = 0; e < allEls.length; e++) {
       var attrs = allEls[e].attributes;
@@ -265,14 +271,16 @@ export function generateA2uiPage(): string {
           allEls[e].removeAttribute(attrs[a].name);
         }
       }
-      // Remove javascript: href/src attributes
-      var href = allEls[e].getAttribute('href');
-      if (href && href.trim().toLowerCase().startsWith('javascript:')) {
-        allEls[e].removeAttribute('href');
-      }
-      var src = allEls[e].getAttribute('src');
-      if (src && src.trim().toLowerCase().startsWith('javascript:')) {
-        allEls[e].removeAttribute('src');
+      // Remove javascript: and data: (non-image) href/src/action attributes
+      var urlAttrs = ['href', 'src', 'action', 'formaction', 'xlink:href'];
+      for (var u = 0; u < urlAttrs.length; u++) {
+        var val = allEls[e].getAttribute(urlAttrs[u]);
+        if (val) {
+          var trimmedVal = val.trim().toLowerCase();
+          if (trimmedVal.startsWith('javascript:') || trimmedVal.startsWith('vbscript:')) {
+            allEls[e].removeAttribute(urlAttrs[u]);
+          }
+        }
       }
     }
     return temp.innerHTML;
@@ -573,11 +581,8 @@ export function generateA2uiPage(): string {
         break;
 
       case 'canvas_eval':
-        try {
-          new Function(data.code)();
-        } catch (e) {
-          sendAction('eval_error', undefined, String(e));
-        }
+        // Arbitrary code execution disabled for security
+        sendAction('eval_error', undefined, 'canvas_eval is disabled for security reasons');
         break;
 
       case 'canvas_a2ui':
@@ -606,7 +611,7 @@ export function generateA2uiPage(): string {
   window.addEventListener('message', handleMessage);
 
   // Signal readiness to parent
-  parent.postMessage({ type: 'canvas_ready' }, '*');
+  parent.postMessage({ type: 'canvas_ready' }, PARENT_ORIGIN);
 })();
 </script>
 </body>

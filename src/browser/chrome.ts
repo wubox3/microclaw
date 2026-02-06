@@ -325,8 +325,8 @@ export async function stopMicroClawChrome(running: RunningChrome, timeoutMs = 25
 
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    if (!proc.exitCode && proc.killed) {
-      break;
+    if (proc.exitCode != null) {
+      return;
     }
     if (!(await isChromeReachable(cdpUrlForPort(running.cdpPort), 200))) {
       return;

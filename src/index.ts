@@ -1,5 +1,5 @@
 import { serve } from "@hono/node-server";
-import { WebSocketServer } from "ws";
+import { WebSocket, WebSocketServer } from "ws";
 import { execSync } from "child_process";
 import { loadDotenv } from "./infra/dotenv.js";
 import { isDev } from "./infra/env.js";
@@ -158,7 +158,7 @@ async function main(): Promise<void> {
       onMessage: (channelId, _chatId, text) => {
         // Deliver IPC messages to WebSocket clients
         for (const [clientId, client] of webMonitor.clients) {
-          if (client.ws.readyState !== 1) {
+          if (client.ws.readyState !== WebSocket.OPEN) {
             continue;
           }
           try {
@@ -197,7 +197,10 @@ async function main(): Promise<void> {
   });
 
   // 13a. Graceful shutdown -- close SQLite to checkpoint WAL
+  let shuttingDown = false;
   const shutdown = () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     log.info("Shutting down...");
     stopBrowserServer().catch(() => {});
     if (containerEnabled) {
@@ -239,7 +242,7 @@ async function main(): Promise<void> {
     // Send memory status on connect
     if (memoryManager) {
       memoryManager.getStatus().then((status) => {
-        if (ws.readyState === 1) {
+        if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({
             type: "memory_status",
             status: `${status.provider}/${status.model} (${status.dimensions}d)`,
@@ -251,7 +254,7 @@ async function main(): Promise<void> {
     }
 
     // Send container mode status
-    if (ws.readyState === 1) {
+    if (ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({
         type: "container_status",
         enabled: containerEnabled,
@@ -263,7 +266,7 @@ async function main(): Promise<void> {
   const processingClients = new Set<string>();
   webMonitor.onMessage(async (clientId, message) => {
     const client = webMonitor.clients.get(clientId);
-    if (!client || client.ws.readyState !== 1) {
+    if (!client || client.ws.readyState !== WebSocket.OPEN) {
       return;
     }
 
@@ -276,7 +279,7 @@ async function main(): Promise<void> {
 
     try {
       // Send typing indicator
-      if (client.ws.readyState === 1) {
+      if (client.ws.readyState === WebSocket.OPEN) {
         client.ws.send(JSON.stringify({ type: "typing" }));
       }
 
@@ -303,7 +306,7 @@ async function main(): Promise<void> {
       });
 
       // Send response
-      if (client.ws.readyState === 1) {
+      if (client.ws.readyState === WebSocket.OPEN) {
         const responseTimestamp = Date.now();
         client.ws.send(JSON.stringify({
           type: "message",
@@ -324,7 +327,7 @@ async function main(): Promise<void> {
         });
       }
     } catch (err) {
-      if (client.ws.readyState === 1) {
+      if (client.ws.readyState === WebSocket.OPEN) {
         client.ws.send(JSON.stringify({
           type: "error",
           message: formatError(err),

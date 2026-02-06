@@ -1,4 +1,4 @@
-import type { WebSocket } from "ws";
+import { WebSocket } from "ws";
 import type { WebInboundMessage } from "./types.js";
 import type { CanvasActionMessage } from "../../canvas-host/types.js";
 
@@ -86,7 +86,7 @@ export function createWebMonitor(): WebMonitor {
     },
     broadcast: (message) => {
       for (const client of clients.values()) {
-        if (client.ws.readyState === 1) {
+        if (client.ws.readyState === WebSocket.OPEN) {
           try {
             client.ws.send(message);
           } catch {

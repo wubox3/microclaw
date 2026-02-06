@@ -111,7 +111,7 @@ export function registerBrowserTabRoutes(app: BrowserRouteRegistrar, ctx: Browse
 
       if (action === "close") {
         const tabs = await profileCtx.listTabs();
-        const target = typeof index === "number" ? tabs[index] : tabs.at(0);
+        const target = typeof index === "number" ? tabs[index] : tabs.at(-1);
         if (!target) {
           return jsonError(res, 404, "tab not found");
         }

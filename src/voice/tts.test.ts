@@ -24,7 +24,12 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 function makeConfig(overrides?: MicroClawConfig["voice"]): MicroClawConfig {
-  return { voice: overrides };
+  // Default to enabled for tests that exercise TTS behavior
+  const defaults: MicroClawConfig["voice"] = { tts: { enabled: true } };
+  if (overrides?.tts) {
+    return { voice: { ...defaults, tts: { ...defaults.tts, ...overrides.tts } } };
+  }
+  return { voice: overrides ?? defaults };
 }
 
 function mockSuccessResponse(audioData: Uint8Array = new Uint8Array([1, 2, 3])) {

@@ -139,7 +139,8 @@ function removeNthFromNonDuplicates(refs: RoleRefMap, tracker: RoleNameTracker) 
   for (const [ref, data] of Object.entries(refs)) {
     const key = tracker.getKey(data.role, data.name);
     if (!duplicates.has(key)) {
-      delete refs[ref]?.nth;
+      const { nth: _removed, ...rest } = data;
+      refs[ref] = rest;
     }
   }
 }

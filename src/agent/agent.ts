@@ -38,11 +38,8 @@ export function createAgent(context: AgentContext): Agent {
   const tools: AgentTool[] = [
     createChannelListTool(),
     ...(context.additionalTools ?? []),
+    ...(context.memoryManager ? [createMemorySearchTool(context.memoryManager)] : []),
   ];
-
-  if (context.memoryManager) {
-    tools.push(createMemorySearchTool(context.memoryManager));
-  }
 
   // Session tracking for container mode (channelId -> sessionId)
   const sessions = context.sessions ?? new Map<string, string>();

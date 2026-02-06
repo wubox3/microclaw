@@ -24,12 +24,12 @@ export function chunk<T>(array: readonly T[], size: number): T[][] {
 }
 
 export function normalizeE164(phone: string): string {
-  const cleaned = phone.replace(/[^+\d]/g, "");
-  const digits = cleaned.replace(/\D/g, "");
+  const hasPlus = phone.trimStart().startsWith("+");
+  const digits = phone.replace(/\D/g, "");
   if (digits.length === 0) {
     return "";
   }
-  return cleaned.startsWith("+") ? cleaned : `+${cleaned}`;
+  return hasPlus ? `+${digits}` : `+${digits}`;
 }
 
 export function hashString(str: string): number {
@@ -37,7 +37,7 @@ export function hashString(str: string): number {
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
+    hash = hash | 0;
   }
   return Math.abs(hash);
 }

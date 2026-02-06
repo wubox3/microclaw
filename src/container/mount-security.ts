@@ -39,6 +39,11 @@ const DEFAULT_BLOCKED_PATTERNS = [
   ".secret",
 ];
 
+export function invalidateAllowlistCache(): void {
+  cachedAllowlist = null;
+  allowlistLoadError = null;
+}
+
 export function loadMountAllowlist(): MountAllowlist | null {
   if (cachedAllowlist !== null) {
     return cachedAllowlist;
@@ -232,6 +237,11 @@ export function validateMount(
 
   if (requestedReadWrite && allowedRoot.allowReadWrite) {
     effectiveReadonly = false;
+  }
+
+  // Enforce nonMainReadOnly: non-main mounts are always read-only
+  if (allowlist.nonMainReadOnly) {
+    effectiveReadonly = true;
   }
 
   return {

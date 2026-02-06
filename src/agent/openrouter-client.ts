@@ -75,7 +75,13 @@ function buildStreamMessages(
   }
 
   for (const m of params.messages) {
-    messages.push({ role: m.role, content: m.content });
+    if (m.role === "tool") {
+      messages.push({ role: "tool", content: m.content, tool_call_id: m.toolCallId });
+    } else if (m.role === "assistant") {
+      messages.push({ role: "assistant", content: m.content });
+    } else {
+      messages.push({ role: "user", content: m.content });
+    }
   }
 
   return messages;

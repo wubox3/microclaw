@@ -25,6 +25,10 @@ export function chunk<T>(array: readonly T[], size: number): T[][] {
 
 export function normalizeE164(phone: string): string {
   const cleaned = phone.replace(/[^+\d]/g, "");
+  const digits = cleaned.replace(/\D/g, "");
+  if (digits.length === 0) {
+    return "";
+  }
   return cleaned.startsWith("+") ? cleaned : `+${cleaned}`;
 }
 

@@ -197,7 +197,7 @@ export async function runContainerAgent(
 
       // Write log file
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-      const logFile = path.join(logsDir, `container-${timestamp}.log`);
+      const logFile = path.join(logsDir, `container-${timestamp}-${randomBytes(3).toString("hex")}.log`);
       const logLines = [
         `=== Container Run Log${timedOut ? " (TIMEOUT)" : ""} ===`,
         `Timestamp: ${new Date().toISOString()}`,

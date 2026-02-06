@@ -46,10 +46,20 @@ export function loadConfig(dir?: string): MicroClawConfig {
   for (const filename of CONFIG_FILENAMES) {
     const filepath = resolve(baseDir, filename);
     if (existsSync(filepath)) {
-      const raw = readFileSync(filepath, "utf-8");
-      const parsed = filename.endsWith(".json")
-        ? JSON.parse(raw)
-        : (parseYaml(raw) ?? {});
+      let raw: string;
+      try {
+        raw = readFileSync(filepath, "utf-8");
+      } catch (err) {
+        throw new Error(`Failed to read config file ${filepath}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      let parsed: unknown;
+      try {
+        parsed = filename.endsWith(".json")
+          ? JSON.parse(raw)
+          : (parseYaml(raw) ?? {});
+      } catch (err) {
+        throw new Error(`Failed to parse config file ${filepath}: ${err instanceof Error ? err.message : String(err)}`);
+      }
       return validateConfig(parsed);
     }
   }

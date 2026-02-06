@@ -47,7 +47,8 @@ export function deriveNameFromUrl(url: string): string {
 }
 
 export function isWithinDir(parent: string, child: string): boolean {
-  return child.startsWith(parent + "/");
+  const normalizedParent = parent.endsWith("/") ? parent : parent + "/";
+  return child.startsWith(normalizedParent);
 }
 
 export function cloneRepo(url: string, targetDir: string): void {

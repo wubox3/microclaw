@@ -38,7 +38,11 @@ export function createWebMonitor(): WebMonitor {
             channelId: typeof parsed.channelId === "string" ? parsed.channelId : undefined,
           };
           for (const handler of messageHandlers) {
-            handler(id, msg);
+            try {
+              handler(id, msg);
+            } catch {
+              // Prevent one handler failure from blocking others
+            }
           }
         } catch {
           // ignore malformed messages
@@ -58,7 +62,11 @@ export function createWebMonitor(): WebMonitor {
     broadcast: (message) => {
       for (const client of clients.values()) {
         if (client.ws.readyState === 1) {
-          client.ws.send(message);
+          try {
+            client.ws.send(message);
+          } catch {
+            // Ignore per-client send failures to avoid aborting broadcast
+          }
         }
       }
     },

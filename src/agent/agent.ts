@@ -166,8 +166,9 @@ async function runDirectChat(params: {
 
   // Handle tool calls in a loop (max 5 iterations), preserving full conversation
   const conversationMessages: LlmMessage[] = [...llmMessages];
+  const MAX_TOOL_ITERATIONS = 5;
   let iterations = 0;
-  while (response.toolCalls && response.toolCalls.length > 0 && iterations < 5) {
+  while (response.toolCalls && response.toolCalls.length > 0 && iterations < MAX_TOOL_ITERATIONS) {
     iterations++;
 
     // Append assistant message with its tool calls
@@ -204,6 +205,10 @@ async function runDirectChat(params: {
       tools: toolDefs.length > 0 ? toolDefs : undefined,
       temperature: context.config.agent?.temperature,
     });
+  }
+
+  if (iterations >= MAX_TOOL_ITERATIONS && response.toolCalls && response.toolCalls.length > 0) {
+    log.warn(`Tool call loop reached max ${MAX_TOOL_ITERATIONS} iterations with ${response.toolCalls.length} unprocessed tool calls`);
   }
 
   return response;

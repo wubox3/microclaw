@@ -129,7 +129,7 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
                   limit,
                 });
 
-                const resultFile = filePath.replace(".json", ".result.json");
+                const resultFile = filePath.replace(/\.json$/, ".result.json");
                 const tempPath = `${resultFile}.tmp`;
                 fs.writeFileSync(
                   tempPath,
@@ -197,9 +197,16 @@ export function writeFilteredEnvFile(): void {
   }
 
   if (lines.length > 0) {
-    fs.writeFileSync(ENV_FILE_PATH, lines.join("\n") + "\n", {
-      mode: 0o600,
-    });
+    const tempPath = `${ENV_FILE_PATH}.tmp`;
+    try {
+      fs.writeFileSync(tempPath, lines.join("\n") + "\n", {
+        mode: 0o600,
+      });
+      fs.renameSync(tempPath, ENV_FILE_PATH);
+    } catch (err) {
+      log.error(`Failed to write filtered env file: ${err instanceof Error ? err.message : String(err)}`);
+      try { fs.unlinkSync(tempPath); } catch { /* cleanup best-effort */ }
+    }
   }
 }
 

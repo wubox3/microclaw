@@ -6,6 +6,9 @@ import type { MemorySearchManager } from "../memory/types.js";
 import type { Agent } from "../agent/agent.js";
 import type { WebMonitor } from "../channels/web/monitor.js";
 import { listChatChannels } from "../channels/registry.js";
+import { createLogger } from "../logging.js";
+
+const log = createLogger("web-routes");
 
 export type WebAppDeps = {
   config: MicroClawConfig;
@@ -54,7 +57,8 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
         limit,
       });
       return c.json({ success: true, data: results });
-    } catch {
+    } catch (err) {
+      log.error(`Memory search failed: ${err instanceof Error ? err.message : String(err)}`);
       return c.json({ success: false, error: "Memory search failed" }, 500);
     }
   });
@@ -110,7 +114,8 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
       }
 
       return c.json({ success: true, data: { text: response.text } });
-    } catch {
+    } catch (err) {
+      log.error(`Chat request failed: ${err instanceof Error ? err.message : String(err)}`);
       return c.json({ success: false, error: "Chat request failed" }, 500);
     }
   });
@@ -135,7 +140,8 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
         before,
       });
       return c.json({ success: true, data: messages });
-    } catch {
+    } catch (err) {
+      log.error(`Failed to load chat history: ${err instanceof Error ? err.message : String(err)}`);
       return c.json({ success: false, error: "Failed to load chat history" }, 500);
     }
   });

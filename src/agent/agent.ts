@@ -2,7 +2,8 @@ import type { MicroClawConfig } from "../config/types.js";
 import type { AuthCredentials } from "../infra/auth.js";
 import type { MemorySearchManager } from "../memory/types.js";
 import type { AgentMessage, AgentResponse, AgentTool } from "./types.js";
-import { createAnthropicClient } from "./client.js";
+import type { LlmClient } from "./llm-client.js";
+import { createLlmClient } from "./create-client.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { createMemorySearchTool, createChannelListTool } from "./tools.js";
 import { runContainerAgent } from "../container/runner.js";
@@ -28,10 +29,9 @@ export type Agent = {
 };
 
 export function createAgent(context: AgentContext): Agent {
-  const client = createAnthropicClient({
+  const client = createLlmClient({
+    config: context.config,
     auth: context.auth,
-    model: context.config.agent?.model,
-    maxTokens: context.config.agent?.maxTokens,
   });
 
   const tools: AgentTool[] = [
@@ -115,7 +115,7 @@ async function runContainerChat(params: {
 async function runDirectChat(params: {
   messages: AgentMessage[];
   channelId?: string;
-  client: ReturnType<typeof createAnthropicClient>;
+  client: LlmClient;
   tools: AgentTool[];
   context: AgentContext;
 }): Promise<AgentResponse> {

@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AgentResponse, AgentStreamEvent } from "./types.js";
 import type { AuthCredentials } from "../infra/auth.js";
+import type { LlmClient, LlmSendParams, LlmStreamParams } from "./llm-client.js";
 
 export type AnthropicClientOptions = {
   auth: AuthCredentials;
@@ -17,7 +18,7 @@ const OAUTH_BETA_HEADERS = {
   "x-app": "cli",
 };
 
-export function createAnthropicClient(options: AnthropicClientOptions) {
+export function createAnthropicClient(options: AnthropicClientOptions): LlmClient {
   const isOAuth = options.auth.isOAuth;
 
   const client = isOAuth
@@ -32,16 +33,7 @@ export function createAnthropicClient(options: AnthropicClientOptions) {
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
 
   return {
-    async sendMessage(params: {
-      messages: Array<{ role: "user" | "assistant"; content: string }>;
-      system?: string;
-      tools?: Array<{
-        name: string;
-        description: string;
-        input_schema: Record<string, unknown>;
-      }>;
-      temperature?: number;
-    }): Promise<AgentResponse> {
+    async sendMessage(params: LlmSendParams): Promise<AgentResponse> {
       // OAuth requires Claude Code identity in system prompt
       let system: string | Anthropic.Messages.TextBlockParam[] | undefined;
       if (isOAuth) {
@@ -87,11 +79,7 @@ export function createAnthropicClient(options: AnthropicClientOptions) {
       };
     },
 
-    async *streamMessage(params: {
-      messages: Array<{ role: "user" | "assistant"; content: string }>;
-      system?: string;
-      temperature?: number;
-    }): AsyncGenerator<AgentStreamEvent> {
+    async *streamMessage(params: LlmStreamParams): AsyncGenerator<AgentStreamEvent> {
       let system: string | Anthropic.Messages.TextBlockParam[] | undefined;
       if (isOAuth) {
         system = [

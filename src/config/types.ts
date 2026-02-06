@@ -18,7 +18,10 @@ export type MemoryConfig = {
   maxResults?: number;
 };
 
+export type LlmProvider = "anthropic" | "openrouter";
+
 export type AgentConfig = {
+  provider?: LlmProvider;
   model?: string;
   maxTokens?: number;
   systemPrompt?: string;

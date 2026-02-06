@@ -32,15 +32,22 @@ async function main(): Promise<void> {
 
   log.info("Starting MicroClaw...");
 
-  // 2. Resolve auth credentials (API key or Claude Code OAuth)
-  const auth = resolveAuthCredentials();
-  log.info(`Auth mode: ${auth.isOAuth ? "Claude Code OAuth" : "API key"}`);
-
-  // 3. Load config
+  // 2. Load config (before auth, so provider selection is known)
   const config = loadConfig();
   const dataDir = resolveDataDir(config);
   const port = resolvePort(config);
   const host = resolveHost(config);
+
+  const provider = config.agent?.provider ?? "anthropic";
+
+  // 3. Resolve auth credentials (only required for Anthropic provider)
+  let auth: import("./infra/auth.js").AuthCredentials = { isOAuth: false };
+  if (provider === "anthropic") {
+    auth = resolveAuthCredentials();
+    log.info(`Auth mode: ${auth.isOAuth ? "Claude Code OAuth" : "API key"}`);
+  } else {
+    log.info(`LLM provider: ${provider}`);
+  }
 
   log.info(`Data directory: ${dataDir}`);
 

@@ -1,6 +1,6 @@
-import type { z } from "zod";
+import type { ChatChannelId } from "../channels/plugins/types.core.js";
 
-export type ChatChannelId = "telegram" | "whatsapp" | "discord" | "googlechat" | "slack" | "signal" | "imessage";
+export type { ChatChannelId } from "../channels/plugins/types.core.js";
 
 export type ChannelConfig = {
   enabled?: boolean;

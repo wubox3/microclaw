@@ -35,7 +35,12 @@ export function mergeSearchResults(params: {
   const merged = new Map<number, MemorySearchResult>();
 
   // Normalize BM25 scores to 0-1 range
-  const maxBm25 = Math.max(...keywordResults.map((r) => r.bm25Score), 1);
+  let maxBm25 = 1;
+  for (const r of keywordResults) {
+    if (r.bm25Score > maxBm25) {
+      maxBm25 = r.bm25Score;
+    }
+  }
 
   for (const vr of vectorResults) {
     merged.set(vr.chunkId, {
@@ -91,7 +96,9 @@ export function buildFtsQuery(query: string): string {
     .split(/\s+/)
     .filter((t) => t.length > 1);
   if (tokens.length === 0) {
-    return query;
+    // Sanitize: strip all non-alphanumeric to avoid FTS5 syntax errors
+    const sanitized = query.replace(/[^\w\s]/g, "").trim();
+    return sanitized.length > 0 ? `"${sanitized}"` : '""';
   }
   return tokens.map((t) => `"${t}"`).join(" AND ");
 }

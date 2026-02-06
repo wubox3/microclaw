@@ -177,9 +177,25 @@ async function main(): Promise<void> {
       // Send typing indicator
       client.ws.send(JSON.stringify({ type: "typing" }));
 
-      // Get agent response
+      // Load recent chat history for conversation context
+      const historyMessages: Array<{ role: "user" | "assistant"; content: string; timestamp: number }> = [];
+      if (memoryManager) {
+        try {
+          const history = await memoryManager.loadChatHistory({ channelId: "web", limit: 20 });
+          for (const msg of history) {
+            historyMessages.push({ role: msg.role, content: msg.content, timestamp: msg.timestamp });
+          }
+        } catch {
+          // History loading is non-fatal
+        }
+      }
+
+      // Get agent response with history + current message
       const response = await agent.chat({
-        messages: [{ role: "user", content: message.text, timestamp: message.timestamp }],
+        messages: [
+          ...historyMessages,
+          { role: "user", content: message.text, timestamp: message.timestamp },
+        ],
         channelId: "web",
       });
 

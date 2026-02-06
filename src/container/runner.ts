@@ -20,6 +20,10 @@ import { createLogger } from "../logging.js";
 
 const log = createLogger("container");
 
+function sanitizeChannelId(channelId: string): string {
+  return channelId.replace(/[^a-zA-Z0-9_-]/g, "-");
+}
+
 function buildVolumeMounts(
   channelId: string,
   config?: ContainerConfig,
@@ -27,8 +31,10 @@ function buildVolumeMounts(
   const mounts: VolumeMount[] = [];
   const projectRoot = process.cwd();
 
+  const safeChannelId = sanitizeChannelId(channelId);
+
   // Workspace: per-channel working directory
-  const workspaceDir = path.join(DATA_DIR, "workspace", channelId);
+  const workspaceDir = path.join(DATA_DIR, "workspace", safeChannelId);
   fs.mkdirSync(workspaceDir, { recursive: true });
   mounts.push({
     hostPath: workspaceDir,
@@ -37,7 +43,7 @@ function buildVolumeMounts(
   });
 
   // Sessions: per-channel Claude session state
-  const sessionsDir = path.join(DATA_DIR, "sessions", channelId, ".claude");
+  const sessionsDir = path.join(DATA_DIR, "sessions", safeChannelId, ".claude");
   fs.mkdirSync(sessionsDir, { recursive: true });
   mounts.push({
     hostPath: sessionsDir,
@@ -46,7 +52,7 @@ function buildVolumeMounts(
   });
 
   // IPC: per-channel IPC namespace
-  const ipcDir = path.join(DATA_DIR, "ipc", channelId);
+  const ipcDir = path.join(DATA_DIR, "ipc", safeChannelId);
   fs.mkdirSync(path.join(ipcDir, "messages"), { recursive: true });
   fs.mkdirSync(path.join(ipcDir, "tasks"), { recursive: true });
   mounts.push({
@@ -118,7 +124,7 @@ export async function runContainerAgent(
   const timeout = config?.timeout ?? CONTAINER_TIMEOUT;
 
   const mounts = buildVolumeMounts(input.channelId, config);
-  const safeName = input.channelId.replace(/[^a-zA-Z0-9-]/g, "-");
+  const safeName = sanitizeChannelId(input.channelId);
   const containerName = `microclaw-${safeName}-${Date.now()}`;
   const dockerArgs = buildDockerArgs(mounts, containerName, image);
 

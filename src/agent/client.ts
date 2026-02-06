@@ -93,7 +93,7 @@ export function createAnthropicClient(options: AnthropicClientOptions): LlmClien
       const stream = client.messages.stream({
         model,
         max_tokens: maxTokens,
-        system: system as string | undefined,
+        system,
         messages: params.messages,
         temperature: params.temperature,
       });

@@ -1,4 +1,3 @@
-import Anthropic from "@anthropic-ai/sdk";
 import type { EmbeddingResult } from "./types.js";
 
 export type EmbeddingProvider = {
@@ -11,8 +10,6 @@ const DEFAULT_MODEL = "voyage-3";
 const DEFAULT_DIMENSIONS = 1024;
 
 export function createAnthropicEmbeddingProvider(apiKey: string): EmbeddingProvider {
-  const client = new Anthropic({ apiKey });
-
   return {
     model: DEFAULT_MODEL,
     dimensions: DEFAULT_DIMENSIONS,

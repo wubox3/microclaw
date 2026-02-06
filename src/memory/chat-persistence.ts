@@ -135,7 +135,7 @@ async function generateEmbeddings(
     const chunk = chunks[i]!;
     const result = embeddings[i];
     if (result) {
-      const blob = Buffer.from(new Float64Array(result.embedding).buffer);
+      const blob = Buffer.from(new Float32Array(result.embedding).buffer);
       db.prepare(
         "INSERT OR REPLACE INTO embedding_cache (chunk_id, provider_model, embedding, dimensions) VALUES (?, ?, ?, ?)"
       ).run(chunk.id, pKey, blob, result.dimensions);

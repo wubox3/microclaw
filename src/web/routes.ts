@@ -36,26 +36,69 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     if (!deps.memoryManager) {
       return c.json({ success: false, error: "Memory not configured" }, 503);
     }
-    const body = await c.req.json();
+    let body: Record<string, unknown>;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: "Invalid JSON body" }, 400);
+    }
+    if (typeof body.query !== "string" || body.query.trim().length === 0) {
+      return c.json({ success: false, error: "query must be a non-empty string" }, 400);
+    }
+    const limit = typeof body.limit === "number" && body.limit > 0 && body.limit <= 100
+      ? Math.floor(body.limit)
+      : 10;
     const results = await deps.memoryManager.search({
       query: body.query,
-      limit: body.limit,
+      limit,
     });
     return c.json({ success: true, data: results });
   });
 
   app.post("/api/chat", async (c) => {
-    const body = await c.req.json();
-    const messages = body.messages ?? [];
+    let body: Record<string, unknown>;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: "Invalid JSON body" }, 400);
+    }
+    if (!Array.isArray(body.messages) || body.messages.length === 0) {
+      return c.json({ success: false, error: "messages must be a non-empty array" }, 400);
+    }
+    const messages = body.messages.filter(
+      (m: unknown): m is { role: string; content: string } =>
+        typeof m === "object" && m !== null &&
+        typeof (m as Record<string, unknown>).role === "string" &&
+        typeof (m as Record<string, unknown>).content === "string",
+    );
+    if (messages.length === 0) {
+      return c.json({ success: false, error: "messages must contain valid {role, content} objects" }, 400);
+    }
     const timestamp = Date.now();
-    const userText = messages.length > 0 ? messages[messages.length - 1]?.content ?? "" : "";
+    const userText = messages[messages.length - 1]?.content ?? "";
+
+    // Load recent chat history for conversation context
+    const historyMessages: Array<{ role: string; content: string; timestamp: number }> = [];
+    if (deps.memoryManager) {
+      try {
+        const history = await deps.memoryManager.loadChatHistory({ channelId: "web", limit: 20 });
+        for (const msg of history) {
+          historyMessages.push({ role: msg.role, content: msg.content, timestamp: msg.timestamp });
+        }
+      } catch {
+        // History loading is non-fatal
+      }
+    }
 
     const response = await deps.agent.chat({
-      messages: messages.map((m: { role: string; content: string }) => ({
-        role: m.role,
-        content: m.content,
-        timestamp,
-      })),
+      messages: [
+        ...historyMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content, timestamp: m.timestamp })),
+        ...messages.map((m: { role: string; content: string }) => ({
+          role: m.role as "user" | "assistant" | "system",
+          content: m.content,
+          timestamp,
+        })),
+      ],
       channelId: "web",
     });
 

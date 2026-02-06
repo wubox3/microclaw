@@ -44,12 +44,16 @@ export function uniqueBy<T>(array: readonly T[], key: (item: T) => string): T[] 
   });
 }
 
-export function groupBy<T>(array: readonly T[], key: (item: T) => string): Record<string, T[]> {
-  const groups: Record<string, T[]> = {};
+export function groupBy<T>(array: readonly T[], key: (item: T) => string): Record<string, readonly T[]> {
+  const groups = new Map<string, T[]>();
   for (const item of array) {
     const k = key(item);
-    const group = groups[k] ?? [];
-    groups[k] = [...group, item];
+    const existing = groups.get(k);
+    if (existing) {
+      existing.push(item);
+    } else {
+      groups.set(k, [item]);
+    }
   }
-  return groups;
+  return Object.fromEntries(groups);
 }

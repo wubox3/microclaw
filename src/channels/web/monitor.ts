@@ -25,11 +25,17 @@ export function createWebMonitor(): WebMonitor {
       clients.set(id, { ws, id, connectedAt: Date.now() });
       ws.on("message", (data) => {
         try {
-          const parsed = JSON.parse(String(data)) as WebInboundMessage;
+          const parsed = JSON.parse(String(data)) as Record<string, unknown>;
+          if (typeof parsed.text !== "string" || parsed.text.trim().length === 0) {
+            return;
+          }
           const msg: WebInboundMessage = {
-            ...parsed,
+            id: typeof parsed.id === "string" ? parsed.id : String(Date.now()),
+            text: parsed.text,
             senderId: id,
+            senderName: typeof parsed.senderName === "string" ? parsed.senderName : undefined,
             timestamp: Date.now(),
+            channelId: typeof parsed.channelId === "string" ? parsed.channelId : undefined,
           };
           for (const handler of messageHandlers) {
             handler(id, msg);

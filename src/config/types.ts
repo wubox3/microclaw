@@ -1,6 +1,8 @@
 import type { ChatChannelId } from "../channels/plugins/types.core.js";
+import type { BrowserConfig } from "../browser/types.js";
 
 export type { ChatChannelId } from "../channels/plugins/types.core.js";
+export type { BrowserConfig } from "../browser/types.js";
 
 export type ChannelConfig = {
   enabled?: boolean;
@@ -79,4 +81,5 @@ export type MicroClawConfig = {
   web?: WebConfig;
   container?: ContainerConfigOptions;
   voice?: VoiceConfig;
+  browser?: BrowserConfig;
 };

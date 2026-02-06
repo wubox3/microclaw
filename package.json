@@ -14,7 +14,8 @@
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:report": "playwright show-report",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "skill:install": "tsx src/skills/install-skill.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

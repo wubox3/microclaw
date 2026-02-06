@@ -44,9 +44,13 @@ export function readClaudeCodeCredentials(): string | null {
       return null;
     }
 
-    if (creds.expiresAt && creds.expiresAt < Date.now()) {
-      log.warn("Claude Code OAuth token has expired");
-      return null;
+    if (creds.expiresAt) {
+      // 1e12 ms ≈ Sep 2001; timestamps below this are assumed to be in seconds
+      const expiresAtMs = creds.expiresAt < 1e12 ? creds.expiresAt * 1000 : creds.expiresAt;
+      if (expiresAtMs < Date.now()) {
+        log.warn("Claude Code OAuth token has expired");
+        return null;
+      }
     }
 
     log.info("Using Claude Code OAuth token from Keychain");

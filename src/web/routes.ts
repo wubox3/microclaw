@@ -48,11 +48,15 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     const limit = typeof body.limit === "number" && body.limit > 0 && body.limit <= 100
       ? Math.floor(body.limit)
       : 10;
-    const results = await deps.memoryManager.search({
-      query: body.query,
-      limit,
-    });
-    return c.json({ success: true, data: results });
+    try {
+      const results = await deps.memoryManager.search({
+        query: body.query,
+        limit,
+      });
+      return c.json({ success: true, data: results });
+    } catch {
+      return c.json({ success: false, error: "Memory search failed" }, 500);
+    }
   });
 
   app.post("/api/chat", async (c) => {
@@ -65,14 +69,16 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     if (!Array.isArray(body.messages) || body.messages.length === 0) {
       return c.json({ success: false, error: "messages must be a non-empty array" }, 400);
     }
+    const VALID_ROLES = new Set(["user", "assistant"]);
     const messages = body.messages.filter(
       (m: unknown): m is { role: string; content: string } =>
         typeof m === "object" && m !== null &&
         typeof (m as Record<string, unknown>).role === "string" &&
+        VALID_ROLES.has((m as Record<string, unknown>).role as string) &&
         typeof (m as Record<string, unknown>).content === "string",
     );
     if (messages.length === 0) {
-      return c.json({ success: false, error: "messages must contain valid {role, content} objects" }, 400);
+      return c.json({ success: false, error: "messages must contain valid {role, content} objects with role 'user' or 'assistant'" }, 400);
     }
     const timestamp = Date.now();
     const userText = messages[messages.length - 1]?.content ?? "";
@@ -90,33 +96,37 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
       }
     }
 
-    const response = await deps.agent.chat({
-      messages: [
-        ...historyMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content, timestamp: m.timestamp })),
-        ...messages.map((m: { role: string; content: string }) => ({
-          role: m.role as "user" | "assistant" | "system",
-          content: m.content,
-          timestamp,
-        })),
-      ],
-      channelId: "web",
-    });
+    try {
+      const response = await deps.agent.chat({
+        messages: [
+          ...historyMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content, timestamp: m.timestamp })),
+          ...messages.map((m: { role: string; content: string }) => ({
+            role: m.role as "user" | "assistant",
+            content: m.content,
+            timestamp,
+          })),
+        ],
+        channelId: "web",
+      });
 
-    // Persist the exchange (non-fatal)
-    if (deps.memoryManager && userText) {
-      try {
-        await deps.memoryManager.saveExchange({
-          channelId: "web",
-          userMessage: userText,
-          assistantMessage: response.text,
-          timestamp,
-        });
-      } catch {
-        // Best-effort persistence
+      // Persist the exchange (non-fatal)
+      if (deps.memoryManager && userText) {
+        try {
+          await deps.memoryManager.saveExchange({
+            channelId: "web",
+            userMessage: userText,
+            assistantMessage: response.text,
+            timestamp,
+          });
+        } catch {
+          // Best-effort persistence
+        }
       }
-    }
 
-    return c.json({ success: true, data: { text: response.text } });
+      return c.json({ success: true, data: { text: response.text } });
+    } catch {
+      return c.json({ success: false, error: "Chat request failed" }, 500);
+    }
   });
 
   app.get("/api/chat/history", async (c) => {
@@ -127,7 +137,10 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     const channelId = c.req.query("channelId") ?? "web";
     const limit = Math.max(1, Math.min(Number(c.req.query("limit")) || 50, 200));
     const beforeParam = c.req.query("before");
-    const before = beforeParam ? Number(beforeParam) : undefined;
+    const before = beforeParam !== undefined ? Number(beforeParam) : undefined;
+    if (before !== undefined && (!Number.isFinite(before) || before < 0)) {
+      return c.json({ success: false, error: "'before' must be a non-negative number" }, 400);
+    }
 
     try {
       const messages = await deps.memoryManager.loadChatHistory({
@@ -141,20 +154,21 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     }
   });
 
-  // Static files
+  // Static files (read once at startup, not per-request)
+  const cssContent = readFileSync(resolve(publicDir, "styles.css"), "utf-8");
+  const jsContent = readFileSync(resolve(publicDir, "app.js"), "utf-8");
+  const htmlContent = readFileSync(resolve(publicDir, "index.html"), "utf-8");
+
   app.get("/styles.css", (c) => {
-    const css = readFileSync(resolve(publicDir, "styles.css"), "utf-8");
-    return c.text(css, 200, { "Content-Type": "text/css" });
+    return c.text(cssContent, 200, { "Content-Type": "text/css" });
   });
 
   app.get("/app.js", (c) => {
-    const js = readFileSync(resolve(publicDir, "app.js"), "utf-8");
-    return c.text(js, 200, { "Content-Type": "application/javascript" });
+    return c.text(jsContent, 200, { "Content-Type": "application/javascript" });
   });
 
   app.get("/", (c) => {
-    const html = readFileSync(resolve(publicDir, "index.html"), "utf-8");
-    return c.html(html);
+    return c.html(htmlContent);
   });
 
   return app;

@@ -27,12 +27,13 @@ export function createMemoryManager(params: {
   db.exec(FTS_SYNC_TRIGGERS);
   db.exec(CHAT_SCHEMA);
 
-  // Embeddings require an API key (Voyage API); OAuth tokens don't work with Voyage
+  // Embeddings require a Voyage API key (separate from Anthropic key)
   let embeddingProvider: EmbeddingProvider | undefined;
   let pKey: string | undefined;
 
-  if (params.auth.apiKey) {
-    embeddingProvider = createAnthropicEmbeddingProvider(params.auth.apiKey);
+  const voyageApiKey = process.env.VOYAGE_API_KEY;
+  if (voyageApiKey) {
+    embeddingProvider = createAnthropicEmbeddingProvider(voyageApiKey);
     pKey = providerKey(embeddingProvider);
   }
 

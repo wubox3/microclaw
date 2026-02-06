@@ -3,14 +3,15 @@ import type { MicroClawConfig } from "../config/types.js";
 import type { SkillLogger, SkillApi, SkillDefinition, AgentTool, SkillToolFactory } from "./types.js";
 import { createSkillRegistry, type SkillRegistry } from "./registry.js";
 import { discoverSkills } from "./discovery.js";
+import { createLogger } from "../logging.js";
 
 function createSkillLogger(skillId: string): SkillLogger {
-  const prefix = `[skill:${skillId}]`;
+  const log = createLogger(`skill:${skillId}`);
   return {
-    info: (msg, ...args) => console.info(prefix, msg, ...args),
-    warn: (msg, ...args) => console.warn(prefix, msg, ...args),
-    error: (msg, ...args) => console.error(prefix, msg, ...args),
-    debug: (msg, ...args) => console.debug(prefix, msg, ...args),
+    info: (msg, ...args) => log.info(msg, ...args),
+    warn: (msg, ...args) => log.warn(msg, ...args),
+    error: (msg, ...args) => log.error(msg, ...args),
+    debug: (msg, ...args) => log.debug(msg, ...args),
   };
 }
 

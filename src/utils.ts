@@ -61,5 +61,6 @@ export function groupBy<T>(array: readonly T[], key: (item: T) => string): Recor
       groups.set(k, [item]);
     }
   }
-  return Object.fromEntries(groups);
+  // Internal arrays are not leaked; the return type enforces readonly
+  return Object.fromEntries(groups) as Record<string, readonly T[]>;
 }

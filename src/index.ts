@@ -104,6 +104,9 @@ async function main(): Promise<void> {
       onMessage: (channelId, _chatId, text) => {
         // Deliver IPC messages to WebSocket clients
         for (const [clientId, client] of webMonitor.clients) {
+          if (client.ws.readyState !== 1) {
+            continue;
+          }
           try {
             client.ws.send(
               JSON.stringify({
@@ -149,8 +152,14 @@ async function main(): Promise<void> {
         log.error(`Failed to close memory database: ${formatError(err)}`);
       }
     }
-    server.close();
-    process.exit(0);
+    server.close(() => {
+      process.exit(0);
+    });
+    // Force exit after 5 seconds if graceful close hangs
+    setTimeout(() => {
+      log.warn("Forced shutdown after timeout");
+      process.exit(1);
+    }, 5000).unref();
   };
   process.on("SIGTERM", shutdown);
   process.on("SIGINT", shutdown);
@@ -179,22 +188,34 @@ async function main(): Promise<void> {
     }
 
     // Send container mode status
-    ws.send(JSON.stringify({
-      type: "container_status",
-      enabled: containerEnabled,
-    }));
+    if (ws.readyState === 1) {
+      ws.send(JSON.stringify({
+        type: "container_status",
+        enabled: containerEnabled,
+      }));
+    }
   });
 
   // 13. Handle WebSocket messages -> agent
+  const processingClients = new Set<string>();
   webMonitor.onMessage(async (clientId, message) => {
     const client = webMonitor.clients.get(clientId);
-    if (!client) {
+    if (!client || client.ws.readyState !== 1) {
       return;
     }
 
+    // Prevent concurrent message processing per client
+    if (processingClients.has(clientId)) {
+      client.ws.send(JSON.stringify({ type: "error", message: "Please wait for the current response" }));
+      return;
+    }
+    processingClients.add(clientId);
+
     try {
       // Send typing indicator
-      client.ws.send(JSON.stringify({ type: "typing" }));
+      if (client.ws.readyState === 1) {
+        client.ws.send(JSON.stringify({ type: "typing" }));
+      }
 
       // Load recent chat history for conversation context
       const historyMessages: Array<{ role: "user" | "assistant"; content: string; timestamp: number }> = [];
@@ -219,12 +240,14 @@ async function main(): Promise<void> {
       });
 
       // Send response
-      const responseTimestamp = Date.now();
-      client.ws.send(JSON.stringify({
-        type: "message",
-        text: response.text,
-        timestamp: responseTimestamp,
-      }));
+      if (client.ws.readyState === 1) {
+        const responseTimestamp = Date.now();
+        client.ws.send(JSON.stringify({
+          type: "message",
+          text: response.text,
+          timestamp: responseTimestamp,
+        }));
+      }
 
       // Persist exchange (non-fatal)
       if (memoryManager) {
@@ -238,10 +261,14 @@ async function main(): Promise<void> {
         });
       }
     } catch (err) {
-      client.ws.send(JSON.stringify({
-        type: "error",
-        message: formatError(err),
-      }));
+      if (client.ws.readyState === 1) {
+        client.ws.send(JSON.stringify({
+          type: "error",
+          message: formatError(err),
+        }));
+      }
+    } finally {
+      processingClients.delete(clientId);
     }
   });
 

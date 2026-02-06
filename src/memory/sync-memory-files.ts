@@ -21,30 +21,38 @@ export function syncMemoryFiles(
   const existingByPath = new Map(existingFiles.map((f) => [f.path, f]));
   const currentPaths = new Set(currentFiles.map((f) => f.path));
 
-  // Remove files no longer present
-  for (const existing of existingFiles) {
-    if (!currentPaths.has(existing.path)) {
-      db.prepare("DELETE FROM memory_files WHERE id = ?").run(existing.id);
-      removed++;
+  db.exec("BEGIN");
+  try {
+    // Remove files no longer present (CASCADE deletes chunks and embeddings)
+    for (const existing of existingFiles) {
+      if (!currentPaths.has(existing.path)) {
+        db.prepare("DELETE FROM memory_files WHERE id = ?").run(existing.id);
+        removed++;
+      }
     }
-  }
 
-  // Add or update files
-  for (const file of currentFiles) {
-    const content = readFileSync(resolve(dir, file.path), "utf-8");
-    const hash = hashContent(content);
-    const existing = existingByPath.get(file.path);
+    // Add or update files
+    for (const file of currentFiles) {
+      const content = readFileSync(resolve(dir, file.path), "utf-8");
+      const hash = hashContent(content);
+      const existing = existingByPath.get(file.path);
 
-    if (!existing) {
-      insertFile(db, file.path, "file", hash, content);
-      added++;
-    } else if (existing.hash !== hash) {
-      db.prepare("DELETE FROM memory_chunks WHERE file_id = ?").run(existing.id);
-      db.prepare("DELETE FROM embedding_cache WHERE chunk_id NOT IN (SELECT id FROM memory_chunks)").run();
-      db.prepare("UPDATE memory_files SET hash = ?, updated_at = unixepoch() WHERE id = ?").run(hash, existing.id);
-      insertChunks(db, existing.id, content);
-      updated++;
+      if (!existing) {
+        insertFile(db, file.path, "file", hash, content);
+        added++;
+      } else if (existing.hash !== hash) {
+        // CASCADE on memory_chunks deletes embedding_cache entries automatically
+        db.prepare("DELETE FROM memory_chunks WHERE file_id = ?").run(existing.id);
+        db.prepare("UPDATE memory_files SET hash = ?, updated_at = unixepoch() WHERE id = ?").run(hash, existing.id);
+        insertChunks(db, existing.id, content);
+        updated++;
+      }
     }
+
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
   }
 
   return { added, updated, removed };

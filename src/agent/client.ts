@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AgentResponse, AgentStreamEvent } from "./types.js";
 import type { AuthCredentials } from "../infra/auth.js";
-import type { LlmClient, LlmSendParams, LlmStreamParams } from "./llm-client.js";
+import type { LlmClient, LlmSendParams, LlmStreamParams, LlmMessage } from "./llm-client.js";
 
 export type AnthropicClientOptions = {
   auth: AuthCredentials;
@@ -17,6 +17,52 @@ const OAUTH_BETA_HEADERS = {
   "user-agent": "claude-cli/2.1.2 (external, cli)",
   "x-app": "cli",
 };
+
+function toAnthropicMessages(messages: LlmMessage[]): Anthropic.Messages.MessageParam[] {
+  const result: Anthropic.Messages.MessageParam[] = [];
+  let i = 0;
+  while (i < messages.length) {
+    const msg = messages[i]!;
+    if (msg.role === "user") {
+      result.push({ role: "user", content: msg.content });
+      i++;
+    } else if (msg.role === "assistant") {
+      if (msg.toolCalls && msg.toolCalls.length > 0) {
+        const content: Anthropic.Messages.ContentBlockParam[] = [];
+        if (msg.content) {
+          content.push({ type: "text", text: msg.content });
+        }
+        for (const tc of msg.toolCalls) {
+          content.push({
+            type: "tool_use",
+            id: tc.id,
+            name: tc.name,
+            input: tc.input as Record<string, unknown>,
+          });
+        }
+        result.push({ role: "assistant", content });
+      } else {
+        result.push({ role: "assistant", content: msg.content });
+      }
+      i++;
+    } else if (msg.role === "tool") {
+      const toolResults: Anthropic.Messages.ToolResultBlockParam[] = [];
+      while (i < messages.length && messages[i]!.role === "tool") {
+        const toolMsg = messages[i] as Extract<LlmMessage, { role: "tool" }>;
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: toolMsg.toolCallId,
+          content: toolMsg.content,
+        });
+        i++;
+      }
+      result.push({ role: "user", content: toolResults });
+    } else {
+      i++;
+    }
+  }
+  return result;
+}
 
 export function createAnthropicClient(options: AnthropicClientOptions): LlmClient {
   const isOAuth = options.auth.isOAuth;
@@ -49,7 +95,7 @@ export function createAnthropicClient(options: AnthropicClientOptions): LlmClien
         model,
         max_tokens: maxTokens,
         system,
-        messages: params.messages,
+        messages: toAnthropicMessages(params.messages),
         tools: params.tools as Anthropic.Messages.Tool[] | undefined,
         temperature: params.temperature,
       });

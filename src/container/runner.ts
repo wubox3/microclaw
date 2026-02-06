@@ -6,6 +6,7 @@ import { execFile, spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 
+import { randomBytes } from "node:crypto";
 import {
   CONTAINER_IMAGE,
   CONTAINER_MAX_OUTPUT_SIZE,
@@ -125,7 +126,7 @@ export async function runContainerAgent(
 
   const mounts = buildVolumeMounts(input.channelId, config);
   const safeName = sanitizeChannelId(input.channelId);
-  const containerName = `microclaw-${safeName}-${Date.now()}`;
+  const containerName = `microclaw-${safeName}-${Date.now()}-${randomBytes(3).toString("hex")}`;
   const dockerArgs = buildDockerArgs(mounts, containerName, image);
 
   log.info(

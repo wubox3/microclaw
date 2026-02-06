@@ -1,4 +1,4 @@
-import type { AgentResponse, AgentStreamEvent } from "./types.js";
+import type { AgentResponse, AgentStreamEvent, AgentToolCall } from "./types.js";
 
 export type LlmToolDefinition = {
   name: string;
@@ -6,8 +6,13 @@ export type LlmToolDefinition = {
   input_schema: Record<string, unknown>;
 };
 
+export type LlmUserMessage = { role: "user"; content: string };
+export type LlmAssistantMessage = { role: "assistant"; content: string; toolCalls?: AgentToolCall[] };
+export type LlmToolResultMessage = { role: "tool"; toolCallId: string; content: string };
+export type LlmMessage = LlmUserMessage | LlmAssistantMessage | LlmToolResultMessage;
+
 export type LlmSendParams = {
-  messages: Array<{ role: "user" | "assistant"; content: string }>;
+  messages: LlmMessage[];
   system?: string;
   tools?: LlmToolDefinition[];
   temperature?: number;

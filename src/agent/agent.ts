@@ -2,7 +2,7 @@ import type { MicroClawConfig } from "../config/types.js";
 import type { AuthCredentials } from "../infra/auth.js";
 import type { MemorySearchManager } from "../memory/types.js";
 import type { AgentMessage, AgentResponse, AgentTool } from "./types.js";
-import type { LlmClient } from "./llm-client.js";
+import type { LlmClient, LlmMessage } from "./llm-client.js";
 import { createLlmClient } from "./create-client.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { createMemorySearchTool, createChannelListTool } from "./tools.js";
@@ -143,7 +143,7 @@ async function runDirectChat(params: {
     channelId,
   });
 
-  const apiMessages = messages
+  const llmMessages: LlmMessage[] = messages
     .filter((m) => m.role === "user" || m.role === "assistant")
     .map((m) => ({
       role: m.role as "user" | "assistant",
@@ -158,37 +158,47 @@ async function runDirectChat(params: {
 
   // Initial response
   let response = await client.sendMessage({
-    messages: apiMessages,
+    messages: llmMessages,
     system: systemPrompt,
     tools: toolDefs.length > 0 ? toolDefs : undefined,
     temperature: context.config.agent?.temperature,
   });
 
-  // Handle tool calls in a loop (max 5 iterations)
+  // Handle tool calls in a loop (max 5 iterations), preserving full conversation
+  const conversationMessages: LlmMessage[] = [...llmMessages];
   let iterations = 0;
   while (response.toolCalls && response.toolCalls.length > 0 && iterations < 5) {
     iterations++;
-    const toolResults: string[] = [];
 
+    // Append assistant message with its tool calls
+    conversationMessages.push({
+      role: "assistant",
+      content: response.text || "",
+      toolCalls: response.toolCalls,
+    });
+
+    // Execute tools and append each result
     for (const toolCall of response.toolCalls) {
       const tool = tools.find((t) => t.name === toolCall.name);
+      let resultContent: string;
       if (tool) {
-        const result = await tool.execute(toolCall.input);
-        toolResults.push(`[Tool: ${toolCall.name}]\n${result.content}`);
+        try {
+          resultContent = (await tool.execute(toolCall.input)).content;
+        } catch (err) {
+          resultContent = `Tool execution error: ${err instanceof Error ? err.message : String(err)}`;
+        }
       } else {
-        toolResults.push(`[Tool: ${toolCall.name}] Unknown tool`);
+        resultContent = `Unknown tool: ${toolCall.name}`;
       }
+      conversationMessages.push({
+        role: "tool",
+        toolCallId: toolCall.id,
+        content: resultContent,
+      });
     }
 
-    // Send tool results back
-    const updatedMessages = [
-      ...apiMessages,
-      { role: "assistant" as const, content: response.text || "I'll use some tools to help answer that." },
-      { role: "user" as const, content: `Tool results:\n${toolResults.join("\n\n")}` },
-    ];
-
     response = await client.sendMessage({
-      messages: updatedMessages,
+      messages: conversationMessages,
       system: systemPrompt,
       tools: toolDefs.length > 0 ? toolDefs : undefined,
       temperature: context.config.agent?.temperature,

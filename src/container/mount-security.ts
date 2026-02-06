@@ -118,15 +118,17 @@ function matchesBlockedPattern(
   blockedPatterns: string[],
 ): string | null {
   const pathParts = realPath.split(path.sep);
+  const fileName = pathParts[pathParts.length - 1] ?? "";
 
   for (const pattern of blockedPatterns) {
+    // Exact match on any path component
     for (const part of pathParts) {
-      if (part === pattern || part.includes(pattern)) {
+      if (part === pattern) {
         return pattern;
       }
     }
-
-    if (realPath.includes(pattern)) {
+    // Also check if the filename starts with the pattern (e.g., ".env.local" matches ".env")
+    if (fileName.startsWith(pattern)) {
       return pattern;
     }
   }

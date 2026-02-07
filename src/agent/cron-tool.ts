@@ -138,7 +138,7 @@ WAKE MODES (for wake action):
             if (!job) {
               return errorResult("Invalid job definition: normalization failed. Ensure the job object has valid schedule and payload fields.");
             }
-            const result = await cronService.add(job as never);
+            const result = await cronService.add(job);
             return jsonResult(result);
           }
 
@@ -154,7 +154,7 @@ WAKE MODES (for wake action):
             if (!patch) {
               return errorResult("Invalid patch definition: normalization failed. Ensure the patch object is valid.");
             }
-            const result = await cronService.update(id, patch as never);
+            const result = await cronService.update(id, patch);
             return jsonResult(result);
           }
 

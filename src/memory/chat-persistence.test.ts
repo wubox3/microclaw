@@ -83,7 +83,8 @@ describe("createChatPersistence", () => {
       }>;
 
       expect(files).toHaveLength(1);
-      expect(files[0]).toMatchObject({ path: "chat/web/2000", source: "chat" });
+      expect(files[0]!.source).toBe("chat");
+      expect(files[0]!.path).toMatch(/^chat\/web\/2000-[a-f0-9]{8}$/);
     });
 
     it("creates memory_chunks with combined exchange content", async () => {
@@ -158,8 +159,8 @@ describe("createChatPersistence", () => {
     });
 
     it("rolls back all writes on failure (transaction atomicity)", async () => {
-      // Cause a unique constraint violation on memory_files.path
-      db.prepare("INSERT INTO memory_files (path, source, hash) VALUES ('chat/web/8000', 'chat', 'existing')").run();
+      // Drop chat_messages table to cause INSERT failure after memory_files succeeds
+      db.exec("DROP TABLE chat_messages");
 
       await expect(
         persistence.saveExchange({
@@ -170,10 +171,11 @@ describe("createChatPersistence", () => {
         }),
       ).rejects.toThrow();
 
-      const messages = queryAll(db, "SELECT id FROM chat_messages");
+      // memory_files should be rolled back since chat_messages INSERT failed
+      const files = queryAll(db, "SELECT id FROM memory_files");
       const chunks = queryAll(db, "SELECT id FROM memory_chunks");
 
-      expect(messages).toHaveLength(0);
+      expect(files).toHaveLength(0);
       expect(chunks).toHaveLength(0);
     });
   });

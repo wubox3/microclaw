@@ -99,8 +99,10 @@ describe("MemoryError", () => {
 // ---------------------------------------------------------------------------
 
 describe("formatError", () => {
-  it("returns message for Error instances", () => {
-    expect(formatError(new Error("oops"))).toBe("oops");
+  it("returns stack trace for Error instances", () => {
+    const result = formatError(new Error("oops"));
+    expect(result).toContain("oops");
+    expect(result).toContain("Error:");
   });
 
   it("converts string to string", () => {

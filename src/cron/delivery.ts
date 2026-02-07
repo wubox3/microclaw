@@ -8,6 +8,8 @@ export type CronDeliveryPlan = {
   requested: boolean;
 };
 
+const KNOWN_CHANNELS = new Set(["web", "telegram", "discord", "slack", "whatsapp", "signal", "imessage", "googlechat", "last"]);
+
 function normalizeChannel(value: unknown): CronMessageChannel | undefined {
   if (typeof value !== "string") {
     return undefined;
@@ -16,6 +18,7 @@ function normalizeChannel(value: unknown): CronMessageChannel | undefined {
   if (!trimmed) {
     return undefined;
   }
+  if (!KNOWN_CHANNELS.has(trimmed)) return "last";
   return trimmed as CronMessageChannel;
 }
 

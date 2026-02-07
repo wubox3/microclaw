@@ -56,12 +56,19 @@ export type DeleteProfileResult = {
 
 const HEX_COLOR_RE = /^#[0-9A-Fa-f]{6}$/;
 
+let profileMutex = Promise.resolve();
+
 export function createBrowserProfilesService(ctx: BrowserRouteContext) {
   const listProfiles = async (): Promise<ProfileStatus[]> => {
     return await ctx.listProfiles();
   };
 
   const createProfile = async (params: CreateProfileParams): Promise<CreateProfileResult> => {
+    let releaseMutex: () => void;
+    const prev = profileMutex;
+    profileMutex = new Promise<void>(r => { releaseMutex = r; });
+    await prev;
+    try {
     const name = params.name.trim();
     const rawCdpUrl = params.cdpUrl?.trim() || undefined;
     const driver = params.driver === "extension" ? "extension" : undefined;
@@ -138,9 +145,17 @@ export function createBrowserProfilesService(ctx: BrowserRouteContext) {
       color: resolved.color,
       isRemote: !resolved.cdpIsLoopback,
     };
+    } finally {
+      releaseMutex!();
+    }
   };
 
   const deleteProfile = async (nameRaw: string): Promise<DeleteProfileResult> => {
+    let releaseMutex: () => void;
+    const prev = profileMutex;
+    profileMutex = new Promise<void>(r => { releaseMutex = r; });
+    await prev;
+    try {
     const name = nameRaw.trim();
     if (!name) {
       throw new Error("profile name is required");
@@ -200,6 +215,9 @@ export function createBrowserProfilesService(ctx: BrowserRouteContext) {
     state.profiles.delete(name);
 
     return { ok: true, profile: name, deleted };
+    } finally {
+      releaseMutex!();
+    }
   };
 
   return {

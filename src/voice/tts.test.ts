@@ -54,7 +54,7 @@ function mockErrorResponse(status: number, body = "error") {
 describe("resolveTtsConfig", () => {
   it("returns defaults when no config provided", () => {
     const resolved = resolveTtsConfig({});
-    expect(resolved.enabled).toBe(false);
+    expect(resolved.enabled).toBe(true);
     expect(resolved.provider).toBe("openrouter");
     expect(resolved.model).toBe("openai/tts-1");
     expect(resolved.voice).toBe("alloy");

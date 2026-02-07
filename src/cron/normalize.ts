@@ -246,14 +246,32 @@ export function normalizeCronJobInput(
   return next;
 }
 
+const CRON_JOB_CREATE_REQUIRED_KEYS: readonly string[] = [
+  "name",
+  "schedule",
+  "payload",
+  "sessionTarget",
+  "wakeMode",
+  "enabled",
+];
+
 export function normalizeCronJobCreate(
   raw: unknown,
   options?: NormalizeOptions,
 ): CronJobCreate | null {
-  return normalizeCronJobInput(raw, {
+  const result = normalizeCronJobInput(raw, {
     applyDefaults: true,
     ...options,
-  }) as CronJobCreate | null;
+  });
+  if (!result) {
+    return null;
+  }
+  for (const key of CRON_JOB_CREATE_REQUIRED_KEYS) {
+    if (!(key in result) || result[key] === undefined) {
+      return null;
+    }
+  }
+  return result as CronJobCreate;
 }
 
 export function normalizeCronJobPatch(

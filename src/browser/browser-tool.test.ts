@@ -86,12 +86,12 @@ describe("execute — error handling", () => {
 // ---------------------------------------------------------------------------
 
 describe("execute — status", () => {
-  it("calls GET /agent/status", async () => {
+  it("calls GET /", async () => {
     const tool = createBrowserTool();
     mockFetchBrowserJson.mockResolvedValueOnce({ running: true });
     const result = await tool.execute({ action: "status" });
     expect(mockFetchBrowserJson).toHaveBeenCalledWith(
-      "/agent/status",
+      "/",
     );
     expect(result.content).toContain("running");
   });
@@ -101,18 +101,18 @@ describe("execute — status", () => {
     mockFetchBrowserJson.mockResolvedValueOnce({ running: true });
     await tool.execute({ action: "status", profile: "test" });
     expect(mockFetchBrowserJson).toHaveBeenCalledWith(
-      "/agent/status?profile=test",
+      "/?profile=test",
     );
   });
 });
 
 describe("execute — start", () => {
-  it("calls POST /agent/start with body", async () => {
+  it("calls POST /start with body", async () => {
     const tool = createBrowserTool();
     mockFetchBrowserJson.mockResolvedValueOnce({ started: true });
     await tool.execute({ action: "start", url: "https://example.com", headless: true });
     expect(mockFetchBrowserJson).toHaveBeenCalledWith(
-      "/agent/start",
+      "/start",
       expect.objectContaining({
         method: "POST",
         body: expect.stringContaining("https://example.com"),
@@ -122,24 +122,24 @@ describe("execute — start", () => {
 });
 
 describe("execute — stop", () => {
-  it("calls POST /agent/stop", async () => {
+  it("calls POST /stop", async () => {
     const tool = createBrowserTool();
     mockFetchBrowserJson.mockResolvedValueOnce({ stopped: true });
     await tool.execute({ action: "stop" });
     expect(mockFetchBrowserJson).toHaveBeenCalledWith(
-      "/agent/stop",
+      "/stop",
       expect.objectContaining({ method: "POST" }),
     );
   });
 });
 
 describe("execute — navigate", () => {
-  it("calls POST /agent/navigate with url and targetId", async () => {
+  it("calls POST /navigate with url and targetId", async () => {
     const tool = createBrowserTool();
     mockFetchBrowserJson.mockResolvedValueOnce({ ok: true });
     await tool.execute({ action: "navigate", url: "https://example.com", targetId: "tab1" });
     expect(mockFetchBrowserJson).toHaveBeenCalledWith(
-      "/agent/navigate",
+      "/navigate",
       expect.objectContaining({
         method: "POST",
         body: expect.stringContaining("https://example.com"),
@@ -149,12 +149,12 @@ describe("execute — navigate", () => {
 });
 
 describe("execute — snapshot", () => {
-  it("calls GET /agent/snapshot with query params", async () => {
+  it("calls GET /snapshot with query params", async () => {
     const tool = createBrowserTool();
     mockFetchBrowserJson.mockResolvedValueOnce({ snapshot: "<html>content</html>" });
     const result = await tool.execute({ action: "snapshot", targetId: "tab1", maxChars: 5000 });
     expect(mockFetchBrowserJson).toHaveBeenCalledWith(
-      expect.stringContaining("/agent/snapshot"),
+      expect.stringContaining("/snapshot"),
       expect.objectContaining({ timeoutMs: 15000 }),
     );
     expect(result.content).toBe("<html>content</html>");
@@ -169,12 +169,12 @@ describe("execute — snapshot", () => {
 });
 
 describe("execute — screenshot", () => {
-  it("calls GET /agent/screenshot", async () => {
+  it("calls POST /screenshot", async () => {
     const tool = createBrowserTool();
     mockFetchBrowserJson.mockResolvedValueOnce({ image: "base64data" });
     await tool.execute({ action: "screenshot", targetId: "tab1" });
     expect(mockFetchBrowserJson).toHaveBeenCalledWith(
-      expect.stringContaining("/agent/screenshot"),
+      "/screenshot",
       expect.objectContaining({ timeoutMs: 15000 }),
     );
   });
@@ -199,13 +199,13 @@ describe("execute — profiles", () => {
 });
 
 describe("execute — act", () => {
-  it("calls POST /agent/act with commands", async () => {
+  it("calls POST /act with commands", async () => {
     const tool = createBrowserTool();
     const commands = [{ kind: "click", ref: "E123" }];
     mockFetchBrowserJson.mockResolvedValueOnce({ ok: true });
     await tool.execute({ action: "act", commands, targetId: "tab1" });
     expect(mockFetchBrowserJson).toHaveBeenCalledWith(
-      "/agent/act",
+      "/act",
       expect.objectContaining({
         method: "POST",
         body: expect.stringContaining("click"),
@@ -245,37 +245,37 @@ describe("execute — focus", () => {
 });
 
 describe("execute — close", () => {
-  it("calls POST /tabs/close with targetId", async () => {
+  it("calls DELETE /tabs/:targetId", async () => {
     const tool = createBrowserTool();
     mockFetchBrowserJson.mockResolvedValueOnce({ ok: true });
     await tool.execute({ action: "close", targetId: "tab1" });
     expect(mockFetchBrowserJson).toHaveBeenCalledWith(
-      "/tabs/close",
+      "/tabs/tab1",
       expect.objectContaining({
-        method: "POST",
+        method: "DELETE",
       }),
     );
   });
 });
 
 describe("execute — console", () => {
-  it("calls GET /agent/console with query params", async () => {
+  it("calls GET /console with query params", async () => {
     const tool = createBrowserTool();
     mockFetchBrowserJson.mockResolvedValueOnce([{ text: "log output" }]);
     await tool.execute({ action: "console", targetId: "tab1", profile: "test" });
     expect(mockFetchBrowserJson).toHaveBeenCalledWith(
-      expect.stringContaining("/agent/console"),
+      expect.stringContaining("/console"),
     );
   });
 });
 
 describe("execute — pdf", () => {
-  it("calls POST /agent/pdf with targetId", async () => {
+  it("calls POST /pdf with targetId", async () => {
     const tool = createBrowserTool();
     mockFetchBrowserJson.mockResolvedValueOnce({ ok: true });
     await tool.execute({ action: "pdf", targetId: "tab1" });
     expect(mockFetchBrowserJson).toHaveBeenCalledWith(
-      "/agent/pdf",
+      "/pdf",
       expect.objectContaining({
         method: "POST",
         timeoutMs: 30000,
@@ -285,12 +285,12 @@ describe("execute — pdf", () => {
 });
 
 describe("execute — upload", () => {
-  it("calls POST /agent/upload with paths and targetId", async () => {
+  it("calls POST /hooks/file-chooser with paths and targetId", async () => {
     const tool = createBrowserTool();
     mockFetchBrowserJson.mockResolvedValueOnce({ ok: true });
     await tool.execute({ action: "upload", paths: ["/file.txt"], targetId: "tab1" });
     expect(mockFetchBrowserJson).toHaveBeenCalledWith(
-      "/agent/upload",
+      "/hooks/file-chooser",
       expect.objectContaining({
         method: "POST",
         body: expect.stringContaining("file.txt"),
@@ -300,12 +300,12 @@ describe("execute — upload", () => {
 });
 
 describe("execute — dialog", () => {
-  it("calls POST /agent/dialog with accept and promptText", async () => {
+  it("calls POST /hooks/dialog with accept and promptText", async () => {
     const tool = createBrowserTool();
     mockFetchBrowserJson.mockResolvedValueOnce({ ok: true });
     await tool.execute({ action: "dialog", accept: true, promptText: "response", targetId: "tab1" });
     expect(mockFetchBrowserJson).toHaveBeenCalledWith(
-      "/agent/dialog",
+      "/hooks/dialog",
       expect.objectContaining({
         method: "POST",
         body: expect.stringContaining("response"),

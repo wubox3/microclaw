@@ -358,6 +358,9 @@ export function registerBrowserAgentActRoutes(
       if (resolved !== path.normalize(p)) {
         return jsonError(res, 400, `file path must be absolute and normalized: "${p}"`);
       }
+      if (resolved.includes('/..') || resolved.includes('\\..')) {
+        return jsonError(res, 400, `file path contains traversal: "${p}"`);
+      }
     }
     try {
       const tab = await profileCtx.ensureTabAvailable(targetId);

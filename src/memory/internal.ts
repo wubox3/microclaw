@@ -4,7 +4,7 @@ const CHUNK_SIZE = 512;
 const CHUNK_OVERLAP = 64;
 
 export function hashContent(content: string): string {
-  return createHash("sha256").update(content).digest("hex").slice(0, 32);
+  return createHash("sha256").update(content).digest("hex");
 }
 
 export function chunkText(text: string, chunkSize = CHUNK_SIZE, overlap = CHUNK_OVERLAP): string[] {
@@ -53,7 +53,8 @@ export function cosineSimilarity(a: number[], b: number[]): number {
     normB += b[i]! * b[i]!;
   }
   const denominator = Math.sqrt(normA) * Math.sqrt(normB);
-  return denominator === 0 ? 0 : dotProduct / denominator;
+  const result = denominator === 0 ? 0 : dotProduct / denominator;
+  return Number.isNaN(result) ? 0 : result;
 }
 
 export function truncateSnippet(text: string, maxLength = 200): string {

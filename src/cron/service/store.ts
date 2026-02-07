@@ -102,19 +102,21 @@ function mergeLegacyDeliveryInto(
   return { delivery: next, mutated };
 }
 
-function stripLegacyDeliveryFields(payload: Record<string, unknown>) {
-  if ("deliver" in payload) {
-    delete payload.deliver;
+function stripLegacyDeliveryFields(payload: Record<string, unknown>): Record<string, unknown> {
+  const copy = { ...payload };
+  if ("deliver" in copy) {
+    delete copy.deliver;
   }
-  if ("channel" in payload) {
-    delete payload.channel;
+  if ("channel" in copy) {
+    delete copy.channel;
   }
-  if ("to" in payload) {
-    delete payload.to;
+  if ("to" in copy) {
+    delete copy.to;
   }
-  if ("bestEffortDeliver" in payload) {
-    delete payload.bestEffortDeliver;
+  if ("bestEffortDeliver" in copy) {
+    delete copy.bestEffortDeliver;
   }
+  return copy;
 }
 
 async function getFileMtimeMs(filePath: string): Promise<number | null> {
@@ -251,7 +253,7 @@ export async function ensureLoaded(
             mutated = true;
           }
         }
-        stripLegacyDeliveryFields(payloadRecord);
+        raw.payload = stripLegacyDeliveryFields(payloadRecord);
         mutated = true;
       }
     }

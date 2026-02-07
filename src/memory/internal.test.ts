@@ -14,14 +14,14 @@ describe("hashContent", () => {
     expect(hashContent("foo")).not.toBe(hashContent("bar"));
   });
 
-  it("returns a 16-character hex string", () => {
+  it("returns a 64-character hex string (full SHA-256)", () => {
     const hash = hashContent("test data");
-    expect(hash).toMatch(/^[0-9a-f]{16}$/);
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it("handles empty string", () => {
     const hash = hashContent("");
-    expect(hash).toMatch(/^[0-9a-f]{16}$/);
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
   });
 });
 

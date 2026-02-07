@@ -166,6 +166,7 @@ export async function startIMessageGateway(
       lastRowId = Math.max(lastRowId, msg.rowid);
 
       if (!msg.text) continue;
+      if (!msg.is_from_me && !msg.sender_id) continue;
 
       const senderId = msg.is_from_me ? "me" : (msg.sender_id ?? "unknown");
       if (!msg.is_from_me && msg.sender_id && !isAllowed(msg.sender_id, allowFrom)) continue;

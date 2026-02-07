@@ -317,6 +317,9 @@ async function connectBrowser(cdpUrl: string): Promise<ConnectedBrowser> {
     await cached.browser.close().catch(() => {});
     cached = null;
   }
+  if (connecting && connectingUrl !== normalized) {
+    try { await connecting; } catch { /* ignore */ }
+  }
   if (connecting && connectingUrl === normalized) {
     return await connecting;
   }

@@ -11,6 +11,11 @@ import type { MemorySearchManager } from "../memory/types.js";
 
 const log = createLogger("ipc");
 
+const O_NOFOLLOW = fs.constants.O_NOFOLLOW ?? 0;
+if (fs.constants.O_NOFOLLOW === undefined) {
+  log.warn("O_NOFOLLOW is not available on this platform; symlink protection is degraded");
+}
+
 export interface IpcWatcherDeps {
   onMessage: (channelId: string, chatId: string | undefined, text: string) => void;
   memoryManager?: MemorySearchManager;
@@ -68,7 +73,7 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
               // Atomically prevent symlink following with O_NOFOLLOW
               let fd: number;
               try {
-                fd = fs.openSync(filePath, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+                fd = fs.openSync(filePath, fs.constants.O_RDONLY | O_NOFOLLOW);
               } catch {
                 log.warn(`Skipping symlink or unreadable IPC message: ${file}`);
                 try { fs.unlinkSync(filePath); } catch { /* best-effort */ }
@@ -144,7 +149,7 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
               // Atomically prevent symlink following with O_NOFOLLOW
               let taskFd: number;
               try {
-                taskFd = fs.openSync(filePath, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+                taskFd = fs.openSync(filePath, fs.constants.O_RDONLY | O_NOFOLLOW);
               } catch {
                 log.warn(`Skipping symlink or unreadable IPC task: ${file}`);
                 try { fs.unlinkSync(filePath); } catch { /* best-effort */ }
@@ -204,33 +209,21 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
     }
 
     if (watcherRunning) {
-      watcherTimeout = setTimeout(() => {
-        processIpcFiles().catch((err) => {
-          log.error(`IPC watcher error, will retry: ${err instanceof Error ? err.message : String(err)}`);
-          // Schedule retry instead of dying silently
-          if (watcherRunning) {
-            watcherTimeout = setTimeout(() => {
-              processIpcFiles().catch((retryErr) => {
-                log.error(`IPC watcher retry failed: ${retryErr instanceof Error ? retryErr.message : String(retryErr)}`);
-              });
-            }, IPC_POLL_INTERVAL * 2);
-          }
-        });
-      }, IPC_POLL_INTERVAL);
+      watcherTimeout = setTimeout(scheduleNext, IPC_POLL_INTERVAL);
     }
   };
 
-  processIpcFiles().catch((err) => {
-    log.error(`IPC watcher startup error, will retry: ${err instanceof Error ? err.message : String(err)}`);
-    // Retry after delay instead of dying
-    if (watcherRunning) {
-      watcherTimeout = setTimeout(() => {
-        processIpcFiles().catch((retryErr) => {
-          log.error(`IPC watcher retry failed: ${retryErr instanceof Error ? retryErr.message : String(retryErr)}`);
-        });
-      }, IPC_POLL_INTERVAL * 2);
-    }
-  });
+  const scheduleNext = () => {
+    processIpcFiles().catch((err) => {
+      log.error(`IPC watcher error: ${err instanceof Error ? err.message : String(err)}`);
+      // Always reschedule so the watcher never dies silently
+      if (watcherRunning) {
+        watcherTimeout = setTimeout(scheduleNext, IPC_POLL_INTERVAL * 2);
+      }
+    });
+  };
+
+  scheduleNext();
   log.info("IPC watcher started");
 }
 

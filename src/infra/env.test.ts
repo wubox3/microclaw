@@ -77,8 +77,13 @@ describe("isDev", () => {
     expect(isDev()).toBe(true);
   });
 
-  it("returns true when NODE_ENV is unset", () => {
+  it("returns false when NODE_ENV is unset", () => {
     delete process.env.NODE_ENV;
-    expect(isDev()).toBe(true);
+    expect(isDev()).toBe(false);
+  });
+
+  it("returns false for unknown NODE_ENV values", () => {
+    process.env.NODE_ENV = "staging";
+    expect(isDev()).toBe(false);
   });
 });

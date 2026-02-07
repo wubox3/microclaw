@@ -138,6 +138,10 @@ function createCdpSender(ws: WebSocket) {
     }
   });
 
+  ws.on("error", (err) => {
+    closeWithError(err instanceof Error ? err : new Error(String(err)));
+  });
+
   ws.on("close", () => {
     closeWithError(new Error("CDP socket closed"));
   });

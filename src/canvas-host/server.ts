@@ -48,7 +48,7 @@ export function createCanvasRoutes(dataDir: string): Hono {
     const normalizedFull = normalize(fullPath);
 
     // Ensure resolved path is within canvas directory
-    if (!normalizedFull.startsWith(normalize(canvasDir))) {
+    if (!normalizedFull.startsWith(normalize(canvasDir) + "/")) {
       return c.json({ error: "Path traversal denied" }, 403);
     }
 

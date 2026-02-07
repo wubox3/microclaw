@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { SqliteDb } from "./sqlite.js";
 import type { EmbeddingProvider } from "./embeddings.js";
 import type { ChatMessageRecord } from "./types.js";
@@ -19,6 +20,7 @@ export type ChatPersistence = {
     limit?: number;
     before?: number;
   }) => Promise<ChatMessageRecord[]>;
+  close: () => Promise<void>;
 };
 
 export function createChatPersistence(params: {
@@ -29,13 +31,15 @@ export function createChatPersistence(params: {
 
   // Serialize concurrent saveExchange calls to prevent interleaved transactions
   let saveQueue: Promise<void> = Promise.resolve();
+  let closed = false;
 
   return {
     saveExchange: async ({ channelId, userMessage, assistantMessage, timestamp }) => {
       const doSave = async () => {
+        if (closed) return;
         const exchangeContent = `User: ${userMessage}\n\nAssistant: ${assistantMessage}`;
         const hash = hashContent(exchangeContent);
-        const chatPath = `chat/${channelId}/${timestamp}-${Math.random().toString(36).slice(2, 10)}`;
+        const chatPath = `chat/${channelId}/${timestamp}-${randomUUID().slice(0, 8)}`;
 
         // Wrap all writes in a transaction for atomicity
         db.exec("BEGIN");
@@ -98,6 +102,11 @@ export function createChatPersistence(params: {
       return queued;
     },
 
+    close: async () => {
+      closed = true;
+      await saveQueue;
+    },
+
     loadHistory: async ({ channelId = "web", limit = 50, before }) => {
       // Always query DESC to get the most recent N messages (optionally before a cursor),
       // then reverse to chronological ASC order for the caller.
@@ -152,18 +161,21 @@ async function generateEmbeddings(
   const texts = chunks.map((c) => c.content);
   const embeddings = await provider.embed(texts);
 
-  // No transaction wrapper: each INSERT OR REPLACE is idempotent and atomic.
-  // Using a transaction here would risk "cannot start a transaction within a
-  // transaction" if syncFiles or another operation runs concurrently on the
-  // same DatabaseSync instance.
-  for (let i = 0; i < chunks.length; i++) {
-    const chunk = chunks[i]!;
-    const result = embeddings[i];
-    if (result) {
-      const blob = Buffer.from(new Float32Array(result.embedding).buffer);
-      db.prepare(
-        "INSERT OR REPLACE INTO embedding_cache (chunk_id, provider_model, embedding, dimensions) VALUES (?, ?, ?, ?)"
-      ).run(chunk.id, pKey, blob, result.dimensions);
+  db.exec("BEGIN");
+  try {
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i]!;
+      const result = embeddings[i];
+      if (result) {
+        const blob = Buffer.from(new Float32Array(result.embedding).buffer);
+        db.prepare(
+          "INSERT OR REPLACE INTO embedding_cache (chunk_id, provider_model, embedding, dimensions) VALUES (?, ?, ?, ?)"
+        ).run(chunk.id, pKey, blob, result.dimensions);
+      }
     }
+    db.exec("COMMIT");
+  } catch (err) {
+    try { db.exec("ROLLBACK"); } catch { /* ignore rollback failure */ }
+    throw err;
   }
 }

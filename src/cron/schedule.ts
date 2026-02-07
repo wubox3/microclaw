@@ -24,7 +24,7 @@ export function computeNextRunAtMs(schedule: CronSchedule, nowMs: number): numbe
 
   if (schedule.kind === "every") {
     const MIN_EVERY_MS = 10_000; // 10 second minimum to prevent busy-loop DoS
-    const everyMs = Math.max(MIN_EVERY_MS, Math.floor(schedule.everyMs));
+    const everyMs = Math.max(MIN_EVERY_MS, Math.floor(schedule.everyMs || MIN_EVERY_MS));
     const anchor = Math.max(0, Math.floor(schedule.anchorMs ?? nowMs));
     if (nowMs < anchor) {
       return anchor;

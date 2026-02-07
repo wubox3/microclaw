@@ -2,6 +2,9 @@ import { readFileSync, readdirSync, lstatSync } from "node:fs";
 import { resolve, relative } from "node:path";
 import type { SqliteDb } from "./sqlite.js";
 import { hashContent, chunkText } from "./internal.js";
+import { createLogger } from "../logging.js";
+
+const log = createLogger("sync-memory");
 
 export function syncMemoryFiles(
   db: SqliteDb,
@@ -18,6 +21,9 @@ export function syncMemoryFiles(
   const sortedFiles = collectFiles(dir).sort((a, b) => a.path.localeCompare(b.path));
 
   // Enforce file count limit to prevent OOM (immutable slice instead of .length mutation)
+  if (sortedFiles.length > MAX_FILE_COUNT) {
+    log.warn(`Memory sync truncated: ${sortedFiles.length} files found, limit is ${MAX_FILE_COUNT}`);
+  }
   const currentFiles = sortedFiles.length > MAX_FILE_COUNT
     ? sortedFiles.slice(0, MAX_FILE_COUNT)
     : sortedFiles;
@@ -53,12 +59,17 @@ export function syncMemoryFiles(
   const existingByPath = new Map(existingFiles.map((f) => [f.path, f]));
   const currentPaths = new Set(currentFiles.filter((f) => fileContents.has(f.path)).map((f) => f.path));
 
+  const deleteFileStmt = db.prepare("DELETE FROM memory_files WHERE id = ?");
+  const deleteChunksStmt = db.prepare("DELETE FROM memory_chunks WHERE file_id = ?");
+  const updateFileStmt = db.prepare("UPDATE memory_files SET hash = ?, updated_at = unixepoch() WHERE id = ?");
+  const insertChunkStmt = db.prepare("INSERT INTO memory_chunks (file_id, content, start_line, end_line, hash) VALUES (?, ?, ?, ?, ?)");
+
   db.exec("BEGIN");
   try {
     // Remove files no longer present (CASCADE deletes chunks and embeddings)
     for (const existing of existingFiles) {
       if (!currentPaths.has(existing.path)) {
-        db.prepare("DELETE FROM memory_files WHERE id = ?").run(existing.id);
+        deleteFileStmt.run(existing.id);
         removed++;
       }
     }
@@ -70,13 +81,13 @@ export function syncMemoryFiles(
       const existing = existingByPath.get(file.path);
 
       if (!existing) {
-        insertFile(db, file.path, "file", entry.hash, entry.content);
+        insertFile(db, file.path, "file", entry.hash, entry.content, insertChunkStmt);
         added++;
       } else if (existing.hash !== entry.hash) {
         // CASCADE on memory_chunks deletes embedding_cache entries automatically
-        db.prepare("DELETE FROM memory_chunks WHERE file_id = ?").run(existing.id);
-        db.prepare("UPDATE memory_files SET hash = ?, updated_at = unixepoch() WHERE id = ?").run(entry.hash, existing.id);
-        insertChunks(db, existing.id, entry.content);
+        deleteChunksStmt.run(existing.id);
+        updateFileStmt.run(entry.hash, existing.id);
+        insertChunks(db, existing.id, entry.content, insertChunkStmt);
         updated++;
       }
     }
@@ -93,8 +104,13 @@ export function syncMemoryFiles(
 function collectFiles(dir: string): Array<{ path: string }> {
   const files: Array<{ path: string }> = [];
   try {
+    const MAX_ENTRIES = 10_000;
     const entries = readdirSync(dir, { recursive: true, encoding: "utf-8" });
-    for (const entry of entries) {
+    if (entries.length > MAX_ENTRIES) {
+      log.warn(`Directory scan truncated: ${entries.length} entries found, limit is ${MAX_ENTRIES}`);
+    }
+    const limitedEntries = entries.slice(0, MAX_ENTRIES);
+    for (const entry of limitedEntries) {
       const fullPath = resolve(dir, entry);
       // Skip paths that escape the data directory (e.g. via symlinked subdirectories)
       if (!fullPath.startsWith(dir + "/") && fullPath !== dir) {
@@ -130,15 +146,15 @@ function isTextFile(path: string): boolean {
   return textExtensions.some((ext) => path.endsWith(ext));
 }
 
-function insertFile(db: SqliteDb, path: string, source: string, hash: string, content: string): void {
+function insertFile(db: SqliteDb, path: string, source: string, hash: string, content: string, insertChunkStmt: ReturnType<SqliteDb["prepare"]>): void {
   const result = db.prepare(
     "INSERT INTO memory_files (path, source, hash) VALUES (?, ?, ?)"
   ).run(path, source, hash);
   const fileId = (result as unknown as { lastInsertRowid: number }).lastInsertRowid;
-  insertChunks(db, fileId, content);
+  insertChunks(db, fileId, content, insertChunkStmt);
 }
 
-function insertChunks(db: SqliteDb, fileId: number, content: string): void {
+function insertChunks(db: SqliteDb, fileId: number, content: string, insertChunkStmt: ReturnType<SqliteDb["prepare"]>): void {
   const chunks = chunkText(content);
   let searchFrom = 0;
 
@@ -149,9 +165,7 @@ function insertChunks(db: SqliteDb, fileId: number, content: string): void {
       : 0;
     const chunkLineCount = chunk.split("\n").length;
     const hash = hashContent(chunk);
-    db.prepare(
-      "INSERT INTO memory_chunks (file_id, content, start_line, end_line, hash) VALUES (?, ?, ?, ?, ?)"
-    ).run(fileId, chunk, startLine, startLine + chunkLineCount - 1, hash);
+    insertChunkStmt.run(fileId, chunk, startLine, startLine + chunkLineCount - 1, hash);
     if (pos >= 0) {
       searchFrom = pos + chunk.length;
     }

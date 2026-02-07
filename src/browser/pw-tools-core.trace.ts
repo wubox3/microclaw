@@ -1,3 +1,4 @@
+import path from "node:path";
 import { ensureContextState, getPageForTargetId } from "./pw-session.js";
 
 export async function traceStartViaPlaywright(opts: {
@@ -32,6 +33,10 @@ export async function traceStopViaPlaywright(opts: {
   if (!ctxState.traceActive) {
     throw new Error("No active trace. Start a trace before stopping it.");
   }
-  await context.tracing.stop({ path: opts.path });
+  const resolvedPath = path.resolve(opts.path);
+  if (resolvedPath.includes('\0')) {
+    throw new Error('Trace path contains null byte');
+  }
+  await context.tracing.stop({ path: resolvedPath });
   ctxState.traceActive = false;
 }

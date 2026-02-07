@@ -1,5 +1,6 @@
 import type { MicroClawConfig } from "../config/types.js";
-import type { MemorySearchResult } from "../memory/types.js";
+import type { MemorySearchResult, UserProfile } from "../memory/types.js";
+import { formatProfileForPrompt } from "../memory/user-profile.js";
 
 const BASE_SYSTEM_PROMPT = `You are MicroClaw, a helpful AI assistant that can communicate across multiple messaging channels.
 
@@ -27,11 +28,17 @@ export function buildSystemPrompt(params: {
   memoryResults?: MemorySearchResult[];
   channelId?: string;
   canvasEnabled?: boolean;
+  userProfile?: UserProfile;
 }): string {
   const parts: string[] = [];
 
   // Base prompt or custom prompt
   parts.push(params.config.agent?.systemPrompt ?? BASE_SYSTEM_PROMPT);
+
+  // User profile (injected early, before memory results)
+  if (params.userProfile) {
+    parts.push("\n" + formatProfileForPrompt(params.userProfile));
+  }
 
   // Canvas instructions
   if (params.canvasEnabled) {

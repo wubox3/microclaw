@@ -1,8 +1,9 @@
-import { mkdirSync, existsSync } from "node:fs";
+import { mkdirSync, existsSync, realpathSync } from "node:fs";
 import { resolve as resolvePath } from "node:path";
 import type { MicroClawConfig } from "../config/types.js";
 import type { AuthCredentials } from "../infra/auth.js";
-import type { MemorySearchManager, MemorySearchParams, MemorySearchResult, MemoryProviderStatus, MemoryRecordCounts } from "./types.js";
+import type { MemorySearchManager, MemorySearchParams, MemorySearchResult, MemoryProviderStatus, MemoryRecordCounts, UserProfile } from "./types.js";
+import { createUserProfileManager } from "./user-profile.js";
 import { createLogger } from "../logging.js";
 import { openDatabase, closeDatabase } from "./sqlite.js";
 import { MEMORY_SCHEMA, FTS_SYNC_TRIGGERS, CHAT_SCHEMA } from "./memory-schema.js";
@@ -42,6 +43,7 @@ export function createMemoryManager(params: {
   }
 
   const chatPersistence = createChatPersistence({ db, embeddingProvider });
+  const profileManager = createUserProfileManager(db);
   const countAllStmt = db.prepare(
     "SELECT (SELECT COUNT(*) FROM memory_files) AS files, (SELECT COUNT(*) FROM memory_chunks) AS chunks, (SELECT COUNT(*) FROM chat_messages) AS chatMessages",
   );
@@ -111,9 +113,17 @@ export function createMemoryManager(params: {
       if (closed) {
         throw new Error("Memory manager is closed");
       }
-      // Validate path to prevent directory traversal
-      const resolved = resolvePath(dir);
-      const dataRoot = resolvePath(backendConfig.dataDir);
+      // Validate path to prevent directory traversal (handles case-insensitive filesystems)
+      let resolved: string;
+      let dataRoot: string;
+      try {
+        resolved = realpathSync(resolvePath(dir));
+        dataRoot = realpathSync(resolvePath(backendConfig.dataDir));
+      } catch {
+        // Fall back to resolve if paths don't exist yet
+        resolved = resolvePath(dir);
+        dataRoot = resolvePath(backendConfig.dataDir);
+      }
       if (resolved !== dataRoot && !resolved.startsWith(dataRoot + "/")) {
         throw new Error("syncFiles directory must be within the configured data directory");
       }
@@ -130,9 +140,20 @@ export function createMemoryManager(params: {
       return chatPersistence.loadHistory(params);
     },
 
-    close: () => {
+    getUserProfile: (): UserProfile | undefined => {
+      if (closed) return undefined;
+      return profileManager.getProfile();
+    },
+
+    updateUserProfile: async (llmClient) => {
+      if (closed) { throw new Error("Memory manager is closed"); }
+      return profileManager.extractAndUpdateProfile(llmClient);
+    },
+
+    close: async () => {
       if (closed) return;
       closed = true;
+      await chatPersistence.close();
       closeDatabase(db);
     },
   };

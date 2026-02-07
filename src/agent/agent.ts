@@ -1,6 +1,6 @@
 import type { MicroClawConfig } from "../config/types.js";
 import type { AuthCredentials } from "../infra/auth.js";
-import type { MemorySearchManager } from "../memory/types.js";
+import type { MemorySearchManager, UserProfile } from "../memory/types.js";
 import type { AgentMessage, AgentResponse, AgentTool } from "./types.js";
 import type { LlmClient, LlmMessage } from "./llm-client.js";
 import { createLlmClient } from "./create-client.js";
@@ -80,7 +80,9 @@ export function createAgent(context: AgentContext): Agent {
       // Direct mode: Anthropic API (fallback)
       // Snapshot tools at call time to avoid mutation during iteration
       const toolsSnapshot = [...currentTools];
-      return runDirectChat({ messages, channelId, client, tools: toolsSnapshot, context });
+      // Read user profile (non-blocking, undefined if unavailable)
+      const userProfile = context.memoryManager?.getUserProfile();
+      return runDirectChat({ messages, channelId, client, tools: toolsSnapshot, context, userProfile });
     },
   };
 }
@@ -149,8 +151,9 @@ async function runDirectChat(params: {
   client: LlmClient;
   tools: AgentTool[];
   context: AgentContext;
+  userProfile?: UserProfile;
 }): Promise<AgentResponse> {
-  const { messages, channelId, client, tools, context } = params;
+  const { messages, channelId, client, tools, context, userProfile } = params;
 
   // Search memory for context if available
   let memoryResults: import("../memory/types.js").MemorySearchResult[] | undefined;
@@ -174,6 +177,7 @@ async function runDirectChat(params: {
     memoryResults,
     channelId,
     canvasEnabled: context.canvasEnabled,
+    userProfile,
   });
 
   const systemMessages = messages.filter((m) => m.role === "system");
@@ -206,8 +210,12 @@ async function runDirectChat(params: {
   const conversationMessages: LlmMessage[] = [...llmMessages];
   const MAX_TOOL_ITERATIONS = 25;
   let iterations = 0;
+  const MAX_CONVERSATION_MESSAGES = 100;
   while (response.toolCalls && response.toolCalls.length > 0 && iterations < MAX_TOOL_ITERATIONS) {
     iterations++;
+    if (conversationMessages.length > MAX_CONVERSATION_MESSAGES) {
+      break;
+    }
 
     // Append assistant message with its tool calls
     conversationMessages.push({

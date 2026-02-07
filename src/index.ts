@@ -13,6 +13,7 @@ import { loadConfig, resolveDataDir, resolvePort, resolveHost } from "./config/c
 import { loadSkills } from "./skills/loader.js";
 import { createMemoryManager } from "./memory/manager.js";
 import { createAgent } from "./agent/agent.js";
+import { createLlmClient } from "./agent/create-client.js";
 import { createWebRoutes } from "./web/routes.js";
 import { createWebMonitor } from "./channels/web/monitor.js";
 import { startIpcWatcher, stopIpcWatcher, writeFilteredEnvFile, removeFilteredEnvFile } from "./container/ipc.js";
@@ -32,6 +33,17 @@ import type { SkillToolFactory } from "./skills/types.js";
 import type { ChannelPlugin, GatewayInboundMessage } from "./channels/plugins/types.js";
 
 const log = createLogger("main");
+
+/** Safely send JSON to a WebSocket, handling race between readyState check and send. */
+function safeSend(ws: WebSocket, data: unknown): void {
+  try {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(data));
+    }
+  } catch {
+    // Connection closed between readyState check and send
+  }
+}
 
 function isDockerAvailable(): boolean {
   try {
@@ -168,6 +180,29 @@ async function main(): Promise<void> {
   });
   log.info("Agent initialized");
 
+  // 9-profile. Schedule user profile extraction (non-blocking)
+  const PROFILE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+  let profileInterval: ReturnType<typeof setInterval> | undefined;
+  if (memoryManager) {
+    const profileLlmClient = createLlmClient({ config, auth });
+    let extractionInProgress = false;
+    const runProfileExtraction = () => {
+      if (extractionInProgress) return;
+      extractionInProgress = true;
+      memoryManager!.updateUserProfile(profileLlmClient)
+        .catch((err) => {
+          log.warn(`User profile extraction failed: ${formatError(err)}`);
+        })
+        .finally(() => { extractionInProgress = false; });
+    };
+    // Run once on startup (non-blocking)
+    runProfileExtraction();
+    // Schedule daily
+    profileInterval = setInterval(runProfileExtraction, PROFILE_INTERVAL_MS);
+    profileInterval.unref();
+    log.info("User profile extraction scheduled (24h interval)");
+  }
+
   // 9a. Build and start cron scheduler
   const cronEnabled = config.cron?.enabled !== false;
   const cronStorePath = resolveCronStorePath(config.cron?.store, config);
@@ -283,7 +318,9 @@ async function main(): Promise<void> {
             userMessage: msg.text,
             assistantMessage: "",
             timestamp: msg.timestamp,
-          }).catch(() => {});
+          }).catch((err) => {
+            log.warn(`Failed to persist self-sent exchange for ${channelId}: ${formatError(err)}`);
+          });
         }
         return;
       }
@@ -300,7 +337,7 @@ async function main(): Promise<void> {
         const historyMessages: Array<{ role: "user" | "assistant"; content: string; timestamp: number }> = [];
         if (memoryManager) {
           try {
-            const history = await memoryManager.loadChatHistory({ channelId, limit: 20 });
+            const history = await memoryManager.loadChatHistory({ channelId, limit: 50 });
             for (const h of history) {
               historyMessages.push({ role: h.role, content: h.content, timestamp: h.timestamp });
             }
@@ -347,7 +384,9 @@ async function main(): Promise<void> {
             userMessage: msg.text,
             assistantMessage: response.text,
             timestamp: msg.timestamp,
-          }).catch(() => {});
+          }).catch((err) => {
+            log.warn(`Failed to persist exchange for ${channelId}: ${formatError(err)}`);
+          });
         }
       } catch (err) {
         log.error(`Gateway message handling failed for ${chatKey}: ${formatError(err)}`);
@@ -449,6 +488,9 @@ async function main(): Promise<void> {
       log.error(`Failed to stop cron scheduler: ${formatError(err)}`);
     }
 
+    if (profileInterval) {
+      clearInterval(profileInterval);
+    }
     stopBrowserServer().catch(() => {});
     if (containerEnabled) {
       stopIpcWatcher();
@@ -456,7 +498,7 @@ async function main(): Promise<void> {
     }
     if (memoryManager) {
       try {
-        memoryManager.close();
+        await memoryManager.close();
         log.info("Memory database closed");
       } catch (err) {
         log.error(`Failed to close memory database: ${formatError(err)}`);
@@ -521,25 +563,21 @@ async function main(): Promise<void> {
         memoryManager.getStatus(),
         memoryManager.getRecordCounts(),
       ]).then(([status, counts]) => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({
-            type: "memory_status",
-            status: `${status.provider}/${status.model} (${status.dimensions}d)`,
-            counts,
-          }));
-        }
+        safeSend(ws, {
+          type: "memory_status",
+          status: `${status.provider}/${status.model} (${status.dimensions}d)`,
+          counts,
+        });
       }).catch(() => {
         // ignore
       });
     }
 
     // Send container mode status
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({
-        type: "container_status",
-        enabled: containerEnabled,
-      }));
-    }
+    safeSend(ws, {
+      type: "container_status",
+      enabled: containerEnabled,
+    });
   });
 
   // 14. Handle WebSocket messages -> agent
@@ -552,25 +590,21 @@ async function main(): Promise<void> {
 
     // Prevent concurrent message processing per client
     if (processingClients.has(clientId)) {
-      client.ws.send(JSON.stringify({ type: "error", message: "Please wait for the current response" }));
+      safeSend(client.ws, { type: "error", message: "Please wait for the current response" });
       return;
     }
     processingClients.add(clientId);
 
     try {
       // Send typing indicator
-      if (client.ws.readyState === WebSocket.OPEN) {
-        client.ws.send(JSON.stringify({ type: "typing" }));
-      }
+      safeSend(client.ws, { type: "typing" });
 
       // Resolve the channel for this message (default to "web")
       const resolvedChannelId = message.channelId ?? "web";
 
       // Validate channelId to prevent injection
       if (!/^[a-zA-Z0-9_-]+$/.test(resolvedChannelId)) {
-        if (client.ws.readyState === WebSocket.OPEN) {
-          client.ws.send(JSON.stringify({ type: "error", message: "Invalid channelId" }));
-        }
+        safeSend(client.ws, { type: "error", message: "Invalid channelId" });
         return;
       }
 
@@ -578,7 +612,7 @@ async function main(): Promise<void> {
       const historyMessages: Array<{ role: "user" | "assistant"; content: string; timestamp: number }> = [];
       if (memoryManager) {
         try {
-          const history = await memoryManager.loadChatHistory({ channelId: resolvedChannelId, limit: 20 });
+          const history = await memoryManager.loadChatHistory({ channelId: resolvedChannelId, limit: 50 });
           for (const msg of history) {
             historyMessages.push({ role: msg.role, content: msg.content, timestamp: msg.timestamp });
           }
@@ -597,15 +631,12 @@ async function main(): Promise<void> {
       });
 
       // Send response
-      if (client.ws.readyState === WebSocket.OPEN) {
-        const responseTimestamp = Date.now();
-        client.ws.send(JSON.stringify({
-          type: "message",
-          text: response.text,
-          timestamp: responseTimestamp,
-          channelId: resolvedChannelId,
-        }));
-      }
+      safeSend(client.ws, {
+        type: "message",
+        text: response.text,
+        timestamp: Date.now(),
+        channelId: resolvedChannelId,
+      });
 
       // Persist exchange (non-fatal)
       if (memoryManager) {
@@ -614,18 +645,16 @@ async function main(): Promise<void> {
           userMessage: message.text,
           assistantMessage: response.text,
           timestamp: message.timestamp,
-        }).catch(() => {
-          // Best-effort persistence
+        }).catch((err) => {
+          log.warn(`Failed to persist exchange for ${resolvedChannelId}: ${formatError(err)}`);
         });
       }
     } catch (err) {
       log.error(`Chat failed for ${clientId}: ${formatError(err)}`);
-      if (client.ws.readyState === WebSocket.OPEN) {
-        client.ws.send(JSON.stringify({
-          type: "error",
-          message: "An internal error occurred",
-        }));
-      }
+      safeSend(client.ws, {
+        type: "error",
+        message: "An internal error occurred",
+      });
     } finally {
       processingClients.delete(clientId);
     }
@@ -649,7 +678,7 @@ async function main(): Promise<void> {
       const historyMessages: Array<{ role: "user" | "assistant"; content: string; timestamp: number }> = [];
       if (memoryManager) {
         try {
-          const history = await memoryManager.loadChatHistory({ channelId: "web", limit: 20 });
+          const history = await memoryManager.loadChatHistory({ channelId: "web", limit: 50 });
           for (const msg of history) {
             historyMessages.push({ role: msg.role, content: msg.content, timestamp: msg.timestamp });
           }
@@ -670,12 +699,12 @@ async function main(): Promise<void> {
       if (response.text) {
         // Send response only to the originating client, not all clients
         const originClient = webMonitor.clients.get(clientId);
-        if (originClient && originClient.ws.readyState === WebSocket.OPEN) {
-          originClient.ws.send(JSON.stringify({
+        if (originClient) {
+          safeSend(originClient.ws, {
             type: "message",
             text: response.text,
             timestamp: Date.now(),
-          }));
+          });
         }
 
         // Persist exchange (non-fatal)
@@ -685,8 +714,8 @@ async function main(): Promise<void> {
             userMessage: actionText,
             assistantMessage: response.text,
             timestamp: now,
-          }).catch(() => {
-            // Best-effort persistence
+          }).catch((err) => {
+            log.warn(`Failed to persist canvas exchange: ${formatError(err)}`);
           });
         }
       }

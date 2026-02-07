@@ -67,6 +67,26 @@ export type ChatMessageRecord = {
   createdAt: number;
 };
 
+export type UserProfile = {
+  name?: string;
+  location?: string;
+  timezone?: string;
+  occupation?: string;
+  interests: string[];
+  preferences: string[];
+  communicationStyle?: string;
+  favoriteFoods: string[];
+  restaurants: string[];
+  coffeePlaces: string[];
+  clubs: string[];
+  shoppingPlaces: string[];
+  workPlaces: string[];
+  dailyPlaces: string[];
+  exerciseRoutes: string[];
+  keyFacts: string[];
+  lastUpdated: string;
+};
+
 export type MemorySearchManager = {
   search: (params: MemorySearchParams) => Promise<MemorySearchResult[]>;
   getStatus: () => Promise<MemoryProviderStatus>;
@@ -83,5 +103,7 @@ export type MemorySearchManager = {
     limit?: number;
     before?: number;
   }) => Promise<ChatMessageRecord[]>;
-  close: () => void;
+  getUserProfile: () => UserProfile | undefined;
+  updateUserProfile: (llmClient: import("../agent/llm-client.js").LlmClient) => Promise<void>;
+  close: () => void | Promise<void>;
 };

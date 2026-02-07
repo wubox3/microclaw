@@ -107,10 +107,10 @@ export function createUserProfileManager(db: SqliteDb): UserProfileManager {
   };
 
   const mergeStringArrays = (
-    base: string[],
+    base: string[] | undefined,
     extracted: string[] | undefined,
   ): string[] =>
-    deduplicateStrings([...base, ...(extracted ?? [])]).slice(
+    deduplicateStrings([...(base ?? []), ...(extracted ?? [])]).slice(
       0,
       MAX_PROFILE_LIST_SIZE,
     );

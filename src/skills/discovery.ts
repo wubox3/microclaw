@@ -1,5 +1,5 @@
 import { readdirSync, statSync, existsSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { resolve, join, relative, isAbsolute } from "node:path";
 import { readSkillManifest, validateManifest, type SkillManifest } from "./manifest.js";
 import { createLogger } from "../logging.js";
 
@@ -46,6 +46,11 @@ export function discoverSkills(skillsDir: string): DiscoveredSkill[] {
 
     const entryFile = manifest.entry ?? "index.ts";
     const entryPoint = resolve(skillDir, entryFile);
+    const rel = relative(skillDir, entryPoint);
+    if (rel.startsWith("..") || isAbsolute(rel)) {
+      log.warn(`Skill ${entry}: entry point escapes skill directory`);
+      continue;
+    }
 
     if (!existsSync(entryPoint)) {
       continue;

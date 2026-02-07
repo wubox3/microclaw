@@ -59,7 +59,7 @@ export function syncMemoryFiles(
 
     db.exec("COMMIT");
   } catch (err) {
-    db.exec("ROLLBACK");
+    try { db.exec("ROLLBACK"); } catch { /* ignore rollback failure */ }
     throw err;
   }
 
@@ -69,13 +69,13 @@ export function syncMemoryFiles(
 function collectFiles(dir: string): Array<{ path: string }> {
   const files: Array<{ path: string }> = [];
   try {
-    const entries = readdirSync(dir, { recursive: true }) as string[];
+    const entries = readdirSync(dir, { recursive: true, encoding: "utf-8" });
     for (const entry of entries) {
       const fullPath = resolve(dir, entry);
       try {
         const stat = statSync(fullPath);
         if (stat.isFile() && isTextFile(entry)) {
-          files.push({ path: entry });
+          files.push({ path: entry.replace(/\\/g, "/") });
         }
       } catch {
         // skip inaccessible files

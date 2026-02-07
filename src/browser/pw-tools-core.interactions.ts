@@ -221,7 +221,11 @@ export async function evaluateViaPlaywright(opts: {
   targetId?: string;
   fn: string;
   ref?: string;
+  evaluateEnabled?: boolean;
 }): Promise<unknown> {
+  if (opts.evaluateEnabled === false) {
+    throw new Error("evaluate is disabled by config (browser.evaluateEnabled=false).");
+  }
   const fnText = String(opts.fn ?? "").trim();
   if (!fnText) {
     throw new Error("function is required");
@@ -298,6 +302,7 @@ export async function waitForViaPlaywright(opts: {
   loadState?: "load" | "domcontentloaded" | "networkidle";
   fn?: string;
   timeoutMs?: number;
+  evaluateEnabled?: boolean;
 }): Promise<void> {
   const page = await getPageForTargetId(opts);
   ensurePageState(page);
@@ -334,6 +339,9 @@ export async function waitForViaPlaywright(opts: {
     await page.waitForLoadState(opts.loadState, { timeout });
   }
   if (opts.fn) {
+    if (opts.evaluateEnabled === false) {
+      throw new Error("wait --fn is disabled by config (browser.evaluateEnabled=false).");
+    }
     const fn = String(opts.fn).trim();
     if (fn) {
       await page.waitForFunction(fn, { timeout });

@@ -71,7 +71,7 @@ export function createChatPersistence(params: {
 
         db.exec("COMMIT");
       } catch (err) {
-        db.exec("ROLLBACK");
+        try { db.exec("ROLLBACK"); } catch { /* ignore rollback failure */ }
         throw err;
       }
 
@@ -154,7 +154,7 @@ async function generateEmbeddings(
     }
     db.exec("COMMIT");
   } catch (err) {
-    db.exec("ROLLBACK");
+    try { db.exec("ROLLBACK"); } catch { /* ignore rollback failure */ }
     throw err;
   }
 }

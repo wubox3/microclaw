@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { readFile } from "node:fs/promises";
+import { lstat, readFile } from "node:fs/promises";
 import { resolve, normalize, extname } from "node:path";
 import { generateA2uiPage } from "./a2ui-page.js";
 
@@ -53,6 +53,11 @@ export function createCanvasRoutes(dataDir: string): Hono {
     }
 
     try {
+      // Reject symlinks to prevent symlink-following attacks
+      const stats = await lstat(normalizedFull);
+      if (stats.isSymbolicLink()) {
+        return c.json({ error: "Symlinks not allowed" }, 403);
+      }
       const data = await readFile(normalizedFull);
       const ext = extname(normalizedFull).toLowerCase();
       const contentType = MIME_TYPES[ext] ?? "application/octet-stream";

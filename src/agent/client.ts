@@ -49,11 +49,15 @@ function toAnthropicMessages(messages: LlmMessage[]): Anthropic.Messages.Message
       const toolResults: Anthropic.Messages.ToolResultBlockParam[] = [];
       while (i < messages.length && messages[i]!.role === "tool") {
         const toolMsg = messages[i] as Extract<LlmMessage, { role: "tool" }>;
-        toolResults.push({
+        const block: Anthropic.Messages.ToolResultBlockParam = {
           type: "tool_result",
           tool_use_id: toolMsg.toolCallId,
           content: toolMsg.content,
-        });
+        };
+        if (toolMsg.isError) {
+          block.is_error = true;
+        }
+        toolResults.push(block);
         i++;
       }
       result.push({ role: "user", content: toolResults });
@@ -69,7 +73,7 @@ export function createAnthropicClient(options: AnthropicClientOptions): LlmClien
 
   const client = isOAuth
     ? new Anthropic({
-        apiKey: "" as string,
+        apiKey: "placeholder", // SDK requires a non-empty string even for OAuth
         authToken: options.auth.authToken,
         defaultHeaders: OAUTH_BETA_HEADERS,
       })
@@ -80,7 +84,6 @@ export function createAnthropicClient(options: AnthropicClientOptions): LlmClien
 
   return {
     async sendMessage(params: LlmSendParams): Promise<AgentResponse> {
-      // OAuth requires Claude Code identity in system prompt
       let system: string | Anthropic.Messages.TextBlockParam[] | undefined;
       if (isOAuth) {
         system = [
@@ -91,14 +94,20 @@ export function createAnthropicClient(options: AnthropicClientOptions): LlmClien
         system = params.system;
       }
 
-      const response = await client.messages.create({
-        model,
-        max_tokens: maxTokens,
-        system,
-        messages: toAnthropicMessages(params.messages),
-        tools: params.tools as Anthropic.Messages.Tool[] | undefined,
-        temperature: params.temperature,
-      });
+      let response: Anthropic.Messages.Message;
+      try {
+        response = await client.messages.create({
+          model,
+          max_tokens: maxTokens,
+          system,
+          messages: toAnthropicMessages(params.messages),
+          tools: params.tools as Anthropic.Messages.Tool[] | undefined,
+          temperature: params.temperature,
+        });
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        throw new Error(`Anthropic API call failed: ${detail}`);
+      }
 
       let text = "";
       const toolCalls: AgentResponse["toolCalls"] = [];
@@ -136,14 +145,20 @@ export function createAnthropicClient(options: AnthropicClientOptions): LlmClien
         system = params.system;
       }
 
-      const stream = client.messages.stream({
-        model,
-        max_tokens: maxTokens,
-        system,
-        messages: toAnthropicMessages(params.messages),
-        tools: params.tools as Anthropic.Messages.Tool[] | undefined,
-        temperature: params.temperature,
-      });
+      let stream: ReturnType<typeof client.messages.stream>;
+      try {
+        stream = client.messages.stream({
+          model,
+          max_tokens: maxTokens,
+          system,
+          messages: toAnthropicMessages(params.messages),
+          tools: params.tools as Anthropic.Messages.Tool[] | undefined,
+          temperature: params.temperature,
+        });
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        throw new Error(`Anthropic stream failed: ${detail}`);
+      }
 
       for await (const event of stream) {
         if (event.type === "content_block_delta") {

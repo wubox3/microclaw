@@ -41,7 +41,7 @@
   function renderChannels() {
     var label = channelList.querySelector('.nav-section-label');
     channelList.innerHTML = '';
-    channelList.appendChild(label);
+    if (label) channelList.appendChild(label);
 
     for (var i = 0; i < channels.length; i++) {
       var ch = channels[i];

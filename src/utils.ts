@@ -28,7 +28,7 @@ export function chunk<T>(array: readonly T[], size: number): T[][] {
 
 export function normalizeE164(phone: string): string {
   const digits = phone.replace(/\D/g, "");
-  if (digits.length === 0) {
+  if (digits.length < 7 || digits.length > 15) {
     return "";
   }
   return `+${digits}`;
@@ -41,7 +41,7 @@ export function hashString(str: string): number {
     hash = ((hash << 5) - hash) + char;
     hash = hash | 0;
   }
-  return Math.abs(hash);
+  return hash >>> 0;
 }
 
 export function uniqueBy<T>(array: readonly T[], key: (item: T) => string): T[] {

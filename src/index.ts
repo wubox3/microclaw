@@ -1,6 +1,8 @@
 import { serve } from "@hono/node-server";
 import { WebSocket, WebSocketServer } from "ws";
 import { execSync } from "child_process";
+import { unlinkSync } from "node:fs";
+import { resolve as resolvePath } from "node:path";
 import { loadDotenv } from "./infra/dotenv.js";
 import { isDev } from "./infra/env.js";
 import { resolveAuthCredentials } from "./infra/auth.js";
@@ -20,6 +22,7 @@ import { createBrowserTool } from "./browser/browser-tool.js";
 import type { MemorySearchManager } from "./memory/types.js";
 import type { AgentTool } from "./agent/types.js";
 import type { SkillToolFactory } from "./skills/types.js";
+import type { ChannelPlugin, GatewayInboundMessage } from "./channels/plugins/types.js";
 
 const log = createLogger("main");
 
@@ -131,12 +134,12 @@ async function main(): Promise<void> {
     additionalTools.push({
       name: skillTool.name,
       description: skillTool.description,
-      input_schema: skillTool.parameters ?? { type: "object", properties: {} },
+      input_schema: (skillTool.parameters && typeof skillTool.parameters === "object" && "type" in skillTool.parameters) ? skillTool.parameters : { type: "object", properties: {} },
       execute: (params, runtimeCtx) => skillTool.execute(params, {
         sessionKey: "",
         channelId: runtimeCtx?.channelId ?? "web",
         chatId: "",
-        config,
+        config: structuredClone(config),
       }),
     });
   }
@@ -151,6 +154,99 @@ async function main(): Promise<void> {
     additionalTools: additionalTools.length > 0 ? additionalTools : undefined,
   });
   log.info("Agent initialized");
+
+  // 9b. Start channel gateway lifecycles
+  const activeGateways: Array<{ channelId: string; plugin: ChannelPlugin }> = [];
+  const processingGatewayChats = new Set<string>();
+
+  for (const reg of skillRegistry.channels) {
+    const plugin = reg.plugin as ChannelPlugin;
+    if (!plugin.gateway?.startAccount) continue;
+
+    const channelId = plugin.id;
+    const isConfigured = plugin.config.isConfigured?.(config) ?? false;
+    const isEnabled = plugin.config.isEnabled?.(config) ?? true;
+
+    if (!isConfigured || !isEnabled) {
+      log.info(`Gateway skipped for ${channelId}: configured=${isConfigured}, enabled=${isEnabled}`);
+      continue;
+    }
+
+    const accountId = config.channels?.[channelId as keyof typeof config.channels]?.accountId ?? "default";
+
+    const onMessage = async (msg: GatewayInboundMessage): Promise<void> => {
+      const chatKey = `${channelId}:${msg.chatId}`;
+
+      // Per-chat concurrency guard
+      if (processingGatewayChats.has(chatKey)) {
+        log.warn(`Dropping message for ${chatKey}: still processing previous`);
+        return;
+      }
+      processingGatewayChats.add(chatKey);
+
+      try {
+        // Load recent chat history
+        const historyMessages: Array<{ role: "user" | "assistant"; content: string; timestamp: number }> = [];
+        if (memoryManager) {
+          try {
+            const history = await memoryManager.loadChatHistory({ channelId, limit: 20 });
+            for (const h of history) {
+              historyMessages.push({ role: h.role, content: h.content, timestamp: h.timestamp });
+            }
+          } catch {
+            // History loading is non-fatal
+          }
+        }
+
+        // Get agent response
+        const response = await agent.chat({
+          messages: [
+            ...historyMessages,
+            { role: "user", content: msg.text, timestamp: msg.timestamp },
+          ],
+          channelId,
+        });
+
+        // Send reply via outbound adapter
+        if (response.text && plugin.outbound?.sendText) {
+          await plugin.outbound.sendText({
+            config,
+            accountId,
+            to: msg.chatId,
+            text: response.text,
+            chatType: msg.chatType,
+          });
+        }
+
+        // Persist exchange
+        if (memoryManager) {
+          memoryManager.saveExchange({
+            channelId,
+            userMessage: msg.text,
+            assistantMessage: response.text,
+            timestamp: msg.timestamp,
+          }).catch(() => {});
+        }
+      } catch (err) {
+        log.error(`Gateway message handling failed for ${chatKey}: ${formatError(err)}`);
+      } finally {
+        processingGatewayChats.delete(chatKey);
+      }
+    };
+
+    try {
+      await plugin.gateway.startAccount({
+        config,
+        accountId,
+        account: undefined,
+        onMessage,
+      });
+      activeGateways.push({ channelId, plugin });
+      log.info(`Gateway started: ${channelId}`);
+    } catch (err) {
+      log.error(`Failed to start gateway for ${channelId}: ${formatError(err)}`);
+    }
+  }
 
   // 10. Start IPC watcher if container mode active
   if (containerEnabled) {
@@ -202,6 +298,15 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     log.info("Shutting down...");
+    // Stop channel gateways
+    for (const gw of activeGateways) {
+      try {
+        gw.plugin.gateway?.stopAccount?.({ config, accountId: "default" });
+        log.info(`Gateway stopped: ${gw.channelId}`);
+      } catch (err) {
+        log.error(`Failed to stop gateway ${gw.channelId}: ${formatError(err)}`);
+      }
+    }
     stopBrowserServer().catch(() => {});
     if (containerEnabled) {
       stopIpcWatcher();
@@ -235,7 +340,8 @@ async function main(): Promise<void> {
   let clientIdCounter = 0;
 
   wss.on("connection", (ws) => {
-    const clientId = `web-${++clientIdCounter}`;
+    clientIdCounter = (clientIdCounter + 1) % Number.MAX_SAFE_INTEGER;
+    const clientId = `web-${clientIdCounter}`;
     webMonitor.addClient(clientId, ws);
     log.info(`WebSocket client connected: ${clientId}`);
 
@@ -417,7 +523,7 @@ process.on("unhandledRejection", (err) => {
 process.on("uncaughtException", (err) => {
   log.error(`Uncaught exception: ${formatError(err)}`);
   // Best-effort credential cleanup (no-op if file doesn't exist)
-  removeFilteredEnvFile();
+  try { unlinkSync(resolvePath(process.cwd(), "data", "env", "env")); } catch {}
   process.exit(1);
 });
 

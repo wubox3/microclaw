@@ -312,6 +312,11 @@ async function connectBrowser(cdpUrl: string): Promise<ConnectedBrowser> {
   if (cached?.cdpUrl === normalized && !cached.browser.isConnected()) {
     cached = null;
   }
+  // Bug 3 fix: close old connection when switching to a different CDP URL
+  if (cached && cached.cdpUrl !== normalized) {
+    await cached.browser.close().catch(() => {});
+    cached = null;
+  }
   if (connecting && connectingUrl === normalized) {
     return await connecting;
   }
@@ -497,6 +502,8 @@ export function refLocator(page: Page, ref: string) {
 export async function closePlaywrightBrowserConnection(): Promise<void> {
   const cur = cached;
   cached = null;
+  // Bug 13 fix: clear role refs cache to prevent memory leak
+  roleRefsByTarget.clear();
   if (!cur) {
     return;
   }

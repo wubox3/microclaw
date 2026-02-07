@@ -35,8 +35,10 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
         channelFolders = fs
           .readdirSync(ipcBaseDir)
           .filter((f) => {
+            if (!/^[a-zA-Z0-9_-]+$/.test(f)) return false;
             try {
-              return fs.statSync(path.join(ipcBaseDir, f)).isDirectory();
+              const stat = fs.lstatSync(path.join(ipcBaseDir, f));
+              return stat.isDirectory() && !stat.isSymbolicLink();
             } catch {
               return false;
             }
@@ -63,14 +65,22 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
           for (const file of messageFiles) {
             const filePath = path.join(messagesDir, file);
             try {
-              // Guard against symlink attacks from malicious containers
-              const stat = fs.lstatSync(filePath);
-              if (stat.isSymbolicLink()) {
-                log.warn(`Skipping symlink in IPC messages: ${file}`);
+              // Atomically prevent symlink following with O_NOFOLLOW
+              let fd: number;
+              try {
+                fd = fs.openSync(filePath, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+              } catch {
+                log.warn(`Skipping symlink or unreadable IPC message: ${file}`);
                 try { fs.unlinkSync(filePath); } catch { /* best-effort */ }
                 continue;
               }
-              const data = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+              let rawData: string;
+              try {
+                rawData = fs.readFileSync(fd, "utf-8");
+              } finally {
+                fs.closeSync(fd);
+              }
+              const data = JSON.parse(rawData);
 
               if (data.type === "message") {
                 // Always use folder-derived channelId, never trust container data
@@ -90,7 +100,7 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
               const errorsDir = path.join(ipcBaseDir, "errors");
               fs.mkdirSync(errorsDir, { recursive: true });
               try {
-                fs.renameSync(filePath, path.join(errorsDir, file));
+                fs.renameSync(filePath, path.join(errorsDir, `${channelId}-${file}`));
               } catch {
                 try {
                   fs.unlinkSync(filePath);
@@ -121,14 +131,22 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
           for (const file of taskFiles) {
             const filePath = path.join(tasksDir, file);
             try {
-              // Guard against symlink attacks from malicious containers
-              const taskStat = fs.lstatSync(filePath);
-              if (taskStat.isSymbolicLink()) {
-                log.warn(`Skipping symlink in IPC tasks: ${file}`);
+              // Atomically prevent symlink following with O_NOFOLLOW
+              let taskFd: number;
+              try {
+                taskFd = fs.openSync(filePath, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+              } catch {
+                log.warn(`Skipping symlink or unreadable IPC task: ${file}`);
                 try { fs.unlinkSync(filePath); } catch { /* best-effort */ }
                 continue;
               }
-              const data = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+              let taskRawData: string;
+              try {
+                taskRawData = fs.readFileSync(taskFd, "utf-8");
+              } finally {
+                fs.closeSync(taskFd);
+              }
+              const data = JSON.parse(taskRawData);
 
               if (
                 data.type === "search_memory" &&
@@ -217,7 +235,9 @@ export function writeFilteredEnvFile(): void {
       // Strip newlines to prevent env variable injection
       const sanitized = value.replace(/[\r\n]/g, "");
       if (sanitized.length > 0) {
-        lines.push(`${varName}=${sanitized}`);
+        // Quote with single quotes and escape embedded single quotes
+        const quoted = sanitized.replace(/'/g, "'\\''");
+        lines.push(`${varName}='${quoted}'`);
       }
     }
   }

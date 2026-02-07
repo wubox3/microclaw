@@ -1,6 +1,15 @@
 import type { MicroClawConfig } from "../../config/types.js";
 import type { ChannelId, ChannelAccountSnapshot, ChannelGroupContext, NormalizedChatType } from "./types.core.js";
 
+export type GatewayInboundMessage = {
+  from: string;
+  text: string;
+  chatType: NormalizedChatType;
+  chatId: string;
+  timestamp: number;
+  senderName?: string;
+};
+
 export type ChannelOutboundContext = {
   channelId: ChannelId;
   accountId?: string;
@@ -39,6 +48,7 @@ export type ChannelGatewayAdapter<ResolvedAccount = unknown> = {
     config: MicroClawConfig;
     accountId: string;
     account: ResolvedAccount;
+    onMessage?: (msg: GatewayInboundMessage) => Promise<void>;
   }) => Promise<unknown>;
   stopAccount?: (params: {
     config: MicroClawConfig;

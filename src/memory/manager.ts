@@ -48,6 +48,11 @@ export function createMemoryManager(params: {
       if (closed) {
         throw new Error("Memory manager is closed");
       }
+
+      if (!searchParams.query || searchParams.query.trim() === "") {
+        return [];
+      }
+
       const vectorWeight = searchParams.vectorWeight ?? backendConfig.vectorWeight;
       const keywordWeight = searchParams.keywordWeight ?? backendConfig.keywordWeight;
       const limit = searchParams.limit ?? backendConfig.maxResults;
@@ -87,7 +92,7 @@ export function createMemoryManager(params: {
       provider: embeddingProvider ? "anthropic" : "keyword-only",
       model: embeddingProvider?.model ?? "none",
       dimensions: embeddingProvider?.dimensions ?? 0,
-      ready: true,
+      ready: !closed,
     }),
 
     syncFiles: async (dir: string) => {
@@ -97,9 +102,15 @@ export function createMemoryManager(params: {
       return syncMemoryFiles(db, dir);
     },
 
-    saveExchange: chatPersistence.saveExchange,
+    saveExchange: async (params) => {
+      if (closed) { throw new Error("Memory manager is closed"); }
+      return chatPersistence.saveExchange(params);
+    },
 
-    loadChatHistory: chatPersistence.loadHistory,
+    loadChatHistory: async (params) => {
+      if (closed) { throw new Error("Memory manager is closed"); }
+      return chatPersistence.loadHistory(params);
+    },
 
     close: () => {
       if (closed) return;

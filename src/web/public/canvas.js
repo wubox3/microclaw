@@ -70,7 +70,7 @@
 
   function sendToIframe(data) {
     if (!iframe || !iframe.contentWindow) return;
-    iframe.contentWindow.postMessage(data, '*');
+    iframe.contentWindow.postMessage(data, window.location.origin);
   }
 
   function show() {

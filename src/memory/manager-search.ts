@@ -54,12 +54,16 @@ export function vectorSearch(
     source: string;
   }>;
 
-  const results: VectorSearchResult[] = rows.map((row) => {
+  const results = rows.map((row): VectorSearchResult | null => {
     // Copy into an aligned ArrayBuffer — Node.js Buffers can have arbitrary
     // byteOffset which would cause Float32Array to throw RangeError.
     const aligned = new ArrayBuffer(row.embedding.byteLength);
     new Uint8Array(aligned).set(new Uint8Array(row.embedding.buffer, row.embedding.byteOffset, row.embedding.byteLength));
     const stored = new Float32Array(aligned);
+    if (stored.length !== queryEmbedding.length) {
+      searchLog.warn(`Embedding dimension mismatch: query=${queryEmbedding.length}, stored=${stored.length} for chunk ${row.chunk_id}, skipping`);
+      return null;
+    }
     const score = cosineSimilarity(queryEmbedding, Array.from(stored));
     return {
       chunkId: row.chunk_id,
@@ -75,6 +79,7 @@ export function vectorSearch(
   });
 
   return results
+    .filter((r): r is VectorSearchResult => r !== null)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
 }

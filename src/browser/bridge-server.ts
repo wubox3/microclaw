@@ -42,7 +42,7 @@ export async function startBrowserBridgeServer(params: {
   }
 
   const state: BrowserServerState = {
-    server: null as unknown as Server,
+    server: null,
     port,
     resolved: params.resolved,
     profiles: new Map(),

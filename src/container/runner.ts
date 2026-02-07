@@ -141,6 +141,12 @@ export async function runContainerAgent(
   fs.mkdirSync(logsDir, { recursive: true });
 
   return new Promise((resolve) => {
+    let settled = false;
+    const safeResolve = (value: ContainerOutput) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
     const container = spawn("docker", dockerArgs, {
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -194,6 +200,11 @@ export async function runContainerAgent(
         if (err) {
           log.warn(`Graceful stop failed for ${containerName}, force killing`);
           container.kill("SIGKILL");
+          execFile("docker", ["kill", containerName], { timeout: 10000 }, (killErr) => {
+            if (killErr) {
+              log.error(`Docker kill also failed for ${containerName}: ${killErr.message}`);
+            }
+          });
         }
       });
     }, timeout);
@@ -237,7 +248,7 @@ export async function runContainerAgent(
       fs.writeFileSync(logFile, logLines.join("\n"));
 
       if (timedOut) {
-        resolve({
+        safeResolve({
           status: "error",
           result: null,
           error: `Container timed out after ${timeout}ms`,
@@ -249,7 +260,7 @@ export async function runContainerAgent(
         log.error(
           `Container exited with code ${code} (${duration}ms)`,
         );
-        resolve({
+        safeResolve({
           status: "error",
           result: null,
           error: `Container exited with code ${code}: ${stderr.slice(-200)}`,
@@ -277,12 +288,12 @@ export async function runContainerAgent(
           `Container completed: ${output.status} (${duration}ms)`,
         );
 
-        resolve(output);
+        safeResolve(output);
       } catch (err) {
         log.error(
           `Failed to parse container output: ${err instanceof Error ? err.message : String(err)}`,
         );
-        resolve({
+        safeResolve({
           status: "error",
           result: null,
           error: `Failed to parse container output: ${err instanceof Error ? err.message : String(err)}`,
@@ -293,7 +304,7 @@ export async function runContainerAgent(
     container.on("error", (err) => {
       clearTimeout(timeoutHandle);
       log.error(`Container spawn error: ${err.message}`);
-      resolve({
+      safeResolve({
         status: "error",
         result: null,
         error: `Container spawn error: ${err.message}`,

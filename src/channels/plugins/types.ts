@@ -11,6 +11,7 @@ export type {
 } from "./types.core.js";
 
 export type {
+  GatewayInboundMessage,
   ChannelOutboundContext,
   ChannelConfigAdapter,
   ChannelOutboundAdapter,

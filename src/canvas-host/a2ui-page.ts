@@ -252,7 +252,7 @@ export function generateA2uiPage(): string {
     }, PARENT_ORIGIN);
   }
 
-  var DANGEROUS_TAGS = ['script', 'style', 'iframe', 'object', 'embed', 'form', 'base', 'link', 'meta'];
+  var DANGEROUS_TAGS = ['script', 'style', 'iframe', 'object', 'embed', 'form', 'base', 'link', 'meta', 'svg', 'math', 'foreignobject', 'animate', 'animatetransform', 'set', 'use', 'mtext', 'mglyph', 'annotation-xml'];
 
   function sanitizeHtml(html) {
     var temp = document.createElement('div');
@@ -535,7 +535,7 @@ export function generateA2uiPage(): string {
   }
 
   function escapeSurfaceSelector(id) {
-    return typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(id) : id.replace(/["\\]/g, '');
+    return typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(id) : id.replace(/([^a-zA-Z0-9])/g, '\\$1');
   }
 
   function renderSurface(surfaceId, root) {

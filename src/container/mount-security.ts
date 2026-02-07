@@ -17,6 +17,8 @@ import { createLogger } from "../logging.js";
 const log = createLogger("mount-security");
 
 let cachedAllowlist: MountAllowlist | null = null;
+let cachedAllowlistTimestamp = 0;
+const ALLOWLIST_CACHE_TTL_MS = 60_000;
 let allowlistLoadError: string | null = null;
 
 const DEFAULT_BLOCKED_PATTERNS = [
@@ -46,7 +48,10 @@ export function invalidateAllowlistCache(): void {
 
 export function loadMountAllowlist(): MountAllowlist | null {
   if (cachedAllowlist !== null) {
-    return cachedAllowlist;
+    if (Date.now() - cachedAllowlistTimestamp < ALLOWLIST_CACHE_TTL_MS) {
+      return cachedAllowlist;
+    }
+    cachedAllowlist = null;
   }
 
   // Don't permanently cache load errors — retry on next call
@@ -85,6 +90,7 @@ export function loadMountAllowlist(): MountAllowlist | null {
       ...allowlist,
       blockedPatterns: mergedBlocked,
     };
+    cachedAllowlistTimestamp = Date.now();
 
     log.info(
       `Mount allowlist loaded: ${allowlist.allowedRoots.length} roots, ${mergedBlocked.length} blocked patterns`,
@@ -135,8 +141,12 @@ function matchesBlockedPattern(
       }
     }
     // Also check if the filename starts with the pattern (e.g., ".env.local" matches ".env")
+    // Only match if pattern is followed by nothing, a dot, or a path separator
     if (fileName.startsWith(pattern)) {
-      return pattern;
+      const rest = fileName.slice(pattern.length);
+      if (rest === "" || rest.startsWith(".") || rest.startsWith("/") || rest.startsWith("\\")) {
+        return pattern;
+      }
     }
   }
 

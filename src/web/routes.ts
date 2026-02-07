@@ -25,6 +25,25 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
   const app = new Hono();
   const publicDir = resolve(import.meta.dirname, "public");
 
+  // CSRF protection: validate Origin header on all POST requests
+  app.use("*", async (c, next) => {
+    if (c.req.method === "POST") {
+      const origin = c.req.header("Origin");
+      if (origin) {
+        try {
+          const url = new URL(origin);
+          const validHosts = ["localhost", "127.0.0.1", "::1"];
+          if (!validHosts.includes(url.hostname)) {
+            return c.json({ success: false, error: "CSRF: invalid origin" }, 403);
+          }
+        } catch {
+          return c.json({ success: false, error: "CSRF: malformed origin" }, 403);
+        }
+      }
+    }
+    await next();
+  });
+
   // API routes
   app.get("/api/channels", (c) => {
     const channels = listChatChannels();
@@ -130,9 +149,12 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     }
 
     const channelId = c.req.query("channelId") ?? "web";
+    if (!/^[a-zA-Z0-9_-]+$/.test(channelId)) {
+      return c.json({ success: false, error: "Invalid channelId" }, 400);
+    }
     const limit = Math.max(1, Math.min(Number(c.req.query("limit")) || 50, 200));
     const beforeParam = c.req.query("before");
-    const before = beforeParam !== undefined ? Number(beforeParam) : undefined;
+    const before = beforeParam !== undefined && beforeParam !== "" ? Number(beforeParam) : undefined;
     if (before !== undefined && (!Number.isFinite(before) || before < 0)) {
       return c.json({ success: false, error: "'before' must be a non-negative number" }, 400);
     }

@@ -357,6 +357,8 @@
       };
 
       currentAudio.play().catch(function(err) {
+        URL.revokeObjectURL(audioUrl);
+        currentAudio = null;
         isSpeaking = false;
         setVoiceStatus('Audio play blocked: ' + err.message);
         updateUI();

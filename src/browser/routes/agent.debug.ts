@@ -135,7 +135,7 @@ export function registerBrowserAgentDebugRoutes(
       await fs.mkdir(dir, { recursive: true });
       const rawTrace = out.trim() || path.join(dir, `browser-trace-${id}.zip`);
       const resolvedTrace = path.resolve(rawTrace);
-      const BLOCKED_PREFIXES = ["/etc/", "/usr/", "/bin/", "/sbin/", "/var/", "/sys/", "/proc/", "/dev/"];
+      const BLOCKED_PREFIXES = ["/etc/", "/usr/", "/bin/", "/sbin/", "/var/", "/sys/", "/proc/", "/dev/", "/home/", "/root/", "/opt/", "/tmp/../", "/Users/"];
       if (BLOCKED_PREFIXES.some((p) => resolvedTrace.startsWith(p)) || resolvedTrace.includes("\0")) {
         res.status(400).json({ ok: false, error: "Trace output path is not allowed" });
         return;

@@ -41,7 +41,7 @@ export function createWebMonitor(): WebMonitor {
               value: parsed.value,
               surfaceId: typeof parsed.surfaceId === "string" ? parsed.surfaceId : undefined,
             };
-            for (const handler of canvasActionHandlers) {
+            for (const handler of [...canvasActionHandlers]) {
               try {
                 handler(id, action);
               } catch {
@@ -62,7 +62,7 @@ export function createWebMonitor(): WebMonitor {
             timestamp: Date.now(),
             channelId: typeof parsed.channelId === "string" ? parsed.channelId : undefined,
           };
-          for (const handler of messageHandlers) {
+          for (const handler of [...messageHandlers]) {
             try {
               handler(id, msg);
             } catch {

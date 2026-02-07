@@ -43,17 +43,24 @@ export function createAgent(context: AgentContext): Agent {
 
   // Session tracking for container mode (channelId -> sessionId)
   const sessions = context.sessions ?? new Map<string, string>();
+  const channelLocks = new Map<string, Promise<AgentResponse>>();
 
   return {
     chat: async ({ messages, channelId }) => {
       // Container mode: spawn Docker container with Claude Agent SDK
       if (context.containerEnabled) {
-        return runContainerChat({
-          messages,
-          channelId: channelId ?? "web",
-          config: context.config,
-          sessions,
-        });
+        const cid = channelId ?? "web";
+        const previous = channelLocks.get(cid) ?? Promise.resolve({} as AgentResponse);
+        const current = previous.catch(() => {}).then(() =>
+          runContainerChat({
+            messages,
+            channelId: cid,
+            config: context.config,
+            sessions,
+          })
+        );
+        channelLocks.set(cid, current);
+        return current;
       }
 
       // Direct mode: Anthropic API (fallback)
@@ -182,19 +189,25 @@ async function runDirectChat(params: {
     for (const toolCall of response.toolCalls) {
       const tool = tools.find((t) => t.name === toolCall.name);
       let resultContent: string;
+      let isError = false;
       if (tool) {
         try {
-          resultContent = (await tool.execute(toolCall.input, toolContext)).content;
+          const result = await tool.execute(toolCall.input, toolContext);
+          resultContent = result.content;
+          isError = result.isError ?? false;
         } catch (err) {
           resultContent = `Tool execution error: ${err instanceof Error ? err.message : String(err)}`;
+          isError = true;
         }
       } else {
         resultContent = `Unknown tool: ${toolCall.name}`;
+        isError = true;
       }
       conversationMessages.push({
         role: "tool",
         toolCallId: toolCall.id,
         content: resultContent,
+        isError,
       });
     }
 
@@ -208,6 +221,11 @@ async function runDirectChat(params: {
 
   if (iterations >= MAX_TOOL_ITERATIONS && response.toolCalls && response.toolCalls.length > 0) {
     log.warn(`Tool call loop reached max ${MAX_TOOL_ITERATIONS} iterations with ${response.toolCalls.length} unprocessed tool calls`);
+    return {
+      ...response,
+      text: response.text + "\n\n[Note: reached maximum tool call iterations. Some tool calls were not executed.]",
+      toolCalls: undefined,
+    };
   }
 
   return response;

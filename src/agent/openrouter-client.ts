@@ -162,7 +162,7 @@ export function createOpenRouterClient(
         toolCalls: toolCalls && toolCalls.length > 0 ? toolCalls : undefined,
         usage: response.usage
           ? {
-              inputTokens: response.usage.prompt_tokens,
+              inputTokens: response.usage.prompt_tokens ?? 0,
               outputTokens: response.usage.completion_tokens ?? 0,
             }
           : undefined,

@@ -15,6 +15,20 @@ type Pending = {
 
 export type CdpSendFn = (method: string, params?: Record<string, unknown>) => Promise<unknown>;
 
+export function sanitizeUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.username || parsed.password) {
+      parsed.username = "";
+      parsed.password = "";
+      return parsed.toString();
+    }
+    return url;
+  } catch {
+    return url;
+  }
+}
+
 export function isLoopbackHost(host: string) {
   const h = host.trim().toLowerCase();
   return (

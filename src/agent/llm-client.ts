@@ -8,7 +8,7 @@ export type LlmToolDefinition = {
 
 export type LlmUserMessage = { role: "user"; content: string };
 export type LlmAssistantMessage = { role: "assistant"; content: string; toolCalls?: AgentToolCall[] };
-export type LlmToolResultMessage = { role: "tool"; toolCallId: string; content: string };
+export type LlmToolResultMessage = { role: "tool"; toolCallId: string; content: string; isError?: boolean };
 export type LlmMessage = LlmUserMessage | LlmAssistantMessage | LlmToolResultMessage;
 
 export type LlmSendParams = {

@@ -216,7 +216,7 @@ export async function downloadViaPlaywright(opts: {
     throw new Error("path is required");
   }
   const resolvedOut = path.resolve(outPath);
-  const BLOCKED_PREFIXES = ["/etc/", "/usr/", "/bin/", "/sbin/", "/var/", "/sys/", "/proc/", "/dev/"];
+  const BLOCKED_PREFIXES = ["/etc/", "/usr/", "/bin/", "/sbin/", "/var/", "/sys/", "/proc/", "/dev/", "/home/", "/root/", "/opt/", "/tmp/../", "/Users/"];
   if (BLOCKED_PREFIXES.some((p) => resolvedOut.startsWith(p)) || resolvedOut.includes("\0")) {
     throw new Error("Download path is not allowed");
   }

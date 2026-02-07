@@ -10,6 +10,7 @@ import { type BrowserServerState, createBrowserRouteContext } from "./server-con
 import { setBrowserControlBaseUrl } from "./client-fetch.js";
 
 let state: BrowserServerState | null = null;
+let startingPromise: Promise<BrowserServerState | null> | null = null;
 const log = createSubsystemLogger("browser");
 const logServer = log.child("server");
 
@@ -20,6 +21,14 @@ export type StartBrowserServerOptions = {
 export async function startBrowserServer(
   options?: StartBrowserServerOptions,
 ): Promise<BrowserServerState | null> {
+  if (state) {
+    return state;
+  }
+  if (startingPromise) {
+    return await startingPromise;
+  }
+
+  const doStart = async (): Promise<BrowserServerState | null> => {
   if (state) {
     return state;
   }
@@ -72,6 +81,12 @@ export async function startBrowserServer(
 
   logServer.info(`Browser control listening on http://127.0.0.1:${port}/`);
   return state;
+  };
+
+  startingPromise = doStart().finally(() => {
+    startingPromise = null;
+  });
+  return await startingPromise;
 }
 
 export async function stopBrowserServer(): Promise<void> {
@@ -101,7 +116,6 @@ export async function stopBrowserServer(): Promise<void> {
       current.server?.close(() => resolve());
     });
   }
-  state = null;
 
   try {
     const mod = await import("./pw-ai.js");
@@ -109,4 +123,7 @@ export async function stopBrowserServer(): Promise<void> {
   } catch {
     // ignore
   }
+
+  // Bug 8 fix: nullify state AFTER Playwright cleanup is complete
+  state = null;
 }

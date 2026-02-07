@@ -110,6 +110,13 @@ export async function textToSpeech(params: {
     };
   }
 
+  if (!params.text.trim()) {
+    return {
+      success: false,
+      error: "Text must not be empty or whitespace-only",
+    };
+  }
+
   if (params.text.length > resolved.maxTextLength) {
     return {
       success: false,

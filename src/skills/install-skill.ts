@@ -23,6 +23,11 @@ export function parseArgs(argv: readonly string[]): { url: string; name: string 
     process.exit(1);
   }
 
+  if (url.startsWith("ext::")) {
+    console.error("Error: ext:: git protocol is not allowed");
+    process.exit(1);
+  }
+
   if (!VALID_GIT_URL.test(url)) {
     console.error("Error: invalid git URL — must be https://, git://, or git@ format");
     process.exit(1);

@@ -279,6 +279,9 @@ async function main(): Promise<void> {
   // 9b. Start channel gateway lifecycles
   const activeGateways: Array<{ channelId: string; accountId: string; plugin: ChannelPlugin }> = [];
   const processingGatewayChats = new Set<string>();
+  // Track recently sent outbound texts to avoid re-processing agent replies as new messages
+  const recentOutboundTexts = new Map<string, Set<string>>();
+  const OUTBOUND_ECHO_TTL_MS = 30_000;
 
   for (const reg of skillRegistry.channels) {
     const plugin = reg.plugin as ChannelPlugin;
@@ -310,19 +313,24 @@ async function main(): Promise<void> {
         isFromSelf,
       }));
 
-      // Self-sent messages: persist to history but don't trigger agent
+      // Detect outbound echoes: agent replies show up as is_from_me in chat.db
       if (isFromSelf) {
-        if (memoryManager) {
-          memoryManager.saveExchange({
-            channelId,
-            userMessage: msg.text,
-            assistantMessage: "",
-            timestamp: msg.timestamp,
-          }).catch((err) => {
-            log.warn(`Failed to persist self-sent exchange for ${channelId}: ${formatError(err)}`);
-          });
+        const echoSet = recentOutboundTexts.get(msg.chatId);
+        if (echoSet?.has(msg.text)) {
+          echoSet.delete(msg.text);
+          // Still persist the assistant side of the exchange
+          if (memoryManager) {
+            memoryManager.saveExchange({
+              channelId,
+              userMessage: "",
+              assistantMessage: msg.text,
+              timestamp: msg.timestamp,
+            }).catch((err) => {
+              log.warn(`Failed to persist outbound echo for ${channelId}: ${formatError(err)}`);
+            });
+          }
+          return;
         }
-        return;
       }
 
       // Per-chat concurrency guard
@@ -357,6 +365,15 @@ async function main(): Promise<void> {
 
         // Send reply via outbound adapter
         if (response.text && plugin.outbound?.sendText) {
+          // Track outbound text so we can filter the echo when it comes back via poll
+          const echoSet = recentOutboundTexts.get(msg.chatId) ?? new Set<string>();
+          echoSet.add(response.text);
+          recentOutboundTexts.set(msg.chatId, echoSet);
+          setTimeout(() => {
+            echoSet.delete(response.text);
+            if (echoSet.size === 0) recentOutboundTexts.delete(msg.chatId);
+          }, OUTBOUND_ECHO_TTL_MS);
+
           await plugin.outbound.sendText({
             config,
             accountId,

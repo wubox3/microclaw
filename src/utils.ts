@@ -27,7 +27,13 @@ export function chunk<T>(array: readonly T[], size: number): T[][] {
 }
 
 export function normalizeE164(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
+  let digits = phone.replace(/\D/g, "");
+  // Strip international dialing prefixes (00 or 011)
+  if (digits.startsWith("011")) {
+    digits = digits.slice(3);
+  } else if (digits.startsWith("00")) {
+    digits = digits.slice(2);
+  }
   if (digits.length < 7 || digits.length > 15) {
     return "";
   }
@@ -67,6 +73,8 @@ export function groupBy<T>(array: readonly T[], key: (item: T) => string): Recor
       groups.set(k, [item]);
     }
   }
-  // Internal arrays are not leaked; the return type enforces readonly
+  // NOTE: Immutability is enforced at compile-time only via the `readonly T[]`
+  // return type. At runtime, callers could still cast and mutate the arrays.
+  // This is acceptable since the function is internal and all callers are typed.
   return Object.fromEntries(groups) as Record<string, readonly T[]>;
 }

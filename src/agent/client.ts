@@ -2,6 +2,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { AgentResponse, AgentStreamEvent } from "./types.js";
 import type { AuthCredentials } from "../infra/auth.js";
 import type { LlmClient, LlmSendParams, LlmStreamParams, LlmMessage } from "./llm-client.js";
+import { createLogger } from "../logging.js";
+
+const log = createLogger("anthropic-client");
 
 export type AnthropicClientOptions = {
   auth: AuthCredentials;
@@ -134,7 +137,14 @@ export function createAnthropicClient(options: AnthropicClientOptions): LlmClien
       };
     },
 
+    // Note: streamMessage is designed for text-only display. It does NOT yield
+    // tool_use events from the stream. If you need tool call handling, use
+    // sendMessage instead which fully supports the tool-use loop.
     async *streamMessage(params: LlmStreamParams): AsyncGenerator<AgentStreamEvent> {
+      if (params.tools && params.tools.length > 0) {
+        log.warn("streamMessage does not support tool calls — tool definitions will be ignored. Use sendMessage for tool use.");
+      }
+
       let system: string | Anthropic.Messages.TextBlockParam[] | undefined;
       if (isOAuth) {
         system = [
@@ -145,32 +155,31 @@ export function createAnthropicClient(options: AnthropicClientOptions): LlmClien
         system = params.system;
       }
 
-      let stream: ReturnType<typeof client.messages.stream>;
+      const stream = client.messages.stream({
+        model,
+        max_tokens: maxTokens,
+        system,
+        messages: toAnthropicMessages(params.messages),
+        tools: params.tools as Anthropic.Messages.Tool[] | undefined,
+        temperature: params.temperature,
+      });
+
       try {
-        stream = client.messages.stream({
-          model,
-          max_tokens: maxTokens,
-          system,
-          messages: toAnthropicMessages(params.messages),
-          tools: params.tools as Anthropic.Messages.Tool[] | undefined,
-          temperature: params.temperature,
-        });
+        for await (const event of stream) {
+          if (event.type === "content_block_delta") {
+            const delta = event.delta;
+            if ("text" in delta) {
+              yield { type: "text_delta", text: delta.text };
+            }
+          } else if (event.type === "message_start") {
+            yield { type: "message_start" };
+          } else if (event.type === "message_stop") {
+            yield { type: "message_stop" };
+          }
+        }
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         throw new Error(`Anthropic stream failed: ${detail}`);
-      }
-
-      for await (const event of stream) {
-        if (event.type === "content_block_delta") {
-          const delta = event.delta;
-          if ("text" in delta) {
-            yield { type: "text_delta", text: delta.text };
-          }
-        } else if (event.type === "message_start") {
-          yield { type: "message_start" };
-        } else if (event.type === "message_stop") {
-          yield { type: "message_stop" };
-        }
       }
     },
   };

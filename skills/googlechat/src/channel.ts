@@ -2,8 +2,6 @@ import type { ChannelPlugin } from "../../../src/channels/plugins/types.js";
 import type { MicroClawConfig } from "../../../src/config/types.js";
 import { startGoogleChatGateway, type GoogleChatGatewayHandle } from "./gateway.js";
 
-let activeHandle: GoogleChatGatewayHandle | undefined;
-
 function resolveCredentialsPath(_cfg: MicroClawConfig): string | undefined {
   return process.env.GOOGLE_CHAT_CREDENTIALS || undefined;
 }
@@ -13,6 +11,8 @@ function resolveVerificationToken(cfg: MicroClawConfig): string | undefined {
 }
 
 export function createGoogleChatPlugin(): ChannelPlugin {
+  let activeHandle: GoogleChatGatewayHandle | undefined;
+
   return {
     id: "googlechat",
     meta: {

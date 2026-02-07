@@ -162,6 +162,13 @@ export async function waitForDownloadViaPlaywright(opts: {
   suggestedFilename: string;
   path: string;
 }> {
+  if (opts.path?.trim()) {
+    const resolvedOut = path.resolve(opts.path.trim());
+    const BLOCKED_PREFIXES = ["/etc/", "/usr/", "/bin/", "/sbin/", "/sys/", "/proc/", "/dev/", "/root/"];
+    if (BLOCKED_PREFIXES.some((p) => resolvedOut.startsWith(p)) || resolvedOut.includes("\0")) {
+      throw new Error("Download path is not allowed");
+    }
+  }
   const page = await getPageForTargetId(opts);
   const state = ensurePageState(page);
   const timeout = normalizeTimeoutMs(opts.timeoutMs, 120_000);
@@ -216,7 +223,7 @@ export async function downloadViaPlaywright(opts: {
     throw new Error("path is required");
   }
   const resolvedOut = path.resolve(outPath);
-  const BLOCKED_PREFIXES = ["/etc/", "/usr/", "/bin/", "/sbin/", "/var/", "/sys/", "/proc/", "/dev/", "/home/", "/root/", "/opt/", "/tmp/../", "/Users/"];
+  const BLOCKED_PREFIXES = ["/etc/", "/usr/", "/bin/", "/sbin/", "/sys/", "/proc/", "/dev/", "/root/"];
   if (BLOCKED_PREFIXES.some((p) => resolvedOut.startsWith(p)) || resolvedOut.includes("\0")) {
     throw new Error("Download path is not allowed");
   }

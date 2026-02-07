@@ -1,22 +1,20 @@
 import { parseRoleRef } from "./pw-role-snapshot.js";
 
-let nextUploadArmId = 0;
-let nextDialogArmId = 0;
-let nextDownloadArmId = 0;
+const armCounters = { upload: 0, dialog: 0, download: 0 };
 
 export function bumpUploadArmId(): number {
-  nextUploadArmId += 1;
-  return nextUploadArmId;
+  armCounters.upload += 1;
+  return armCounters.upload;
 }
 
 export function bumpDialogArmId(): number {
-  nextDialogArmId += 1;
-  return nextDialogArmId;
+  armCounters.dialog += 1;
+  return armCounters.dialog;
 }
 
 export function bumpDownloadArmId(): number {
-  nextDownloadArmId += 1;
-  return nextDownloadArmId;
+  armCounters.download += 1;
+  return armCounters.download;
 }
 
 export function requireRef(value: unknown): string {

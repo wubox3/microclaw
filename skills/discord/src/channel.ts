@@ -15,32 +15,8 @@ type SendableChannel = TextChannel | DMChannel | ThreadChannel;
 
 const SNOWFLAKE_RE = /^\d{17,20}$/;
 
-let activeHandle: DiscordGatewayHandle | undefined;
-
 function resolveToken(cfg: MicroClawConfig): string | undefined {
   return process.env.DISCORD_BOT_TOKEN ?? cfg.channels?.discord?.token ?? undefined;
-}
-
-async function fetchSendableChannel(
-  channelId: string,
-): Promise<SendableChannel | undefined> {
-  if (!activeHandle) return undefined;
-  if (!SNOWFLAKE_RE.test(channelId)) return undefined;
-  try {
-    const channel = await activeHandle.client.channels.fetch(channelId);
-    if (!channel) return undefined;
-    if (
-      channel.type === ChannelType.GuildText ||
-      channel.type === ChannelType.DM ||
-      channel.type === ChannelType.PublicThread ||
-      channel.type === ChannelType.PrivateThread
-    ) {
-      return channel as SendableChannel;
-    }
-    return undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 function sanitizeExtension(mimeType: string): string {
@@ -49,6 +25,30 @@ function sanitizeExtension(mimeType: string): string {
 }
 
 export function createDiscordPlugin(): ChannelPlugin {
+  let activeHandle: DiscordGatewayHandle | undefined;
+
+  async function fetchSendableChannel(
+    channelId: string,
+  ): Promise<SendableChannel | undefined> {
+    if (!activeHandle) return undefined;
+    if (!SNOWFLAKE_RE.test(channelId)) return undefined;
+    try {
+      const channel = await activeHandle.client.channels.fetch(channelId);
+      if (!channel) return undefined;
+      if (
+        channel.type === ChannelType.GuildText ||
+        channel.type === ChannelType.DM ||
+        channel.type === ChannelType.PublicThread ||
+        channel.type === ChannelType.PrivateThread
+      ) {
+        return channel as SendableChannel;
+      }
+      return undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   return {
     id: "discord",
     meta: {

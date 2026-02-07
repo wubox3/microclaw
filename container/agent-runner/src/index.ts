@@ -51,7 +51,7 @@ async function main(): Promise<void> {
   try {
     const stdinData = await readStdin();
     input = JSON.parse(stdinData);
-    log(`Received input for channel: ${input.channelId}`);
+    log(`Received input for channel: ${input.channelId.replace(/[\x00-\x1f\x7f]/g, "")}`);
   } catch (err) {
     writeOutput({
       status: "error",

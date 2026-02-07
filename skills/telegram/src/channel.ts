@@ -8,9 +8,9 @@ import {
 const TELEGRAM_CHAT_ID_RE = /^-?\d+$/;
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB Telegram bot upload limit
 
-let activeHandle: TelegramGatewayHandle | undefined;
-
 export function createTelegramPlugin(): ChannelPlugin {
+  let activeHandle: TelegramGatewayHandle | undefined;
+
   return {
     id: "telegram",
     meta: {

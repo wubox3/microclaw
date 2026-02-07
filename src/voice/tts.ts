@@ -45,7 +45,7 @@ export function resolveTtsConfig(config: MicroClawConfig): ResolvedTtsConfig {
 }
 
 function resolveApiKey(resolved: ResolvedTtsConfig): string | undefined {
-  return resolved.openai.apiKey || process.env.OPENAI_API_KEY;
+  return resolved.openai.apiKey ?? process.env.OPENAI_API_KEY;
 }
 
 async function openaiTTS(params: {

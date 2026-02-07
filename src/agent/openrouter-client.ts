@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import type { AgentResponse, AgentStreamEvent } from "./types.js";
-import type { LlmClient, LlmSendParams, LlmStreamParams, LlmToolDefinition, LlmMessage } from "./llm-client.js";
+import type { LlmClient, LlmSendParams, LlmStreamParams, LlmToolDefinition } from "./llm-client.js";
 import { createLogger } from "../logging.js";
 
 const log = createLogger("openrouter");
@@ -27,46 +27,8 @@ function toOpenAITools(
   }));
 }
 
-function buildSendMessages(
-  params: LlmSendParams,
-): OpenAI.ChatCompletionMessageParam[] {
-  const messages: OpenAI.ChatCompletionMessageParam[] = [];
-
-  if (params.system) {
-    messages.push({ role: "system", content: params.system });
-  }
-
-  for (const m of params.messages) {
-    if (m.role === "user") {
-      messages.push({ role: "user", content: m.content });
-    } else if (m.role === "assistant") {
-      if (m.toolCalls && m.toolCalls.length > 0) {
-        messages.push({
-          role: "assistant",
-          content: m.content || null,
-          tool_calls: m.toolCalls.map((tc) => ({
-            id: tc.id,
-            type: "function" as const,
-            function: { name: tc.name, arguments: JSON.stringify(tc.input) },
-          })),
-        });
-      } else {
-        messages.push({ role: "assistant", content: m.content });
-      }
-    } else if (m.role === "tool") {
-      messages.push({
-        role: "tool",
-        tool_call_id: m.toolCallId,
-        content: m.content,
-      });
-    }
-  }
-
-  return messages;
-}
-
-function buildStreamMessages(
-  params: LlmStreamParams,
+function buildMessages(
+  params: LlmSendParams | LlmStreamParams,
 ): OpenAI.ChatCompletionMessageParam[] {
   const messages: OpenAI.ChatCompletionMessageParam[] = [];
 
@@ -76,7 +38,11 @@ function buildStreamMessages(
 
   for (const m of params.messages) {
     if (m.role === "tool") {
-      messages.push({ role: "tool", content: m.content, tool_call_id: m.toolCallId });
+      messages.push({
+        role: "tool",
+        tool_call_id: m.toolCallId,
+        content: m.content,
+      });
     } else if (m.role === "assistant") {
       if (m.toolCalls && m.toolCalls.length > 0) {
         messages.push({
@@ -116,7 +82,7 @@ export function createOpenRouterClient(
 
   return {
     async sendMessage(params: LlmSendParams): Promise<AgentResponse> {
-      const messages = buildSendMessages(params);
+      const messages = buildMessages(params);
       const tools =
         params.tools && params.tools.length > 0
           ? toOpenAITools(params.tools)
@@ -170,10 +136,16 @@ export function createOpenRouterClient(
     },
 
     // Note: streamMessage does not support tool calls — use sendMessage for tool use.
+    // Tool_use events are not yielded from the stream. Any tool definitions
+    // passed will be ignored.
     async *streamMessage(
       params: LlmStreamParams,
     ): AsyncGenerator<AgentStreamEvent> {
-      const messages = buildStreamMessages(params);
+      if (params.tools && params.tools.length > 0) {
+        log.warn("streamMessage does not support tool calls — tool definitions will be ignored. Use sendMessage for tool use.");
+      }
+
+      const messages = buildMessages(params);
 
       let stream: AsyncIterable<OpenAI.ChatCompletionChunk>;
       try {

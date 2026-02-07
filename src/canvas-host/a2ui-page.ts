@@ -241,9 +241,10 @@ export function generateA2uiPage(): string {
   var htmlRoot = document.getElementById('html-root');
   var surfaces = {};
 
-  var PARENT_ORIGIN = location.origin || '*';
+  var PARENT_ORIGIN = location.origin || '';
 
   function sendAction(action, componentId, value) {
+    if (!PARENT_ORIGIN) return;
     parent.postMessage({
       type: 'canvas_action',
       action: action,
@@ -624,7 +625,9 @@ export function generateA2uiPage(): string {
   window.addEventListener('message', handleMessage);
 
   // Signal readiness to parent
-  parent.postMessage({ type: 'canvas_ready' }, PARENT_ORIGIN);
+  if (PARENT_ORIGIN) {
+    parent.postMessage({ type: 'canvas_ready' }, PARENT_ORIGIN);
+  }
 })();
 </script>
 </body>

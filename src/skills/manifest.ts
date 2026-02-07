@@ -26,6 +26,13 @@ export function readSkillManifest(skillDir: string): SkillManifest | null {
     if (typeof parsed.id !== "string" || typeof parsed.name !== "string") {
       return null;
     }
+    // Reject entry fields with path traversal segments
+    if (typeof parsed.entry === "string") {
+      const segments = parsed.entry.split(/[/\\]/);
+      if (segments.some((s: string) => s === "..")) {
+        return null;
+      }
+    }
     return parsed as unknown as SkillManifest;
   } catch {
     return null;

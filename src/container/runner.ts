@@ -279,7 +279,16 @@ export async function runContainerAgent(
             .trim();
         } else {
           const lines = stdout.trim().split("\n");
-          jsonLine = lines[lines.length - 1];
+          const lastLine = lines[lines.length - 1]?.trim() ?? "";
+          if (!lastLine) {
+            safeResolve({
+              status: "error",
+              result: null,
+              error: "Container produced no parsable output (no markers found and stdout is empty)",
+            });
+            return;
+          }
+          jsonLine = lastLine;
         }
 
         const output: ContainerOutput = JSON.parse(jsonLine);

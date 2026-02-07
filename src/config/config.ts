@@ -33,6 +33,12 @@ function validateConfig(value: unknown): MicroClawConfig {
   if (web?.port !== undefined && typeof web.port !== "number") {
     throw new Error("Config 'web.port' must be a number");
   }
+  if (typeof web?.port === "number") {
+    const p = web.port;
+    if (!Number.isInteger(p) || p < 1 || p > 65535) {
+      throw new Error("web.port must be an integer between 1 and 65535");
+    }
+  }
   const agent = obj.agent as Record<string, unknown> | undefined;
   if (agent?.provider !== undefined && typeof agent.provider !== "string") {
     throw new Error("Config 'agent.provider' must be a string");

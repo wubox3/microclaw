@@ -279,7 +279,7 @@ describe("createOpenRouterClient", () => {
       expect(callArgs.temperature).toBe(0.7);
     });
 
-    it("uses custom model and maxTokens from options", () => {
+    it("uses custom model and maxTokens from options", async () => {
       const customClient = createOpenRouterClient({
         apiKey: "sk-or-test",
         model: "openai/gpt-4o",
@@ -288,7 +288,7 @@ describe("createOpenRouterClient", () => {
 
       mockCreate.mockResolvedValueOnce(makeCompletion());
 
-      customClient.sendMessage({
+      await customClient.sendMessage({
         messages: [{ role: "user", content: "Hi" }],
       });
 

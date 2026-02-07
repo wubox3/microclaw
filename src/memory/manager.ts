@@ -1,4 +1,5 @@
 import { mkdirSync, existsSync } from "node:fs";
+import { resolve as resolvePath } from "node:path";
 import type { MicroClawConfig } from "../config/types.js";
 import type { AuthCredentials } from "../infra/auth.js";
 import type { MemorySearchManager, MemorySearchParams, MemorySearchResult, MemoryProviderStatus } from "./types.js";
@@ -99,7 +100,12 @@ export function createMemoryManager(params: {
       if (closed) {
         throw new Error("Memory manager is closed");
       }
-      return syncMemoryFiles(db, dir);
+      // Validate path to prevent directory traversal
+      const resolved = resolvePath(dir);
+      if (resolved.includes("..") || !resolvePath(resolved).startsWith(resolvePath(backendConfig.dataDir))) {
+        throw new Error("syncFiles directory must be within the configured data directory");
+      }
+      return syncMemoryFiles(db, resolved);
     },
 
     saveExchange: async (params) => {

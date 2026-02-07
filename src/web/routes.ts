@@ -25,9 +25,10 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
   const app = new Hono();
   const publicDir = resolve(import.meta.dirname, "public");
 
-  // CSRF protection: validate Origin header on all POST requests
+  // CSRF protection: validate Origin header on all state-mutating requests
+  const STATE_MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
   app.use("*", async (c, next) => {
-    if (c.req.method === "POST") {
+    if (STATE_MUTATING_METHODS.has(c.req.method)) {
       const origin = c.req.header("Origin");
       if (origin) {
         try {

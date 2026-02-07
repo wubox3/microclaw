@@ -193,16 +193,30 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
     if (watcherRunning) {
       watcherTimeout = setTimeout(() => {
         processIpcFiles().catch((err) => {
-          log.error(`IPC watcher fatal error: ${err instanceof Error ? err.message : String(err)}`);
-          watcherRunning = false;
+          log.error(`IPC watcher error, will retry: ${err instanceof Error ? err.message : String(err)}`);
+          // Schedule retry instead of dying silently
+          if (watcherRunning) {
+            watcherTimeout = setTimeout(() => {
+              processIpcFiles().catch((retryErr) => {
+                log.error(`IPC watcher retry failed: ${retryErr instanceof Error ? retryErr.message : String(retryErr)}`);
+              });
+            }, IPC_POLL_INTERVAL * 2);
+          }
         });
       }, IPC_POLL_INTERVAL);
     }
   };
 
   processIpcFiles().catch((err) => {
-    log.error(`IPC watcher fatal error: ${err instanceof Error ? err.message : String(err)}`);
-    watcherRunning = false;
+    log.error(`IPC watcher startup error, will retry: ${err instanceof Error ? err.message : String(err)}`);
+    // Retry after delay instead of dying
+    if (watcherRunning) {
+      watcherTimeout = setTimeout(() => {
+        processIpcFiles().catch((retryErr) => {
+          log.error(`IPC watcher retry failed: ${retryErr instanceof Error ? retryErr.message : String(retryErr)}`);
+        });
+      }, IPC_POLL_INTERVAL * 2);
+    }
   });
   log.info("IPC watcher started");
 }

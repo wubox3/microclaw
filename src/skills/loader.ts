@@ -27,6 +27,8 @@ function createSkillApi(
     config: structuredClone(config),
     skillConfig,
     logger: createSkillLogger(skillId),
+    // Intentional mutation: registry arrays are internal and not exposed to
+    // external consumers. Push is acceptable for an internal append-only registry.
     registerTool: (tool: AgentTool | SkillToolFactory) => {
       registry.tools.push({ skillId, tool });
     },

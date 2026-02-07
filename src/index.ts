@@ -330,8 +330,14 @@ async function main(): Promise<void> {
         log.error(`Failed to close memory database: ${formatError(err)}`);
       }
     }
-    server.close(() => {
-      process.exit(0);
+    // Close WebSocket server and terminate all client connections
+    wss.clients.forEach((client) => {
+      client.terminate();
+    });
+    wss.close(() => {
+      server.close(() => {
+        process.exit(0);
+      });
     });
   };
   process.on("SIGTERM", () => { shutdown(); });

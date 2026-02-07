@@ -90,23 +90,23 @@ describe("install-skill", () => {
     });
 
     it("exits when no URL provided", () => {
-      expect(() => parseArgs(["node", "script"])).toThrow("process.exit(1)");
+      expect(() => parseArgs(["node", "script"])).toThrow("Usage:");
     });
 
     it("exits for invalid URL", () => {
-      expect(() => parseArgs(["node", "script", "not-a-url"])).toThrow("process.exit(1)");
+      expect(() => parseArgs(["node", "script", "not-a-url"])).toThrow("invalid git URL");
     });
 
     it("exits for empty --name", () => {
       expect(() =>
         parseArgs(["node", "script", "https://github.com/user/repo", "--name", "  "]),
-      ).toThrow("process.exit(1)");
+      ).toThrow("--name must not be empty");
     });
 
     it("exits for --name with invalid characters", () => {
       expect(() =>
         parseArgs(["node", "script", "https://github.com/user/repo", "--name", "../etc"]),
-      ).toThrow("process.exit(1)");
+      ).toThrow("--name contains invalid characters");
     });
 
     it("accepts SSH URL format", () => {

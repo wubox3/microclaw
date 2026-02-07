@@ -4,8 +4,6 @@ import { startSlackGateway, type SlackGatewayHandle } from "./gateway.js";
 
 const SLACK_CHANNEL_ID_RE = /^[CDGW][A-Z0-9]{8,}$/;
 
-let activeHandle: SlackGatewayHandle | undefined;
-
 function resolveBotToken(cfg: MicroClawConfig): string | undefined {
   return process.env.SLACK_BOT_TOKEN ?? cfg.channels?.slack?.token ?? undefined;
 }
@@ -20,6 +18,8 @@ function resolveAppToken(cfg: MicroClawConfig): string | undefined {
 }
 
 export function createSlackPlugin(): ChannelPlugin {
+  let activeHandle: SlackGatewayHandle | undefined;
+
   return {
     id: "slack",
     meta: {

@@ -51,14 +51,19 @@ export function createAgent(context: AgentContext): Agent {
       if (context.containerEnabled) {
         const cid = channelId ?? "web";
         const previous = channelLocks.get(cid) ?? Promise.resolve({} as AgentResponse);
-        const current = previous.catch(() => {}).then(() =>
-          runContainerChat({
-            messages,
-            channelId: cid,
-            config: context.config,
-            sessions,
+        const current = previous
+          .catch((err) => {
+            log.warn(`Previous request for channel ${cid} failed: ${err instanceof Error ? err.message : String(err)}`);
           })
-        );
+          .then(() =>
+            runContainerChat({
+              messages,
+              channelId: cid,
+              config: context.config,
+              sessions,
+            })
+          )
+          .finally(() => channelLocks.delete(cid));
         channelLocks.set(cid, current);
         return current;
       }
@@ -148,6 +153,11 @@ async function runDirectChat(params: {
     channelId,
     canvasEnabled: context.canvasEnabled,
   });
+
+  const systemMessages = messages.filter((m) => m.role === "system");
+  if (systemMessages.length > 0) {
+    log.warn(`Dropping ${systemMessages.length} system-role message(s) — system messages are not supported in direct chat mode`);
+  }
 
   const llmMessages: LlmMessage[] = messages
     .filter((m) => m.role === "user" || m.role === "assistant")

@@ -62,9 +62,9 @@ export async function startDiscordGateway(
     logger?.error(`Discord client error: ${error.message}`);
   });
 
-  client.on(Events.MessageCreate, (message) => {
+  client.on(Events.MessageCreate, async (message) => {
     try {
-      processMessage(message);
+      await processMessage(message);
     } catch (err) {
       logger?.error(
         `Failed to process Discord message: ${err instanceof Error ? err.message : String(err)}`,
@@ -72,7 +72,8 @@ export async function startDiscordGateway(
     }
   });
 
-  const processMessage = (message: Message): void => {
+  const processMessage = async (message: Message): Promise<void> => {
+    if (stopped) return;
     // Skip messages from bots (including ourselves)
     if (message.author.bot) return;
 
@@ -102,11 +103,7 @@ export async function startDiscordGateway(
         message.member?.displayName ?? message.author.displayName ?? undefined,
     };
 
-    onMessage(inbound).catch((err) => {
-      logger?.error(
-        `Gateway onMessage handler failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    });
+    await onMessage(inbound);
   };
 
   await client.login(token);

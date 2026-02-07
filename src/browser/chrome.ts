@@ -256,6 +256,13 @@ export async function launchMicroClawChrome(
       }
       await new Promise((r) => setTimeout(r, 50));
     }
+    if (bootstrap.exitCode == null) {
+      try {
+        bootstrap.kill("SIGKILL");
+      } catch {
+        // ignore
+      }
+    }
   }
 
   if (needsDecorate) {
@@ -329,7 +336,13 @@ export async function stopMicroClawChrome(running: RunningChrome, timeoutMs = 25
       return;
     }
     if (!(await isChromeReachable(cdpUrlForPort(running.cdpPort), 200))) {
-      return;
+      // CDP is gone, but verify the process actually exited
+      await new Promise((r) => setTimeout(r, 500));
+      if (proc.exitCode != null) {
+        return;
+      }
+      // Process still running without CDP - fall through to SIGKILL
+      break;
     }
     await new Promise((r) => setTimeout(r, 100));
   }

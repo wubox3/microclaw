@@ -5,8 +5,6 @@ const DEFAULT_SIGNAL_CLI_URL = "http://localhost:8080";
 const PHONE_RE = /^\+?\d{7,15}$/;
 const MAX_ATTACHMENT_SIZE = 100 * 1024 * 1024; // 100 MB
 
-let activeHandle: SignalGatewayHandle | undefined;
-
 function resolveBaseUrl(): string {
   return process.env.SIGNAL_CLI_URL || DEFAULT_SIGNAL_CLI_URL;
 }
@@ -16,6 +14,8 @@ function resolvePhoneNumber(cfg: { channels?: { signal?: { accountId?: string } 
 }
 
 export function createSignalPlugin(): ChannelPlugin {
+  let activeHandle: SignalGatewayHandle | undefined;
+
   return {
     id: "signal",
     meta: {

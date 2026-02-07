@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { mkdir } from "node:fs/promises";
-import makeWASocket, {
+import {
+  makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
   jidNormalizedUser,
@@ -14,6 +15,7 @@ const MAX_MESSAGE_LENGTH = 8000;
 const MAX_RECONNECT_ATTEMPTS = 10;
 const BASE_RECONNECT_DELAY_MS = 2000;
 const MAX_RECONNECT_DELAY_MS = 60_000;
+const PAIRING_CODE_DELAY_MS = 5000;
 
 export type WhatsAppGatewayHandle = {
   readonly sock: WASocket;
@@ -22,6 +24,7 @@ export type WhatsAppGatewayHandle = {
 
 export type WhatsAppGatewayParams = {
   authDir?: string;
+  phoneNumber?: string;
   allowFrom?: string[];
   onMessage: (msg: GatewayInboundMessage) => Promise<void>;
   logger?: {
@@ -54,7 +57,7 @@ function resolveTimestamp(ts: unknown): number {
 export async function startWhatsAppGateway(
   params: WhatsAppGatewayParams,
 ): Promise<WhatsAppGatewayHandle> {
-  const { onMessage, allowFrom, logger } = params;
+  const { onMessage, allowFrom, phoneNumber, logger } = params;
   const authDir = params.authDir ?? resolve(process.cwd(), ".microclaw", "whatsapp-auth");
 
   await mkdir(authDir, { recursive: true });
@@ -64,8 +67,21 @@ export async function startWhatsAppGateway(
   let stopped = false;
   let currentSock: WASocket;
   let reconnectAttempts = 0;
+  let pairingCodeTimer: ReturnType<typeof setTimeout> | undefined;
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const needsPairing = (): boolean =>
+    Boolean(phoneNumber) && !state.creds.registered;
 
   const connectSocket = (): WASocket => {
+    // Reset creds.me before connecting if pairing isn't complete.
+    // requestPairingCode sets creds.me which causes reconnects to use
+    // login mode (pull: true). The server rejects that since no device
+    // is paired yet. Clearing it forces registration mode.
+    if (needsPairing()) {
+      state.creds.me = undefined as never;
+    }
+
     const sock = makeWASocket({
       auth: state,
       printQRInTerminal: true,
@@ -73,10 +89,33 @@ export async function startWhatsAppGateway(
 
     sock.ev.on("creds.update", saveCreds);
 
+    // Request pairing code after WS handshake settles
+    if (needsPairing()) {
+      const stripped = phoneNumber!.replace(/[^0-9]/g, "");
+      pairingCodeTimer = setTimeout(() => {
+        if (stopped) return;
+        sock.requestPairingCode(stripped)
+          .then((code: string) => {
+            logger?.info(`\n========================================`);
+            logger?.info(`  WhatsApp pairing code: ${code}`);
+            logger?.info(`  Enter in WhatsApp > Linked Devices > Link a Device`);
+            logger?.info(`========================================\n`);
+          })
+          .catch((err: unknown) => {
+            logger?.error(`Failed to request pairing code: ${err instanceof Error ? err.message : String(err)}`);
+          });
+      }, PAIRING_CODE_DELAY_MS);
+    }
+
     sock.ev.on("connection.update", (update) => {
       const { connection, lastDisconnect } = update;
 
       if (connection === "close") {
+        if (pairingCodeTimer) {
+          clearTimeout(pairingCodeTimer);
+          pairingCodeTimer = undefined;
+        }
+
         const boom = lastDisconnect?.error as Boom | undefined;
         const statusCode = boom?.output?.statusCode ?? 0;
         const isLoggedOut = statusCode === DisconnectReason.loggedOut;
@@ -87,15 +126,24 @@ export async function startWhatsAppGateway(
         }
 
         if (!stopped && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-          const delay = Math.min(
-            BASE_RECONNECT_DELAY_MS * Math.pow(2, reconnectAttempts),
-            MAX_RECONNECT_DELAY_MS,
-          );
+          const delay = needsPairing()
+            ? PAIRING_CODE_DELAY_MS
+            : Math.min(
+                BASE_RECONNECT_DELAY_MS * Math.pow(2, reconnectAttempts),
+                MAX_RECONNECT_DELAY_MS,
+              );
           reconnectAttempts++;
           logger?.info(`WhatsApp disconnected, reconnecting in ${delay}ms (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
-          setTimeout(() => {
+          reconnectTimer = setTimeout(() => {
+            reconnectTimer = undefined;
             if (!stopped) {
+              const oldSock = currentSock;
               currentSock = connectSocket();
+              try {
+                oldSock.end(undefined);
+              } catch {
+                // old socket may already be closed
+              }
             }
           }, delay);
         } else if (!stopped) {
@@ -105,6 +153,10 @@ export async function startWhatsAppGateway(
 
       if (connection === "open") {
         reconnectAttempts = 0;
+        if (pairingCodeTimer) {
+          clearTimeout(pairingCodeTimer);
+          pairingCodeTimer = undefined;
+        }
         logger?.info("WhatsApp connection established");
       }
     });
@@ -182,7 +234,26 @@ export async function startWhatsAppGateway(
     },
     stop: async () => {
       stopped = true;
-      currentSock.end(undefined);
+      if (pairingCodeTimer) {
+        clearTimeout(pairingCodeTimer);
+        pairingCodeTimer = undefined;
+      }
+      if (reconnectTimer != null) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = undefined;
+      }
+      await new Promise<void>((resolve) => {
+        const timeout = setTimeout(() => {
+          resolve();
+        }, 2000);
+        currentSock.ev.on("connection.update", (update) => {
+          if (update.connection === "close") {
+            clearTimeout(timeout);
+            resolve();
+          }
+        });
+        currentSock.end(undefined);
+      });
     },
   };
 

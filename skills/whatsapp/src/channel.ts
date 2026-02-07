@@ -2,19 +2,19 @@ import type { ChannelPlugin } from "../../../src/channels/plugins/types.js";
 import type { MicroClawConfig } from "../../../src/config/types.js";
 import { startWhatsAppGateway, type WhatsAppGatewayHandle } from "./gateway.js";
 
-let activeHandle: WhatsAppGatewayHandle | undefined;
-
 function resolvePhoneNumber(cfg: MicroClawConfig): string | undefined {
   return process.env.WHATSAPP_PHONE_NUMBER || cfg.channels?.whatsapp?.accountId || undefined;
 }
 
 export function createWhatsAppPlugin(): ChannelPlugin {
+  let activeHandle: WhatsAppGatewayHandle | undefined;
+
   return {
     id: "whatsapp",
     meta: {
       id: "whatsapp",
       label: "WhatsApp",
-      selectionLabel: "WhatsApp (QR link)",
+      selectionLabel: "WhatsApp (pairing code)",
       blurb: "Works with your own number via WhatsApp Web.",
     },
     capabilities: {
@@ -63,9 +63,11 @@ export function createWhatsAppPlugin(): ChannelPlugin {
         }
 
         const allowFrom = config.channels?.whatsapp?.allowFrom;
+        const phoneNumber = resolvePhoneNumber(config);
 
         activeHandle = await startWhatsAppGateway({
           allowFrom,
+          phoneNumber,
           onMessage: onMessage ?? (async () => {}),
         });
 

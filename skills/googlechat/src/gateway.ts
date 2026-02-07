@@ -153,8 +153,12 @@ function readRequestBody(req: IncomingMessage): Promise<string> {
 function safeTokenCompare(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
   const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) return false;
-  return timingSafeEqual(bufA, bufB);
+  const maxLen = Math.max(bufA.length, bufB.length);
+  const paddedA = Buffer.alloc(maxLen);
+  const paddedB = Buffer.alloc(maxLen);
+  bufA.copy(paddedA);
+  bufB.copy(paddedB);
+  return timingSafeEqual(paddedA, paddedB) && bufA.length === bufB.length;
 }
 
 function sendJsonResponse(
@@ -183,7 +187,7 @@ export async function startGoogleChatGateway(
     verificationToken,
     logger,
   } = params;
-  const port = params.port ?? Number(process.env.GOOGLE_CHAT_WEBHOOK_PORT) || DEFAULT_PORT;
+  const port = params.port ?? (Number(process.env.GOOGLE_CHAT_WEBHOOK_PORT) || DEFAULT_PORT);
   const credentialsPath =
     params.credentialsPath ?? process.env.GOOGLE_CHAT_CREDENTIALS ?? undefined;
 
@@ -481,7 +485,14 @@ export async function startGoogleChatGateway(
     sendMedia,
     stop: async () => {
       await new Promise<void>((resolve) => {
-        server.close(() => resolve());
+        const timeout = setTimeout(() => {
+          resolve();
+        }, 5000);
+        server.close(() => {
+          clearTimeout(timeout);
+          resolve();
+        });
+        server.closeAllConnections();
       });
       logger?.info("Google Chat gateway stopped");
     },

@@ -113,6 +113,7 @@ export async function startTelegramGateway(
 
   // Start long polling with reconnection logic
   let reconnectAttempts = 0;
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 
   const startPolling = (): void => {
     bot
@@ -133,7 +134,8 @@ export async function startTelegramGateway(
           logger?.warn(
             `Telegram polling error, reconnecting in ${delay}ms (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`,
           );
-          setTimeout(() => {
+          reconnectTimer = setTimeout(() => {
+            reconnectTimer = undefined;
             if (!stopped) startPolling();
           }, delay);
         } else {
@@ -150,6 +152,10 @@ export async function startTelegramGateway(
     bot,
     stop: async () => {
       stopped = true;
+      if (reconnectTimer != null) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = undefined;
+      }
       await bot.stop();
     },
   };

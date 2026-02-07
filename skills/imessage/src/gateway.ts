@@ -178,7 +178,7 @@ export async function startIMessageGateway(
         chatType: resolveChatType(msg.group_id),
         chatId: msg.chat_identifier ?? msg.sender_id,
         timestamp: appleTimestampToUnixMs(msg.msg_date),
-        senderName: undefined,
+        senderName: msg.display_name ?? undefined,
       };
 
       try {

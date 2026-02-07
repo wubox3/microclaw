@@ -168,17 +168,17 @@ export function restoreRoleRefsForTarget(opts: {
   if (!targetId) {
     return;
   }
-  const cached = roleRefsByTarget.get(roleRefsKey(opts.cdpUrl, targetId));
-  if (!cached) {
+  const roleRefEntry = roleRefsByTarget.get(roleRefsKey(opts.cdpUrl, targetId));
+  if (!roleRefEntry) {
     return;
   }
   const state = ensurePageState(opts.page);
   if (state.roleRefs) {
     return;
   }
-  state.roleRefs = cached.refs;
-  state.roleRefsFrameSelector = cached.frameSelector;
-  state.roleRefsMode = cached.mode;
+  state.roleRefs = roleRefEntry.refs;
+  state.roleRefsFrameSelector = roleRefEntry.frameSelector;
+  state.roleRefsMode = roleRefEntry.mode;
 }
 
 export function ensurePageState(page: Page): PageState {
@@ -391,8 +391,11 @@ async function findPageByTargetId(
       return page;
     }
   }
-  // If CDP sessions fail (e.g., extension relay blocks Target.attachToBrowserTarget),
-  // fall back to URL-based matching using the /json/list endpoint
+  // WARNING: The URL-based fallback below can match the wrong page when multiple
+  // pages share the same URL. The index-based tiebreaker assumes Playwright and
+  // the relay enumerate tabs in the same order, which is not guaranteed. Prefer
+  // the CDP session approach above whenever possible. This fallback exists only
+  // for environments where CDP attachment APIs are blocked (e.g., extension relay).
   if (cdpUrl) {
     try {
       const baseUrl = cdpUrl

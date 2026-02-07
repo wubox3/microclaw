@@ -493,7 +493,7 @@ export async function ensureChromeExtensionRelayServer(opts: {
     }
 
     if (pathname === "/extension") {
-      // Bug 9 fix: require origin header for extension WebSocket connections
+      // Require origin header for extension WebSocket connections
       const origin = headerValue(req.headers.origin);
       if (!origin) {
         rejectUpgrade(socket, 403, "Forbidden: missing origin");
@@ -502,6 +502,14 @@ export async function ensureChromeExtensionRelayServer(opts: {
       if (!origin.startsWith("chrome-extension://")) {
         rejectUpgrade(socket, 403, "Forbidden: invalid origin");
         return;
+      }
+      const expectedExtensionId = process.env.MICROCLAW_EXTENSION_ID?.trim();
+      if (expectedExtensionId) {
+        const originExtensionId = origin.slice("chrome-extension://".length).replace(/\/$/, "");
+        if (originExtensionId !== expectedExtensionId) {
+          rejectUpgrade(socket, 403, "Forbidden: extension ID mismatch");
+          return;
+        }
       }
       if (extensionWs) {
         rejectUpgrade(socket, 409, "Extension already connected");

@@ -183,8 +183,8 @@ describe("buildFtsQuery", () => {
     expect(buildFtsQuery("foo.bar(baz)")).toBe('"foo" AND "bar" AND "baz"');
   });
 
-  it("falls back to quoted sanitized string for single-char words", () => {
-    // Single-char tokens are filtered, but the sanitized raw string is non-empty
-    expect(buildFtsQuery("a b c")).toBe('"a b c"');
+  it("falls back to joined single-char tokens", () => {
+    // Single-char tokens are joined into a single token for FTS
+    expect(buildFtsQuery("a b c")).toBe('"abc"');
   });
 });

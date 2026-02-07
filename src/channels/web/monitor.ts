@@ -30,7 +30,13 @@ export function createWebMonitor(): WebMonitor {
       clients.set(id, { ws, id, connectedAt: Date.now() });
       ws.on("message", (data) => {
         try {
-          const parsed = JSON.parse(String(data)) as Record<string, unknown>;
+          const raw = String(data);
+          // Reject payloads over 1MB to prevent abuse
+          const MAX_PAYLOAD_BYTES = 1_048_576;
+          if (raw.length > MAX_PAYLOAD_BYTES) {
+            return;
+          }
+          const parsed = JSON.parse(raw) as Record<string, unknown>;
 
           // Handle canvas action messages
           if (parsed.type === "canvas_action" && typeof parsed.action === "string") {

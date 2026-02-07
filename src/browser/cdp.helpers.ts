@@ -187,8 +187,10 @@ export async function withCdpSocket<T>(
   const { send, closeWithError } = createCdpSender(ws);
 
   const openPromise = new Promise<void>((resolve, reject) => {
-    ws.once("open", () => resolve());
-    ws.once("error", (err) => reject(err));
+    const onOpen = () => { ws.removeListener("error", onError); resolve(); };
+    const onError = (err: Error) => { ws.removeListener("open", onOpen); reject(err); };
+    ws.once("open", onOpen);
+    ws.once("error", onError);
   });
 
   await openPromise;

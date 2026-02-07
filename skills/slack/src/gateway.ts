@@ -51,6 +51,7 @@ export async function startSlackGateway(
   });
 
   app.message(async ({ message }) => {
+    if (stopped) return;
     try {
       // Only process generic (user-sent) messages, skip bot messages and subtypes
       const msg = message as GenericMessageEvent;

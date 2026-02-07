@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, lstatSync } from "node:fs";
 import { resolve, relative } from "node:path";
 import type { SqliteDb } from "./sqlite.js";
 import { hashContent, chunkText } from "./internal.js";
@@ -11,12 +11,25 @@ export function syncMemoryFiles(
   let updated = 0;
   let removed = 0;
 
+  const MAX_FILE_COUNT = 1000;
+  const MAX_FILE_SIZE_BYTES = 1_048_576; // 1MB per file
+
   const currentFiles = collectFiles(dir);
+
+  // Enforce file count limit to prevent OOM
+  if (currentFiles.length > MAX_FILE_COUNT) {
+    currentFiles.length = MAX_FILE_COUNT;
+  }
 
   // Read all file contents BEFORE opening the transaction to avoid holding
   // the SQLite write lock during synchronous I/O
   const fileContents = new Map<string, { content: string; hash: string }>();
   for (const file of currentFiles) {
+    const fileStat = lstatSync(resolve(dir, file.path));
+    // Skip files exceeding the size limit to prevent OOM
+    if (fileStat.size > MAX_FILE_SIZE_BYTES) {
+      continue;
+    }
     const content = readFileSync(resolve(dir, file.path), "utf-8");
     fileContents.set(file.path, { content, hash: hashContent(content) });
   }
@@ -73,7 +86,10 @@ function collectFiles(dir: string): Array<{ path: string }> {
     for (const entry of entries) {
       const fullPath = resolve(dir, entry);
       try {
-        const stat = statSync(fullPath);
+        const stat = lstatSync(fullPath);
+        if (stat.isSymbolicLink()) {
+          continue;
+        }
         if (stat.isFile() && isTextFile(entry)) {
           files.push({ path: entry.replace(/\\/g, "/") });
         }
@@ -91,7 +107,11 @@ function collectFiles(dir: string): Array<{ path: string }> {
 }
 
 function isTextFile(path: string): boolean {
-  const textExtensions = [".txt", ".md", ".ts", ".js", ".json", ".yaml", ".yml", ".toml", ".csv"];
+  const textExtensions = [
+    ".txt", ".md", ".ts", ".js", ".json", ".yaml", ".yml", ".toml", ".csv",
+    ".html", ".css", ".py", ".go", ".rs", ".java", ".sh", ".rb", ".php",
+    ".sql", ".xml", ".env", ".ini", ".cfg",
+  ];
   return textExtensions.some((ext) => path.endsWith(ext));
 }
 

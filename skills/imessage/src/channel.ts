@@ -20,8 +20,6 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
 const RECIPIENT_RE =
   /^(\+?[\d]{7,20}|[\w.%+-]+@[\w.-]+\.\w{2,}|chat\d+|iMessage;[-+];[^\x00-\x1f]+)$/;
 
-let activeHandle: IMessageGatewayHandle | undefined;
-
 function toAppleScriptChatId(to: string): string {
   if (to.startsWith("iMessage;")) return to;
   if (to.startsWith("chat")) return `iMessage;+;${to}`;
@@ -89,6 +87,8 @@ async function sendFileViaAppleScript(
 }
 
 export function createIMessagePlugin(): ChannelPlugin {
+  let activeHandle: IMessageGatewayHandle | undefined;
+
   return {
     id: "imessage",
     meta: {

@@ -19,28 +19,23 @@ export function parseArgs(argv: readonly string[]): { url: string; name: string 
   const url = positional[0] ?? null;
 
   if (!url) {
-    console.error("Usage: tsx src/skills/install-skill.ts <git-url> [--name <dir-name>]");
-    process.exit(1);
+    throw new Error("Usage: tsx src/skills/install-skill.ts <git-url> [--name <dir-name>]");
   }
 
   if (url.startsWith("ext::")) {
-    console.error("Error: ext:: git protocol is not allowed");
-    process.exit(1);
+    throw new Error("Error: ext:: git protocol is not allowed");
   }
 
   if (!VALID_GIT_URL.test(url)) {
-    console.error("Error: invalid git URL — must be https://, git://, or git@ format");
-    process.exit(1);
+    throw new Error("Error: invalid git URL — must be https://, git://, or git@ format");
   }
 
   if (name !== null && name.length === 0) {
-    console.error("Error: --name must not be empty");
-    process.exit(1);
+    throw new Error("Error: --name must not be empty");
   }
 
   if (name !== null && !VALID_DIR_NAME.test(name)) {
-    console.error("Error: --name contains invalid characters (use alphanumeric, hyphens, underscores, dots)");
-    process.exit(1);
+    throw new Error("Error: --name contains invalid characters (use alphanumeric, hyphens, underscores, dots)");
   }
 
   return { url, name };

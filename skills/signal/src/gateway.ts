@@ -78,6 +78,7 @@ export async function startSignalGateway(
   let stopped = false;
   let reconnectAttempts = 0;
   let pollTimer: ReturnType<typeof setTimeout> | undefined;
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   let ws: WebSocket | undefined;
 
   const processEnvelope = (envelope: Record<string, unknown>): void => {
@@ -215,7 +216,8 @@ export async function startSignalGateway(
       `Signal disconnected, reconnecting in ${delay}ms (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`,
     );
 
-    setTimeout(() => {
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = undefined;
       if (!stopped) {
         tryWebSocket();
       }
@@ -301,9 +303,23 @@ export async function startSignalGateway(
         clearTimeout(pollTimer);
         pollTimer = undefined;
       }
+      if (reconnectTimer != null) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = undefined;
+      }
       if (ws) {
-        ws.close();
+        const socket = ws;
         ws = undefined;
+        await new Promise<void>((resolve) => {
+          const timeout = setTimeout(() => {
+            resolve();
+          }, 2000);
+          socket.addEventListener("close", () => {
+            clearTimeout(timeout);
+            resolve();
+          }, { once: true });
+          socket.close();
+        });
       }
     },
     sendMessage,

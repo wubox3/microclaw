@@ -29,7 +29,8 @@ const ALLOWED_ATTRS = new Set([
 ]);
 
 function sanitizeHtml(raw: string): string {
-  let html = raw;
+  // Strip null bytes and control characters that can confuse HTML parsers
+  let html = raw.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
 
   // Strip HTML comments first to prevent comment-based bypasses
   html = html.replace(/<!--[\s\S]*?-->/g, "");

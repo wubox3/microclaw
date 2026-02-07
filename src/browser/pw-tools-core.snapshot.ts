@@ -163,9 +163,18 @@ export async function navigateViaPlaywright(opts: {
   if (!url) {
     throw new Error("url is required");
   }
-  const urlLower = url.toLowerCase();
-  if (urlLower.startsWith("javascript:") || urlLower.startsWith("data:") || urlLower.startsWith("vbscript:")) {
-    throw new Error(`Unsafe URL scheme: "${url.slice(0, url.indexOf(":") + 1)}"`);
+  // Use an allowlist for URL schemes to prevent SSRF via file:, ftp:, blob:, etc.
+  const ALLOWED_SCHEMES = new Set(["http:", "https:", "about:"]);
+  try {
+    const parsed = new URL(url);
+    if (!ALLOWED_SCHEMES.has(parsed.protocol.toLowerCase())) {
+      throw new Error(`Unsafe URL scheme: "${parsed.protocol}"`);
+    }
+  } catch (e) {
+    // TypeError means relative URL or no scheme — allow (browser adds https://)
+    if (!(e instanceof TypeError)) {
+      throw e;
+    }
   }
   const page = await getPageForTargetId(opts);
   ensurePageState(page);

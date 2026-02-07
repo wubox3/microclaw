@@ -163,10 +163,13 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
 
                 const resultFile = filePath.replace(/\.json$/, ".result.json");
                 const tempPath = `${resultFile}.tmp`;
-                fs.writeFileSync(
-                  tempPath,
-                  JSON.stringify({ results }, null, 2),
-                );
+                // Use O_WRONLY | O_CREAT | O_EXCL to avoid following symlinks
+                const fd = fs.openSync(tempPath, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL, 0o644);
+                try {
+                  fs.writeSync(fd, JSON.stringify({ results }, null, 2));
+                } finally {
+                  fs.closeSync(fd);
+                }
                 fs.renameSync(tempPath, resultFile);
               }
 

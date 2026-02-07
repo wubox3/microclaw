@@ -23,9 +23,12 @@
       </nav>
       <div id="voice-panel" class="sidebar-section">
         <div class="nav-section-label">Voice</div>
+        <div id="voice-provider" class="voice-provider"></div>
         <div class="voice-controls">
-          <button id="wake-toggle" class="voice-btn" title="Toggle wake word detection">Wake</button>
-          <button id="talk-btn" class="voice-btn" title="Toggle talk mode">Talk</button>
+          <button id="voice-toggle" class="voice-toggle-btn" title="Toggle voice on/off">
+            <span class="voice-toggle-dot"></span>
+            <span class="voice-toggle-label">Off</span>
+          </button>
         </div>
       </div>
       <div id="memory-panel" class="sidebar-section">
@@ -72,33 +75,6 @@
       <iframe id="canvas-iframe" src="/canvas/a2ui" sandbox="allow-scripts"></iframe>
     </aside>
   </div>
-  <!-- Voice Setup Dialog -->
-  <div id="voice-setup-dialog" class="dialog-overlay hidden">
-    <div class="dialog-box">
-      <div class="dialog-header">
-        <h3>Voice Setup Required</h3>
-        <button id="voice-setup-close" class="dialog-close">&times;</button>
-      </div>
-      <div class="dialog-body">
-        <p id="voice-setup-message">Voice features require TTS (Text-to-Speech) to be configured.</p>
-        <div class="dialog-instructions">
-          <p>To enable voice, add the following to your <code>microclaw.config.yaml</code>:</p>
-          <pre><code>voice:
-  tts:
-    enabled: true
-    provider: openai
-    openai:
-      apiKey: your-openai-api-key
-      voice: alloy  # Options: alloy, ash, coral, echo, fable, onyx, nova, sage, shimmer</code></pre>
-          <p>Or set the <code>OPENAI_API_KEY</code> environment variable and enable TTS in config.</p>
-        </div>
-      </div>
-      <div class="dialog-footer">
-        <button id="voice-setup-dismiss" class="dialog-btn">Got it</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Cron Job Dialog -->
   <div id="cron-dialog" class="dialog-overlay hidden">
     <div class="dialog-box">

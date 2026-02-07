@@ -42,15 +42,19 @@ const BLOCKED_PATTERNS = [
 ] as const;
 
 // Sanitized environment for exec: only safe variables, no API keys or secrets
-const SAFE_ENV: Record<string, string | undefined> = {
-  PATH: process.env.PATH,
-  HOME: process.env.HOME,
-  USER: process.env.USER,
-  SHELL: process.env.SHELL,
-  LANG: process.env.LANG,
-  TERM: process.env.TERM,
-  NODE_ENV: process.env.NODE_ENV,
-};
+// Computed lazily so it captures values after loadDotenv() has run
+function buildSafeEnv(): Record<string, string | undefined> {
+  return {
+    PATH: process.env.PATH,
+    HOME: process.env.HOME,
+    USER: process.env.USER,
+    SHELL: process.env.SHELL,
+    LANG: process.env.LANG,
+    TERM: process.env.TERM,
+    TMPDIR: process.env.TMPDIR,
+    NODE_ENV: process.env.NODE_ENV,
+  };
+}
 
 function isBlockedCommand(command: string): boolean {
   return BLOCKED_PATTERNS.some((pattern) => pattern.test(command));
@@ -95,7 +99,7 @@ export function createShellTool(opts: { cwd: string }): AgentTool {
       }
 
       return new Promise((resolve) => {
-        exec(command, { cwd, timeout: TIMEOUT_MS, maxBuffer: MAX_BUFFER, env: SAFE_ENV }, (error, stdout, stderr) => {
+        exec(command, { cwd, timeout: TIMEOUT_MS, maxBuffer: MAX_BUFFER, env: buildSafeEnv() }, (error, stdout, stderr) => {
           const combined = [stdout, stderr].filter(Boolean).join("\n").trim();
 
           if (error) {

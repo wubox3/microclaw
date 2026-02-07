@@ -36,12 +36,12 @@ async function executeBrowserAction(
   try {
     switch (action) {
       case "status": {
-        const result = await fetchBrowserJson(`/agent/status${profileQuery}`);
+        const result = await fetchBrowserJson(`/status${profileQuery}`);
         return { content: formatResult(result) };
       }
 
       case "start": {
-        const result = await fetchBrowserJson(`/agent/start${profileQuery}`, {
+        const result = await fetchBrowserJson(`/start${profileQuery}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -53,7 +53,7 @@ async function executeBrowserAction(
       }
 
       case "stop": {
-        const result = await fetchBrowserJson(`/agent/stop${profileQuery}`, {
+        const result = await fetchBrowserJson(`/stop${profileQuery}`, {
           method: "POST",
         });
         return { content: formatResult(result) };
@@ -104,7 +104,7 @@ async function executeBrowserAction(
         if (params.targetId) qs.set("targetId", String(params.targetId));
         if (params.maxChars) qs.set("maxChars", String(params.maxChars));
         const qStr = qs.toString() ? `?${qs.toString()}` : "";
-        const result = await fetchBrowserJson<{ snapshot?: string }>(`/agent/snapshot${qStr}`, {
+        const result = await fetchBrowserJson<{ snapshot?: string }>(`/snapshot${qStr}`, {
           timeoutMs: 15000,
         });
         return { content: result.snapshot ?? formatResult(result) };
@@ -115,14 +115,14 @@ async function executeBrowserAction(
         if (profile) qs.set("profile", profile);
         if (params.targetId) qs.set("targetId", String(params.targetId));
         const qStr = qs.toString() ? `?${qs.toString()}` : "";
-        const result = await fetchBrowserJson(`/agent/screenshot${qStr}`, {
+        const result = await fetchBrowserJson(`/screenshot${qStr}`, {
           timeoutMs: 15000,
         });
         return { content: formatResult(result) };
       }
 
       case "navigate": {
-        const result = await fetchBrowserJson(`/agent/navigate${profileQuery}`, {
+        const result = await fetchBrowserJson(`/navigate${profileQuery}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -139,12 +139,12 @@ async function executeBrowserAction(
         if (profile) qs.set("profile", profile);
         if (params.targetId) qs.set("targetId", String(params.targetId));
         const qStr = qs.toString() ? `?${qs.toString()}` : "";
-        const result = await fetchBrowserJson(`/agent/console${qStr}`);
+        const result = await fetchBrowserJson(`/console${qStr}`);
         return { content: formatResult(result) };
       }
 
       case "pdf": {
-        const result = await fetchBrowserJson(`/agent/pdf${profileQuery}`, {
+        const result = await fetchBrowserJson(`/pdf${profileQuery}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ targetId: params.targetId }),
@@ -154,7 +154,7 @@ async function executeBrowserAction(
       }
 
       case "upload": {
-        const result = await fetchBrowserJson(`/agent/upload${profileQuery}`, {
+        const result = await fetchBrowserJson(`/upload${profileQuery}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -166,7 +166,7 @@ async function executeBrowserAction(
       }
 
       case "dialog": {
-        const result = await fetchBrowserJson(`/agent/dialog${profileQuery}`, {
+        const result = await fetchBrowserJson(`/dialog${profileQuery}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -179,7 +179,7 @@ async function executeBrowserAction(
       }
 
       case "act": {
-        const result = await fetchBrowserJson(`/agent/act${profileQuery}`, {
+        const result = await fetchBrowserJson(`/act${profileQuery}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

@@ -136,6 +136,13 @@ export function createJob(state: CronServiceState, input: CronJobCreate): CronJo
   };
   assertSupportedJobSpec(job);
   assertDeliverySupport(job);
+  // Validate everyMs minimum to prevent busy-loop DoS
+  if (job.schedule.kind === "every") {
+    const MIN_EVERY_MS = 10_000;
+    if (job.schedule.everyMs < MIN_EVERY_MS) {
+      throw new Error(`everyMs must be at least ${MIN_EVERY_MS}ms (10 seconds)`);
+    }
+  }
   // Validate schedule timestamp for "at" jobs
   if (job.schedule.kind === "at") {
     const validation = validateScheduleTimestamp(job.schedule, now);

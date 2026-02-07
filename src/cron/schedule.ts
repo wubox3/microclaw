@@ -23,7 +23,8 @@ export function computeNextRunAtMs(schedule: CronSchedule, nowMs: number): numbe
   }
 
   if (schedule.kind === "every") {
-    const everyMs = Math.max(1, Math.floor(schedule.everyMs));
+    const MIN_EVERY_MS = 10_000; // 10 second minimum to prevent busy-loop DoS
+    const everyMs = Math.max(MIN_EVERY_MS, Math.floor(schedule.everyMs));
     const anchor = Math.max(0, Math.floor(schedule.anchorMs ?? nowMs));
     if (nowMs < anchor) {
       return anchor;
@@ -37,10 +38,14 @@ export function computeNextRunAtMs(schedule: CronSchedule, nowMs: number): numbe
   if (!expr) {
     return undefined;
   }
-  const cron = new Cron(expr, {
-    timezone: schedule.tz?.trim() || undefined,
-    catch: false,
-  });
-  const next = cron.nextRun(new Date(nowMs));
-  return next ? next.getTime() : undefined;
+  try {
+    const cron = new Cron(expr, {
+      timezone: schedule.tz?.trim() || undefined,
+    });
+    const next = cron.nextRun(new Date(nowMs));
+    return next ? next.getTime() : undefined;
+  } catch {
+    // Invalid cron expression or timezone — treat as no next run
+    return undefined;
+  }
 }

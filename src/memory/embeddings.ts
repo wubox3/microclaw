@@ -19,6 +19,7 @@ export function createAnthropicEmbeddingProvider(apiKey: string): EmbeddingProvi
       // For now, use a direct fetch to the Voyage API endpoint
       const response = await fetch("https://api.voyageai.com/v1/embeddings", {
         method: "POST",
+        signal: AbortSignal.timeout(30_000),
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${apiKey}`,

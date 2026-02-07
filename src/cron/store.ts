@@ -47,7 +47,7 @@ export async function loadCronStore(storePath: string): Promise<CronStoreFile> {
     process.stderr.write(`[cron:store] Corrupt cron store at ${storePath}: ${errMsg}\n`);
     // Preserve corrupt file for debugging
     try {
-      await fs.promises.copyFile(storePath, `${storePath}.corrupt.${Date.now()}`);
+      await fs.promises.copyFile(storePath, `${storePath}.corrupt`);
     } catch {
       // best-effort
     }

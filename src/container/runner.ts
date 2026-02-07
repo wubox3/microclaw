@@ -134,9 +134,16 @@ export async function runContainerAgent(
   }
   const timeout = config?.timeout ?? CONTAINER_TIMEOUT;
 
+  // Validate prompt size BEFORE spawning the container
+  const MAX_PROMPT_LENGTH = 500_000;
+  if (input.prompt.length > MAX_PROMPT_LENGTH) {
+    return { status: "error", result: null, error: `Prompt too long: ${input.prompt.length} chars (max ${MAX_PROMPT_LENGTH})`, newSessionId: undefined };
+  }
+
   const mounts = buildVolumeMounts(input.channelId, config);
   const safeName = sanitizeChannelId(input.channelId);
-  const containerName = `microclaw-${safeName}-${Date.now()}-${randomBytes(3).toString("hex")}`;
+  const shortName = safeName.slice(0, 40);
+  const containerName = `microclaw-${shortName}-${Date.now()}-${randomBytes(3).toString("hex")}`;
   const dockerArgs = buildDockerArgs(mounts, containerName, image);
 
   log.info(
@@ -165,17 +172,6 @@ export async function runContainerAgent(
     container.stdin.on("error", (err) => {
       log.warn(`Container stdin error: ${err.message}`);
     });
-    // Limit prompt size to prevent resource exhaustion in the container
-    const MAX_PROMPT_LENGTH = 500_000;
-    if (input.prompt.length > MAX_PROMPT_LENGTH) {
-      container.kill();
-      return resolve({
-        status: "error",
-        result: null,
-        error: `Prompt too long: ${input.prompt.length} chars (max ${MAX_PROMPT_LENGTH})`,
-        newSessionId: undefined,
-      });
-    }
     container.stdin.write(JSON.stringify(input));
     container.stdin.end();
 
@@ -237,7 +233,7 @@ export async function runContainerAgent(
         `=== Container Run Log${timedOut ? " (TIMEOUT)" : ""} ===`,
         `Timestamp: ${new Date().toISOString()}`,
         `Container: ${containerName}`,
-        `Channel: ${input.channelId}`,
+        `Channel: ${safeName}`,
         `Duration: ${duration}ms`,
         `Exit Code: ${code}`,
         `Stdout Truncated: ${stdoutTruncated}`,

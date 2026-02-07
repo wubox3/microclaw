@@ -539,40 +539,62 @@ main#chat-area {
 }
 
 /* Voice Controls - Sidebar */
+.voice-provider {
+  padding: 2px 16px 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 .voice-controls {
   display: flex;
   gap: 8px;
   padding: 4px 16px 8px;
 }
 
-.voice-btn {
-  flex: 1;
-  padding: 8px 12px;
+.voice-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 14px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: 20px;
   background: var(--surface);
   color: var(--text-secondary);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.2s;
 }
 
-.voice-btn:hover {
-  background: var(--sidebar-hover);
+.voice-toggle-btn:hover {
   border-color: var(--primary-light);
 }
 
-.voice-btn.active {
+.voice-toggle-btn.active {
   background: var(--primary);
   color: white;
   border-color: var(--primary);
 }
 
-.voice-btn:disabled {
+.voice-toggle-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.voice-toggle-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.voice-toggle-btn.active .voice-toggle-dot {
+  background: #34C759;
+  box-shadow: 0 0 6px rgba(52, 199, 89, 0.5);
 }
 
 /* Mic Button */

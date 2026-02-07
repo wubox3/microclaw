@@ -222,21 +222,24 @@ async function main(): Promise<void> {
       return result;
     },
     onEvent: (evt) => {
-      if (evt.action === "finished") {
-        log.info(`Cron job ${evt.jobId} finished: ${evt.status ?? "unknown"}`);
-        // Append to run log for main session jobs too
-        const logPath = resolveCronRunLogPath({ storePath: cronStorePath, jobId: evt.jobId });
-        appendCronRunLog(logPath, {
-          ts: Date.now(),
-          jobId: evt.jobId,
-          action: "finished",
-          status: evt.status,
-          error: evt.error,
-          summary: evt.summary,
-          runAtMs: evt.runAtMs,
-          durationMs: evt.durationMs,
-          nextRunAtMs: evt.nextRunAtMs,
-        }).catch(() => {});
+      try {
+        if (evt.action === "finished") {
+          log.info(`Cron job ${evt.jobId} finished: ${evt.status ?? "unknown"}`);
+          const logPath = resolveCronRunLogPath({ storePath: cronStorePath, jobId: evt.jobId });
+          appendCronRunLog(logPath, {
+            ts: Date.now(),
+            jobId: evt.jobId,
+            action: "finished",
+            status: evt.status,
+            error: evt.error,
+            summary: evt.summary,
+            runAtMs: evt.runAtMs,
+            durationMs: evt.durationMs,
+            nextRunAtMs: evt.nextRunAtMs,
+          }).catch(() => {});
+        }
+      } catch (err) {
+        log.error(`Cron onEvent error: ${formatError(err)}`);
       }
     },
   });
@@ -491,9 +494,9 @@ async function main(): Promise<void> {
     verifyClient: ({ req }: { req: import("http").IncomingMessage }) => {
       const ALLOWED_HOSTS = ["localhost", "127.0.0.1", "::1"];
       // Validate Host header to prevent DNS rebinding attacks
-      const host = req.headers.host;
-      if (host) {
-        const hostWithoutPort = host.replace(/:\d+$/, "");
+      const requestHost = req.headers.host;
+      if (requestHost) {
+        const hostWithoutPort = requestHost.replace(/:\d+$/, "");
         if (!ALLOWED_HOSTS.includes(hostWithoutPort)) {
           return false;
         }
@@ -510,7 +513,7 @@ async function main(): Promise<void> {
         }
       }
       // Reject connections that have neither Host nor Origin header
-      if (!host && !origin) {
+      if (!requestHost && !origin) {
         return false;
       }
       return true;

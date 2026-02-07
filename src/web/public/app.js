@@ -195,10 +195,7 @@
           var entry = { role: role, content: label, timestamp: data.timestamp };
 
           // Store in the correct channel history
-          if (!channelHistories[data.channelId]) {
-            channelHistories[data.channelId] = [];
-          }
-          channelHistories[data.channelId].push(entry);
+          pushHistory(entry, data.channelId);
 
           // Render if viewing that channel
           if (data.channelId === activeChannelId) {

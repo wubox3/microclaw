@@ -8,6 +8,7 @@ import type {
   CronPayload,
   CronPayloadPatch,
 } from "../types.js";
+import { validateScheduleTimestamp } from "../validate-timestamp.js";
 import type { CronServiceState } from "./state.js";
 import { parseAbsoluteTimeMs } from "../parse.js";
 import { computeNextRunAtMs } from "../schedule.js";
@@ -135,6 +136,13 @@ export function createJob(state: CronServiceState, input: CronJobCreate): CronJo
   };
   assertSupportedJobSpec(job);
   assertDeliverySupport(job);
+  // Validate schedule timestamp for "at" jobs
+  if (job.schedule.kind === "at") {
+    const validation = validateScheduleTimestamp(job.schedule, now);
+    if (!validation.ok) {
+      throw new Error(validation.message);
+    }
+  }
   job.state.nextRunAtMs = computeJobNextRunAtMs(job, now);
   return job;
 }

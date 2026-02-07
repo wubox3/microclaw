@@ -29,14 +29,25 @@ const ALLOWED_ATTRS = new Set([
 ]);
 
 function sanitizeHtml(raw: string): string {
-  // Strip event handlers and dangerous URI schemes (multi-pass for nested evasion)
   let html = raw;
+
+  // Strip HTML comments first to prevent comment-based bypasses
+  html = html.replace(/<!--[\s\S]*?-->/g, "");
+  html = html.replace(/<!--/g, "").replace(/-->/g, "");
+
+  // Strip script/style/noscript content entirely (not just tags)
+  html = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
+  html = html.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "");
+  html = html.replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, "");
+
+  // Strip event handlers and dangerous URI schemes (multi-pass for nested evasion)
+  // Use robust patterns that match control characters within scheme names
   for (let pass = 0; pass < 3; pass++) {
     const prev = html;
     html = html
-      .replace(/\bon\w+\s*=/gi, "data-removed-handler=")
-      .replace(/javascript\s*:/gi, "removed:")
-      .replace(/vbscript\s*:/gi, "removed:")
+      .replace(/\bon\w+\s*=/gi, "x-removed=")
+      .replace(/j\s*a\s*v\s*a\s*s\s*c\s*r\s*i\s*p\s*t\s*:/gi, "removed:")
+      .replace(/v\s*b\s*s\s*c\s*r\s*i\s*p\s*t\s*:/gi, "removed:")
       .replace(/data\s*:\s*text\/html/gi, "removed:");
     if (html === prev) break;
   }
@@ -58,7 +69,8 @@ function sanitizeHtml(raw: string): string {
     while ((attrMatch = attrRegex.exec(match)) !== null) {
       const attrName = attrMatch[1]!.toLowerCase();
       const attrValue = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? "";
-      if (ALLOWED_ATTRS.has(attrName) || attrName.startsWith("data-")) {
+      const ALLOWED_DATA_ATTRS = new Set(["data-a2ui-id", "data-surface"]);
+      if (ALLOWED_ATTRS.has(attrName) || ALLOWED_DATA_ATTRS.has(attrName)) {
         // Extra safety: strip dangerous URIs from href/src
         if ((attrName === "href" || attrName === "src") &&
             /^\s*(javascript|vbscript|data\s*:\s*text\/html)\s*:/i.test(attrValue)) {

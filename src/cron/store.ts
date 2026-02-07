@@ -61,9 +61,12 @@ export async function saveCronStore(storePath: string, store: CronStoreFile) {
   const json = JSON.stringify(store, null, 2);
   await fs.promises.writeFile(tmp, json, "utf-8");
   try {
+    // Only backup if existing file is valid JSON to avoid overwriting good backup with corrupt data
+    const existing = await fs.promises.readFile(storePath, "utf-8");
+    JSON.parse(existing);
     await fs.promises.copyFile(storePath, `${storePath}.bak`);
   } catch {
-    // best-effort — file may not exist yet on first save
+    // best-effort — file may not exist yet or be invalid
   }
   try {
     await fs.promises.rename(tmp, storePath);

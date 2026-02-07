@@ -20,6 +20,7 @@ export function discoverSkills(skillsDir: string): DiscoveredSkill[] {
   const discovered: DiscoveredSkill[] = [];
 
   for (const entry of entries) {
+    if (entry.startsWith(".")) continue;
     const skillDir = resolve(skillsDir, entry);
     let stat;
     try {

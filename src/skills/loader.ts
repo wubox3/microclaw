@@ -22,7 +22,8 @@ function redactSensitiveConfig(config: MicroClawConfig): MicroClawConfig {
     if (depth > 10 || !obj || typeof obj !== "object") return;
     for (const key of Object.keys(obj)) {
       const lower = key.toLowerCase();
-      if (lower.includes("key") || lower.includes("token") || lower.includes("secret") || lower.includes("password") || lower.includes("credential")) {
+      const SENSITIVE_PATTERNS = [/(?:^|_|-)(api[_-]?key|secret[_-]?key|access[_-]?key|private[_-]?key|auth[_-]?key)(?:$|_|-)/i, /(?:^|_|-)(token|secret|password|credential|auth[_-]?secret)(?:$|_|-)/i];
+      if (SENSITIVE_PATTERNS.some((p) => p.test(key))) {
         obj[key] = "[REDACTED]";
       } else if (typeof obj[key] === "object" && obj[key] !== null) {
         walk(obj[key] as Record<string, unknown>, depth + 1);

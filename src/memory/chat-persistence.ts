@@ -35,7 +35,7 @@ export function createChatPersistence(params: {
       const doSave = async () => {
         const exchangeContent = `User: ${userMessage}\n\nAssistant: ${assistantMessage}`;
         const hash = hashContent(exchangeContent);
-        const chatPath = `chat/${channelId}/${timestamp}`;
+        const chatPath = `chat/${channelId}/${timestamp}-${Math.random().toString(36).slice(2, 10)}`;
 
         // Wrap all writes in a transaction for atomicity
         db.exec("BEGIN");
@@ -92,7 +92,9 @@ export function createChatPersistence(params: {
 
       // Chain onto the queue so concurrent calls are serialized
       const queued = saveQueue.catch(() => {}).then(doSave);
-      saveQueue = queued.catch(() => {}); // prevent unhandled rejection on the queue itself
+      saveQueue = queued.catch((err) => {
+        log.error(`saveExchange failed: ${err instanceof Error ? err.message : String(err)}`);
+      });
       return queued;
     },
 

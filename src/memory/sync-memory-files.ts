@@ -96,6 +96,10 @@ function collectFiles(dir: string): Array<{ path: string }> {
     const entries = readdirSync(dir, { recursive: true, encoding: "utf-8" });
     for (const entry of entries) {
       const fullPath = resolve(dir, entry);
+      // Skip paths that escape the data directory (e.g. via symlinked subdirectories)
+      if (!fullPath.startsWith(dir + "/") && fullPath !== dir) {
+        continue;
+      }
       try {
         const stat = lstatSync(fullPath);
         if (stat.isSymbolicLink()) {

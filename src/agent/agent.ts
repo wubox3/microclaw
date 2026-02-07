@@ -118,6 +118,8 @@ async function runContainerChat(params: {
 
   // Track session for conversation continuity
   if (output.newSessionId) {
+    // Delete and re-insert to maintain LRU ordering in Map
+    sessions.delete(channelId);
     sessions.set(channelId, output.newSessionId);
     // Evict oldest entries if sessions map exceeds limit to prevent memory leak
     const MAX_SESSIONS = 10000;

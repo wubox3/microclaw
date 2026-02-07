@@ -285,7 +285,17 @@
     } else if (scheduleKind === 'at') {
       var atValue = scheduleValue;
       if (valueInput && valueInput.type === 'datetime-local') {
-        atValue = new Date(scheduleValue).toISOString();
+        try {
+          var d = new Date(scheduleValue);
+          if (isNaN(d.getTime())) {
+            alert('Invalid date/time value');
+            return;
+          }
+          atValue = d.toISOString();
+        } catch (e) {
+          alert('Invalid date/time value');
+          return;
+        }
       }
       schedule = { kind: 'at', at: atValue };
     }

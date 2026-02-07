@@ -29,7 +29,28 @@ const BLOCKED_PATTERNS = [
   /\b(shutdown|reboot|halt|poweroff)\b/i,
   /\biptables\b/i,
   /\b:(){/,  // fork bomb
+  /\b(env|printenv)\b/i,  // environment variable exfiltration
+  /\bexport\s+-p\b/i,     // export -p lists all env vars
+  /\/proc\/self\//i,       // /proc filesystem access
+  /\/proc\/\d+\//i,        // /proc/<pid> access
+  /\bcat\b.*\.env\b/i,    // .env file access
+  /\bless\b.*\.env\b/i,
+  /\bhead\b.*\.env\b/i,
+  /\btail\b.*\.env\b/i,
+  /\bgrep\b.*\.env\b/i,
+  /bash\s+<\s*\(/i,       // process substitution
 ] as const;
+
+// Sanitized environment for exec: only safe variables, no API keys or secrets
+const SAFE_ENV: Record<string, string | undefined> = {
+  PATH: process.env.PATH,
+  HOME: process.env.HOME,
+  USER: process.env.USER,
+  SHELL: process.env.SHELL,
+  LANG: process.env.LANG,
+  TERM: process.env.TERM,
+  NODE_ENV: process.env.NODE_ENV,
+};
 
 function isBlockedCommand(command: string): boolean {
   return BLOCKED_PATTERNS.some((pattern) => pattern.test(command));
@@ -74,7 +95,7 @@ export function createShellTool(opts: { cwd: string }): AgentTool {
       }
 
       return new Promise((resolve) => {
-        exec(command, { cwd, timeout: TIMEOUT_MS, maxBuffer: MAX_BUFFER }, (error, stdout, stderr) => {
+        exec(command, { cwd, timeout: TIMEOUT_MS, maxBuffer: MAX_BUFFER, env: SAFE_ENV }, (error, stdout, stderr) => {
           const combined = [stdout, stderr].filter(Boolean).join("\n").trim();
 
           if (error) {

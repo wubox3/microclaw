@@ -183,6 +183,8 @@ export function createAnthropicClient(options: AnthropicClientOptions): LlmClien
           }
         }
       } catch (error) {
+        // Ensure stream consumers receive message_stop even on error
+        yield { type: "message_stop" };
         const detail = error instanceof Error ? error.message : String(error);
         throw new Error(`Anthropic stream failed: ${detail}`);
       }

@@ -312,6 +312,7 @@ export function registerBrowserAgentActRoutes(
             targetId: tab.targetId,
             fn,
             ref,
+            evaluateEnabled,
           });
           return res.json({
             ok: true,

@@ -22,7 +22,9 @@ import { createLogger } from "../logging.js";
 const log = createLogger("container");
 
 function sanitizeChannelId(channelId: string): string {
-  return channelId.replace(/[^a-zA-Z0-9_-]/g, "-");
+  const sanitized = channelId.replace(/[^a-zA-Z0-9_-]/g, "-");
+  // Limit length to prevent ENAMETOOLONG filesystem errors
+  return sanitized.length > 200 ? sanitized.slice(0, 200) : sanitized;
 }
 
 function buildVolumeMounts(
@@ -125,6 +127,11 @@ export async function runContainerAgent(
 ): Promise<ContainerOutput> {
   const startTime = Date.now();
   const image = config?.image ?? CONTAINER_IMAGE;
+  // Validate image name to prevent pulling from arbitrary registries
+  const IMAGE_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._/:@-]*$/;
+  if (!IMAGE_PATTERN.test(image) || image.length > 500) {
+    return { status: "error", result: null, error: `Invalid container image name: ${image.slice(0, 100)}`, newSessionId: undefined };
+  }
   const timeout = config?.timeout ?? CONTAINER_TIMEOUT;
 
   const mounts = buildVolumeMounts(input.channelId, config);
@@ -158,6 +165,17 @@ export async function runContainerAgent(
     container.stdin.on("error", (err) => {
       log.warn(`Container stdin error: ${err.message}`);
     });
+    // Limit prompt size to prevent resource exhaustion in the container
+    const MAX_PROMPT_LENGTH = 500_000;
+    if (input.prompt.length > MAX_PROMPT_LENGTH) {
+      container.kill();
+      return resolve({
+        status: "error",
+        result: null,
+        error: `Prompt too long: ${input.prompt.length} chars (max ${MAX_PROMPT_LENGTH})`,
+        newSessionId: undefined,
+      });
+    }
     container.stdin.write(JSON.stringify(input));
     container.stdin.end();
 

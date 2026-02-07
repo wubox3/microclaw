@@ -156,7 +156,7 @@ async function main(): Promise<void> {
   log.info("Agent initialized");
 
   // 9b. Start channel gateway lifecycles
-  const activeGateways: Array<{ channelId: string; plugin: ChannelPlugin }> = [];
+  const activeGateways: Array<{ channelId: string; accountId: string; plugin: ChannelPlugin }> = [];
   const processingGatewayChats = new Set<string>();
 
   for (const reg of skillRegistry.channels) {
@@ -241,7 +241,7 @@ async function main(): Promise<void> {
         account: undefined,
         onMessage,
       });
-      activeGateways.push({ channelId, plugin });
+      activeGateways.push({ channelId, accountId, plugin });
       log.info(`Gateway started: ${channelId}`);
     } catch (err) {
       log.error(`Failed to start gateway for ${channelId}: ${formatError(err)}`);
@@ -294,19 +294,29 @@ async function main(): Promise<void> {
 
   // 13a. Graceful shutdown -- close SQLite to checkpoint WAL
   let shuttingDown = false;
-  const shutdown = () => {
+  const shutdown = async () => {
     if (shuttingDown) return;
     shuttingDown = true;
     log.info("Shutting down...");
-    // Stop channel gateways
-    for (const gw of activeGateways) {
-      try {
-        gw.plugin.gateway?.stopAccount?.({ config, accountId: "default" });
-        log.info(`Gateway stopped: ${gw.channelId}`);
-      } catch (err) {
-        log.error(`Failed to stop gateway ${gw.channelId}: ${formatError(err)}`);
-      }
-    }
+
+    // Force exit after 5 seconds if graceful close hangs
+    setTimeout(() => {
+      log.warn("Forced shutdown after timeout");
+      process.exit(1);
+    }, 5000).unref();
+
+    // Stop channel gateways (await all in parallel)
+    await Promise.allSettled(
+      activeGateways.map(async (gw) => {
+        try {
+          await gw.plugin.gateway?.stopAccount?.({ config, accountId: gw.accountId });
+          log.info(`Gateway stopped: ${gw.channelId}`);
+        } catch (err) {
+          log.error(`Failed to stop gateway ${gw.channelId}: ${formatError(err)}`);
+        }
+      }),
+    );
+
     stopBrowserServer().catch(() => {});
     if (containerEnabled) {
       stopIpcWatcher();
@@ -323,14 +333,9 @@ async function main(): Promise<void> {
     server.close(() => {
       process.exit(0);
     });
-    // Force exit after 5 seconds if graceful close hangs
-    setTimeout(() => {
-      log.warn("Forced shutdown after timeout");
-      process.exit(1);
-    }, 5000).unref();
   };
-  process.on("SIGTERM", shutdown);
-  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", () => { shutdown(); });
+  process.on("SIGINT", () => { shutdown(); });
 
   // 13b. Attach WebSocket
   const wss = new WebSocketServer({

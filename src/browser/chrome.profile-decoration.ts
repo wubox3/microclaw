@@ -37,7 +37,7 @@ function setDeep(obj: Record<string, unknown>, keys: string[], value: unknown) {
   let node: Record<string, unknown> = obj;
   for (const key of keys.slice(0, -1)) {
     const next = node[key];
-    if (typeof next !== "object" || next === null || Array.isArray(next)) {
+    if (typeof next !== "object" || next === null) {
       node[key] = {};
     }
     node = node[key] as Record<string, unknown>;

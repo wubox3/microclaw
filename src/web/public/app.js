@@ -18,6 +18,7 @@
   var isFirstConnect = true;
   var reconnectDelay = 1000;
   var MAX_RECONNECT_DELAY = 30000;
+  var messageCounter = 0;
 
   // Per-channel message history keyed by channel id
   var channelHistories = {};
@@ -42,11 +43,15 @@
     return channelHistories[activeChannelId];
   }
 
-  function pushHistory(entry) {
-    var history = getHistory();
+  function pushHistory(entry, channelId) {
+    var targetChannel = channelId || activeChannelId;
+    if (!channelHistories[targetChannel]) {
+      channelHistories[targetChannel] = [];
+    }
+    var history = channelHistories[targetChannel];
     history.push(entry);
     if (history.length > MAX_HISTORY_SIZE) {
-      channelHistories[activeChannelId] = history.slice(-MAX_HISTORY_SIZE);
+      channelHistories[targetChannel] = history.slice(-MAX_HISTORY_SIZE);
     }
   }
 
@@ -120,22 +125,17 @@
     messagesEl.innerHTML = '';
     hideTyping();
 
-    // Restore cached messages if we already loaded this channel
-    var cached = channelHistories[channelId];
-    if (cached && cached.length > 0) {
-      for (var i = 0; i < cached.length; i++) {
-        addMessage(cached[i].role, cached[i].content, cached[i].timestamp);
-      }
-    }
-
-    // Always fetch latest from server
+    // Fetch latest from server (loadHistory handles rendering)
     loadHistory(channelId);
   }
 
   function loadHistory(channelId) {
     var ch = channelId || activeChannelId;
     fetch('/api/chat/history?channelId=' + encodeURIComponent(ch) + '&limit=50')
-      .then(function(res) { return res.json(); })
+      .then(function(res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
       .then(function(data) {
         if (data.success && data.data) {
           channelHistories[ch] = [];
@@ -178,7 +178,7 @@
         if (data.type === 'message') {
           hideTyping();
           var msgChannelId = data.channelId || activeChannelId;
-          pushHistory({ role: 'assistant', content: data.text, timestamp: data.timestamp });
+          pushHistory({ role: 'assistant', content: data.text, timestamp: data.timestamp }, msgChannelId);
           // Only render if the response is for the active channel
           if (msgChannelId === activeChannelId) {
             addMessage('assistant', data.text, data.timestamp);
@@ -225,7 +225,7 @@
             memoryStatus.textContent = (memoryStatus.textContent || '') + ' [container]';
           }
         } else if (data.type === 'canvas_present' || data.type === 'canvas_hide' ||
-                   data.type === 'canvas_update' || data.type === 'canvas_eval' ||
+                   data.type === 'canvas_update' ||
                    data.type === 'canvas_a2ui' || data.type === 'canvas_a2ui_reset') {
           if (window.MicroClawCanvas && window.MicroClawCanvas.handleMessage) {
             window.MicroClawCanvas.handleMessage(data);
@@ -245,7 +245,7 @@
 
     ws.onclose = function() {
       setConnected(false);
-      var delay = Math.min(reconnectDelay + Math.random() * 500, MAX_RECONNECT_DELAY);
+      var delay = Math.min(reconnectDelay + Math.random() * reconnectDelay * 0.3, MAX_RECONNECT_DELAY);
       setTimeout(connectWebSocket, delay);
       reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
     };
@@ -265,7 +265,7 @@
     ws.send(JSON.stringify({
       type: 'message',
       text: text,
-      id: now.toString(),
+      id: now.toString() + '-' + (++messageCounter),
       timestamp: now,
       channelId: activeChannelId,
     }));

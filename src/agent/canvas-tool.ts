@@ -6,22 +6,72 @@ const VALID_A2UI_KINDS = new Set(["beginRendering", "surfaceUpdate", "dataModelU
 
 /**
  * Strip dangerous HTML content that could enable XSS via prompt injection.
- * Removes script tags, event handlers, and dangerous attributes.
+ * Uses an allowlist approach: only permitted tags survive; everything else
+ * is escaped. Event handlers and dangerous URI schemes are always stripped.
+ * Multi-pass to handle nested/split tag reconstruction attacks.
  */
+const ALLOWED_TAGS = new Set([
+  "div", "span", "p", "br", "hr", "h1", "h2", "h3", "h4", "h5", "h6",
+  "ul", "ol", "li", "dl", "dt", "dd", "table", "thead", "tbody", "tfoot",
+  "tr", "th", "td", "caption", "colgroup", "col", "strong", "em", "b", "i",
+  "u", "s", "del", "ins", "code", "pre", "blockquote", "a", "img", "sub",
+  "sup", "small", "mark", "abbr", "time", "details", "summary", "figure",
+  "figcaption", "section", "article", "header", "footer", "nav", "main",
+  "aside", "label", "input", "button", "select", "option", "textarea",
+  "fieldset", "legend", "progress", "meter",
+]);
+
+const ALLOWED_ATTRS = new Set([
+  "class", "id", "style", "title", "alt", "src", "href", "width", "height",
+  "colspan", "rowspan", "target", "rel", "type", "placeholder", "value",
+  "disabled", "checked", "readonly", "min", "max", "step", "name", "for",
+  "open", "data-a2ui-id", "data-surface", "role", "aria-label", "aria-hidden",
+]);
+
 function sanitizeHtml(raw: string): string {
-  return raw
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<script[\s>]/gi, "&lt;script")
-    .replace(/\bon\w+\s*=/gi, "data-removed-handler=")
-    .replace(/javascript\s*:/gi, "removed:")
-    .replace(/data\s*:/gi, "removed:")
-    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
-    .replace(/<iframe[\s>]/gi, "&lt;iframe")
-    .replace(/<object[\s\S]*?<\/object>/gi, "")
-    .replace(/<embed[\s>]/gi, "&lt;embed")
-    .replace(/<link[\s>]/gi, "&lt;link")
-    .replace(/<meta[\s>]/gi, "&lt;meta")
-    .replace(/<base[\s>]/gi, "&lt;base");
+  // Strip event handlers and dangerous URI schemes (multi-pass for nested evasion)
+  let html = raw;
+  for (let pass = 0; pass < 3; pass++) {
+    const prev = html;
+    html = html
+      .replace(/\bon\w+\s*=/gi, "data-removed-handler=")
+      .replace(/javascript\s*:/gi, "removed:")
+      .replace(/vbscript\s*:/gi, "removed:")
+      .replace(/data\s*:\s*text\/html/gi, "removed:");
+    if (html === prev) break;
+  }
+
+  // Strip non-allowed tags while keeping their text content
+  // Match opening tags, closing tags, and self-closing tags
+  html = html.replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*\/?>/gi, (match, tagName: string) => {
+    const lower = tagName.toLowerCase();
+    if (!ALLOWED_TAGS.has(lower)) {
+      return ""; // strip the tag entirely
+    }
+    // For allowed tags, strip non-allowed attributes
+    if (match.startsWith("</")) {
+      return `</${lower}>`;
+    }
+    const attrs: string[] = [];
+    const attrRegex = /\s+([a-zA-Z][a-zA-Z0-9_-]*)\s*(?:=\s*(?:"([^"]*)"|'([^']*)'|(\S+)))?/g;
+    let attrMatch;
+    while ((attrMatch = attrRegex.exec(match)) !== null) {
+      const attrName = attrMatch[1]!.toLowerCase();
+      const attrValue = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? "";
+      if (ALLOWED_ATTRS.has(attrName) || attrName.startsWith("data-")) {
+        // Extra safety: strip dangerous URIs from href/src
+        if ((attrName === "href" || attrName === "src") &&
+            /^\s*(javascript|vbscript|data\s*:\s*text\/html)\s*:/i.test(attrValue)) {
+          continue;
+        }
+        attrs.push(` ${attrName}="${attrValue.replace(/"/g, "&quot;")}"`);
+      }
+    }
+    const selfClose = match.trimEnd().endsWith("/>") ? " /" : "";
+    return `<${lower}${attrs.join("")}${selfClose}>`;
+  });
+
+  return html;
 }
 
 export type CanvasToolDeps = {
@@ -79,10 +129,6 @@ Example a2ui_push message:
           type: "string",
           description: "HTML content for 'update' action",
         },
-        code: {
-          type: "string",
-          description: "JavaScript code for 'eval' action",
-        },
         messages: {
           type: "array",
           description: "A2UI messages for 'a2ui_push' action",
@@ -138,7 +184,7 @@ Example a2ui_push message:
             for (const msg of validMessages) {
               if (msg.kind === "beginRendering" && msg.surfaceId) {
                 if (!newSurfaces.has(msg.surfaceId)) {
-                  newSurfaces.set(msg.surfaceId, null as unknown as A2uiComponent);
+                  newSurfaces.set(msg.surfaceId, { type: "container" } as A2uiComponent);
                 }
               } else if (msg.kind === "surfaceUpdate" && msg.surfaceId) {
                 newSurfaces.set(msg.surfaceId, (msg as { root: A2uiComponent }).root);
@@ -163,7 +209,7 @@ Example a2ui_push message:
         }
 
         default:
-          return { content: `Unknown canvas action: ${action}`, isError: true };
+          return { content: "Unknown canvas action", isError: true };
       }
     },
   };

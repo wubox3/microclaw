@@ -113,7 +113,8 @@ export function createMemoryManager(params: {
       }
       // Validate path to prevent directory traversal
       const resolved = resolvePath(dir);
-      if (resolved.includes("..") || !resolvePath(resolved).startsWith(resolvePath(backendConfig.dataDir))) {
+      const dataRoot = resolvePath(backendConfig.dataDir);
+      if (resolved !== dataRoot && !resolved.startsWith(dataRoot + "/")) {
         throw new Error("syncFiles directory must be within the configured data directory");
       }
       return syncMemoryFiles(db, resolved);

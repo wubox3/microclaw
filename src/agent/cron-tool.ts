@@ -134,7 +134,10 @@ WAKE MODES (for wake action):
             if (!params.job || typeof params.job !== "object") {
               return errorResult("job object required for add action");
             }
-            const job = normalizeCronJobCreate(params.job) ?? params.job;
+            const job = normalizeCronJobCreate(params.job);
+            if (!job) {
+              return errorResult("Invalid job definition: normalization failed. Ensure the job object has valid schedule and payload fields.");
+            }
             const result = await cronService.add(job as never);
             return jsonResult(result);
           }
@@ -147,7 +150,10 @@ WAKE MODES (for wake action):
             if (!params.patch || typeof params.patch !== "object") {
               return errorResult("patch object required for update action");
             }
-            const patch = normalizeCronJobPatch(params.patch) ?? params.patch;
+            const patch = normalizeCronJobPatch(params.patch);
+            if (!patch) {
+              return errorResult("Invalid patch definition: normalization failed. Ensure the patch object is valid.");
+            }
             const result = await cronService.update(id, patch as never);
             return jsonResult(result);
           }
@@ -189,7 +195,7 @@ WAKE MODES (for wake action):
               params.mode === "now" || params.mode === "next-heartbeat"
                 ? params.mode
                 : "next-heartbeat";
-            const result = cronService.wake({ mode: mode as "now" | "next-heartbeat", text });
+            const result = await cronService.wake({ mode: mode as "now" | "next-heartbeat", text });
             return jsonResult(result);
           }
 

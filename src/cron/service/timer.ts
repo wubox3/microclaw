@@ -34,24 +34,24 @@ export function armTimer(state: CronServiceState) {
 }
 
 export async function onTimer(state: CronServiceState) {
-  if (state.running) {
-    return;
-  }
-  state.running = true;
-  try {
-    await locked(state, async () => {
+  await locked(state, async () => {
+    if (state.running) {
+      return;
+    }
+    state.running = true;
+    try {
       // Reload persisted due-times without recomputing so runDueJobs sees
       // the original nextRunAtMs values.
       await ensureLoaded(state, { forceReload: true, skipRecompute: true });
       await runDueJobs(state);
       recomputeNextRuns(state);
       await persist(state);
-    });
-  } finally {
-    state.running = false;
-    // Always re-arm so transient errors don't kill the scheduler.
-    armTimer(state);
-  }
+    } finally {
+      state.running = false;
+      // Always re-arm so transient errors don't kill the scheduler.
+      armTimer(state);
+    }
+  });
 }
 
 export async function runDueJobs(state: CronServiceState) {
@@ -179,11 +179,7 @@ export async function executeJob(
   } catch (err) {
     await finish("error", String(err));
   } finally {
-    job.updatedAtMs = nowMs;
-    if (!opts.forced && job.enabled && !deleted) {
-      // Keep nextRunAtMs in sync in case the schedule advanced during a long run.
-      job.state.nextRunAtMs = computeJobNextRunAtMs(job, state.deps.nowMs());
-    }
+    job.updatedAtMs = state.deps.nowMs();
   }
 }
 

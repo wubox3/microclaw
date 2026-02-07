@@ -42,10 +42,18 @@ export async function getPwAiModule(opts?: { mode?: PwAiLoadMode }): Promise<PwA
     if (!pwAiModuleSoft) {
       pwAiModuleSoft = loadPwAiModule("soft");
     }
-    return await pwAiModuleSoft;
+    const result = await pwAiModuleSoft;
+    if (result === null) {
+      pwAiModuleSoft = null;
+    }
+    return result;
   }
   if (!pwAiModuleStrict) {
     pwAiModuleStrict = loadPwAiModule("strict");
   }
-  return await pwAiModuleStrict;
+  const result = await pwAiModuleStrict;
+  if (result === null) {
+    pwAiModuleStrict = null;
+  }
+  return result;
 }

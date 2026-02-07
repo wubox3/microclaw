@@ -8,6 +8,33 @@ const TIMEOUT_MS = 30_000;
 const MAX_BUFFER = 10 * 1024 * 1024;
 const MAX_OUTPUT_CHARS = 50_000;
 
+// Blocklist of dangerous command patterns to prevent misuse via prompt injection
+const BLOCKED_PATTERNS = [
+  /\brm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+)?(-[a-zA-Z]*r[a-zA-Z]*\s+)?\//i,  // rm -rf /
+  /\brm\s+(-[a-zA-Z]*r[a-zA-Z]*\s+)?(-[a-zA-Z]*f[a-zA-Z]*\s+)?\//i,
+  /\bmkfs\b/i,
+  /\bdd\s+.*\bof=/i,
+  />\s*\/dev\/sd/i,
+  /\bcurl\b.*\|\s*(ba)?sh/i,
+  /\bwget\b.*\|\s*(ba)?sh/i,
+  /\bnc\s+(-[a-zA-Z]*e|-[a-zA-Z]*c)\b/i,
+  /\bchmod\s+[0-7]*777\s+\//i,
+  /\bchown\b.*\//i,
+  /\/etc\/shadow/i,
+  /\/etc\/passwd/i,
+  /~\/\.ssh\//i,
+  /\.ssh\/.*id_/i,
+  /\bsudo\b/i,
+  /\bsu\s+-?\s*(root)?\s*$/i,
+  /\b(shutdown|reboot|halt|poweroff)\b/i,
+  /\biptables\b/i,
+  /\b:(){/,  // fork bomb
+] as const;
+
+function isBlockedCommand(command: string): boolean {
+  return BLOCKED_PATTERNS.some((pattern) => pattern.test(command));
+}
+
 function truncateOutput(output: string): string {
   if (output.length <= MAX_OUTPUT_CHARS) {
     return output;
@@ -39,6 +66,11 @@ export function createShellTool(opts: { cwd: string }): AgentTool {
 
       if (command === "") {
         return { content: "Error: command is required and must be a non-empty string.", isError: true };
+      }
+
+      if (isBlockedCommand(command)) {
+        log.warn(`Blocked dangerous shell command: ${command.slice(0, 200)}`);
+        return { content: "Error: this command has been blocked for safety. Destructive system commands are not permitted.", isError: true };
       }
 
       return new Promise((resolve) => {

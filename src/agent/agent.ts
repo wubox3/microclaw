@@ -36,7 +36,7 @@ export function createAgent(context: AgentContext): Agent {
     auth: context.auth,
   });
 
-  const tools: AgentTool[] = [
+  let currentTools: AgentTool[] = [
     createChannelListTool(),
     ...(context.additionalTools ?? []),
     ...(context.memoryManager ? [createMemorySearchTool(context.memoryManager)] : []),
@@ -48,7 +48,7 @@ export function createAgent(context: AgentContext): Agent {
 
   return {
     addTool: (tool: AgentTool) => {
-      tools.push(tool);
+      currentTools = [...currentTools, tool];
     },
     chat: async ({ messages, channelId }) => {
       // Container mode: spawn Docker container with Claude Agent SDK
@@ -78,7 +78,9 @@ export function createAgent(context: AgentContext): Agent {
       }
 
       // Direct mode: Anthropic API (fallback)
-      return runDirectChat({ messages, channelId, client, tools, context });
+      // Snapshot tools at call time to avoid mutation during iteration
+      const toolsSnapshot = [...currentTools];
+      return runDirectChat({ messages, channelId, client, tools: toolsSnapshot, context });
     },
   };
 }
@@ -197,9 +199,9 @@ async function runDirectChat(params: {
     temperature: context.config.agent?.temperature,
   });
 
-  // Handle tool calls in a loop (max 5 iterations), preserving full conversation
+  // Handle tool calls in a loop, preserving full conversation
   const conversationMessages: LlmMessage[] = [...llmMessages];
-  const MAX_TOOL_ITERATIONS = 5000;
+  const MAX_TOOL_ITERATIONS = 25;
   let iterations = 0;
   while (response.toolCalls && response.toolCalls.length > 0 && iterations < MAX_TOOL_ITERATIONS) {
     iterations++;
@@ -250,7 +252,7 @@ async function runDirectChat(params: {
     log.warn(`Tool call loop reached max ${MAX_TOOL_ITERATIONS} iterations with ${response.toolCalls.length} unprocessed tool calls`);
     return {
       ...response,
-      text: response.text + "\n\n[Note: reached maximum tool call iterations. Some tool calls were not executed.]",
+      text: (response.text || "") + "\n\n[Note: reached maximum tool call iterations. Some tool calls were not executed.]",
       toolCalls: undefined,
     };
   }

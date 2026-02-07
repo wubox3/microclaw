@@ -88,6 +88,7 @@ async function fetchChromeVersion(cdpUrl: string, timeoutMs = 500): Promise<Chro
       headers: getHeadersWithAuth(versionUrl),
     });
     if (!res.ok) {
+      await res.text().catch(() => {});
       return null;
     }
     const data = (await res.json()) as ChromeVersion;

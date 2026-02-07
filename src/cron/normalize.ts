@@ -4,7 +4,7 @@ import { migrateLegacyCronPayload } from "./payload-migration.js";
 
 /** Inline sanitizeAgentId replacement. */
 function sanitizeAgentId(raw: string): string {
-  return raw.replace(/[^a-zA-Z0-9_-]/g, "");
+  return raw.toLowerCase().replace(/[^a-zA-Z0-9_-]/g, "");
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -126,19 +126,13 @@ function buildDeliveryFromLegacyPayload(payload: UnknownRecord): UnknownRecord {
   return next;
 }
 
-function stripLegacyDeliveryFields(payload: UnknownRecord) {
-  if ("deliver" in payload) {
-    delete payload.deliver;
-  }
-  if ("channel" in payload) {
-    delete payload.channel;
-  }
-  if ("to" in payload) {
-    delete payload.to;
-  }
-  if ("bestEffortDeliver" in payload) {
-    delete payload.bestEffortDeliver;
-  }
+function stripLegacyDeliveryFields(payload: UnknownRecord): UnknownRecord {
+  const copy = { ...payload };
+  delete copy.deliver;
+  delete copy.channel;
+  delete copy.to;
+  delete copy.bestEffortDeliver;
+  return copy;
 }
 
 function unwrapJob(raw: UnknownRecord) {
@@ -240,7 +234,7 @@ export function normalizeCronJobInput(
     if (!hasDelivery && isIsolatedAgentTurn && payloadKind === "agentTurn") {
       if (payload && hasLegacyDelivery) {
         next.delivery = buildDeliveryFromLegacyPayload(payload);
-        stripLegacyDeliveryFields(payload);
+        next.payload = stripLegacyDeliveryFields(payload);
       } else {
         next.delivery = { mode: "announce" };
       }

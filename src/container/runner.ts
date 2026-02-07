@@ -30,7 +30,6 @@ function buildVolumeMounts(
   config?: ContainerConfig,
 ): VolumeMount[] {
   const mounts: VolumeMount[] = [];
-  const projectRoot = process.cwd();
 
   const safeChannelId = sanitizeChannelId(channelId);
 
@@ -245,7 +244,11 @@ export async function runContainerAgent(
         );
       }
 
-      fs.writeFileSync(logFile, logLines.join("\n"));
+      try {
+        fs.writeFileSync(logFile, logLines.join("\n"));
+      } catch (writeErr) {
+        log.warn(`Failed to write container log file ${logFile}: ${writeErr instanceof Error ? writeErr.message : String(writeErr)}`);
+      }
 
       if (timedOut) {
         safeResolve({

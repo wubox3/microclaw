@@ -140,55 +140,64 @@ export function createJob(state: CronServiceState, input: CronJobCreate): CronJo
 }
 
 export function applyJobPatch(job: CronJob, patch: CronJobPatch) {
+  // Deep-clone so validation failures don't leave the original job
+  // half-patched via shared nested object references.
+  const draft = structuredClone(job);
+
   if ("name" in patch) {
-    job.name = normalizeRequiredName(patch.name);
+    draft.name = normalizeRequiredName(patch.name);
   }
   if ("description" in patch) {
-    job.description = normalizeOptionalText(patch.description);
+    draft.description = normalizeOptionalText(patch.description);
   }
   if (typeof patch.enabled === "boolean") {
-    job.enabled = patch.enabled;
+    draft.enabled = patch.enabled;
   }
   if (typeof patch.deleteAfterRun === "boolean") {
-    job.deleteAfterRun = patch.deleteAfterRun;
+    draft.deleteAfterRun = patch.deleteAfterRun;
   }
   if (patch.schedule) {
-    job.schedule = patch.schedule;
+    draft.schedule = patch.schedule;
   }
   if (patch.sessionTarget) {
-    job.sessionTarget = patch.sessionTarget;
+    draft.sessionTarget = patch.sessionTarget;
   }
   if (patch.wakeMode) {
-    job.wakeMode = patch.wakeMode;
+    draft.wakeMode = patch.wakeMode;
   }
   if (patch.payload) {
-    job.payload = mergeCronPayload(job.payload, patch.payload);
+    draft.payload = mergeCronPayload(draft.payload, patch.payload);
   }
   if (!patch.delivery && patch.payload?.kind === "agentTurn") {
     // Back-compat: legacy clients still update delivery via payload fields.
     const legacyDeliveryPatch = buildLegacyDeliveryPatch(patch.payload);
     if (
       legacyDeliveryPatch &&
-      job.sessionTarget === "isolated" &&
-      job.payload.kind === "agentTurn"
+      draft.sessionTarget === "isolated" &&
+      draft.payload.kind === "agentTurn"
     ) {
-      job.delivery = mergeCronDelivery(job.delivery, legacyDeliveryPatch);
+      draft.delivery = mergeCronDelivery(draft.delivery, legacyDeliveryPatch);
     }
   }
   if (patch.delivery) {
-    job.delivery = mergeCronDelivery(job.delivery, patch.delivery);
+    draft.delivery = mergeCronDelivery(draft.delivery, patch.delivery);
   }
-  if (job.sessionTarget === "main" && job.delivery) {
-    job.delivery = undefined;
+  if (draft.sessionTarget === "main" && draft.delivery) {
+    draft.delivery = undefined;
   }
   if (patch.state) {
-    job.state = { ...job.state, ...patch.state };
+    draft.state = { ...draft.state, ...patch.state };
   }
   if ("agentId" in patch) {
-    job.agentId = normalizeOptionalAgentId((patch as { agentId?: unknown }).agentId);
+    draft.agentId = normalizeOptionalAgentId((patch as { agentId?: unknown }).agentId);
   }
-  assertSupportedJobSpec(job);
-  assertDeliverySupport(job);
+
+  // Validate BEFORE applying to the real job.
+  assertSupportedJobSpec(draft);
+  assertDeliverySupport(draft);
+
+  // Validation passed — copy draft fields back to the original job.
+  Object.assign(job, draft);
 }
 
 function mergeCronPayload(existing: CronPayload, patch: CronPayloadPatch): CronPayload {

@@ -12,6 +12,12 @@
       <div class="sidebar-header">
         <h1 class="logo">MicroClaw</h1>
       </div>
+      <div id="cron-panel" class="sidebar-section">
+        <div class="nav-section-label">Jobs</div>
+        <div id="cron-status" class="cron-status">Loading...</div>
+        <div id="cron-list" class="cron-list"></div>
+        <button id="cron-add-btn" class="cron-add-btn">+ New Job</button>
+      </div>
       <nav id="channel-list">
         <div class="nav-section-label">Channels</div>
       </nav>
@@ -25,12 +31,6 @@
       <div id="memory-panel" class="sidebar-section">
         <div class="nav-section-label">Memory</div>
         <div id="memory-status" class="memory-status">Initializing...</div>
-      </div>
-      <div id="cron-panel" class="sidebar-section">
-        <div class="nav-section-label">Jobs</div>
-        <div id="cron-status" class="cron-status">Loading...</div>
-        <div id="cron-list" class="cron-list"></div>
-        <button id="cron-add-btn" class="cron-add-btn">+ New Job</button>
       </div>
     </aside>
     <main id="chat-area">
@@ -156,6 +156,7 @@
   </div>
 
   <script src="/cron.js"></script>
+  <script src="/sound-fx.js"></script>
   <script src="/voice.js"></script>
   <script src="/canvas.js"></script>
   <script src="/app.js"></script>

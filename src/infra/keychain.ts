@@ -47,8 +47,10 @@ export function readClaudeCodeCredentials(): string | null {
     if (creds.expiresAt) {
       // 1e12 ms ≈ Sep 2001; timestamps below this are assumed to be in seconds
       const expiresAtMs = creds.expiresAt < 1e12 ? creds.expiresAt * 1000 : creds.expiresAt;
-      if (expiresAtMs < Date.now()) {
-        log.warn("Claude Code OAuth token has expired");
+      // Add 60s buffer to prevent using a token that expires during initialization
+      const TOKEN_EXPIRY_BUFFER_MS = 60_000;
+      if (expiresAtMs < Date.now() + TOKEN_EXPIRY_BUFFER_MS) {
+        log.warn("Claude Code OAuth token has expired or is about to expire");
         return null;
       }
     }

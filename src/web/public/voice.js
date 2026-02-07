@@ -18,6 +18,9 @@
   var voiceConfigured = false; // Whether TTS is enabled and has API key
   var voiceConfigLoaded = false; // Whether config has been fetched
 
+  // ─── Sound Effects (loaded from sound-fx.js) ───
+  var SoundFX = window.MicroClawSoundFX || { init: function() {}, play: function() {} };
+
   // ─── DOM Elements (set in init) ───
   var micBtn = null;
   var wakeToggle = null;
@@ -81,6 +84,7 @@
 
       if (wakeResult.found && !wakeDetected) {
         wakeDetected = true;
+        SoundFX.play('wake');
         setVoiceStatus('Wake word "' + wakeResult.trigger + '" detected');
 
         // Clear previous timer
@@ -180,6 +184,7 @@
 
     talkMode = true;
     stopWakeListening();
+    SoundFX.play('talk-start');
     setTalkPhase('listening');
     startTalkListening();
     updateUI();
@@ -187,6 +192,7 @@
 
   function stopTalkMode() {
     talkMode = false;
+    SoundFX.play('talk-end');
     setTalkPhase('idle');
     if (recognition) {
       try { recognition.stop(); } catch (e) { /* ignore */ }
@@ -285,6 +291,7 @@
   function handleVoiceCommand(text) {
     if (!text.trim()) return;
 
+    SoundFX.play('send');
     setTalkPhase('thinking');
     setVoiceStatus('Processing: "' + text + '"');
 
@@ -372,6 +379,7 @@
     })
     .catch(function(err) {
       isSpeaking = false;
+      SoundFX.play('error');
       setVoiceStatus('TTS failed: ' + err.message);
       updateUI();
       if (talkMode) {
@@ -444,6 +452,7 @@
 
     try {
       recognition.start();
+      SoundFX.play('listen');
       setVoiceStatus('Listening... speak now');
       updateUI();
     } catch (e) {
@@ -525,7 +534,10 @@
   // ─── Load Wake Triggers from Server ───
   function loadWakeTriggers() {
     fetch('/api/voicewake')
-      .then(function(res) { return res.json(); })
+      .then(function(res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
       .then(function(data) {
         if (data.success && data.data && Array.isArray(data.data.triggers)) {
           wakeTriggers = data.data.triggers;
@@ -578,6 +590,7 @@
       voiceStatus = document.getElementById('voice-status');
       voiceOrb = document.getElementById('voice-orb');
 
+      SoundFX.init();
       initVoiceSetupDialog();
       loadVoiceConfig();
 
@@ -681,6 +694,9 @@
     // Interrupt speaking (barge-in)
     interrupt: function() {
       if (currentAudio) {
+        if (currentAudio.src) {
+          URL.revokeObjectURL(currentAudio.src);
+        }
         currentAudio.pause();
         currentAudio = null;
         isSpeaking = false;

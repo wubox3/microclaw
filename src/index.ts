@@ -1,7 +1,8 @@
 import { serve } from "@hono/node-server";
 import { WebSocket, WebSocketServer } from "ws";
+import crypto from "node:crypto";
 import { execSync } from "child_process";
-import { unlinkSync } from "node:fs";
+// unlinkSync removed (unused import)
 import { resolve as resolvePath } from "node:path";
 import { loadDotenv } from "./infra/dotenv.js";
 import { isDev } from "./infra/env.js";
@@ -482,19 +483,33 @@ async function main(): Promise<void> {
       });
     });
   };
-  process.on("SIGTERM", () => { shutdown().catch((err) => log.error(`Shutdown error: ${formatError(err)}`)); });
-  process.on("SIGINT", () => { shutdown().catch((err) => log.error(`Shutdown error: ${formatError(err)}`)); });
 
   // 13b. Attach WebSocket
   const wss = new WebSocketServer({
     server: server as unknown as import("http").Server,
     path: "/ws",
+    verifyClient: ({ req }: { req: import("http").IncomingMessage }) => {
+      const origin = req.headers.origin;
+      if (origin) {
+        try {
+          const url = new URL(origin);
+          if (!["localhost", "127.0.0.1", "::1"].includes(url.hostname)) {
+            return false;
+          }
+        } catch {
+          return false;
+        }
+      }
+      return true;
+    },
   });
-  let clientIdCounter = 0;
+
+  // Register signal handlers after wss is initialized to avoid temporal dead zone
+  process.on("SIGTERM", () => { shutdown().catch((err) => log.error(`Shutdown error: ${formatError(err)}`)); });
+  process.on("SIGINT", () => { shutdown().catch((err) => log.error(`Shutdown error: ${formatError(err)}`)); });
 
   wss.on("connection", (ws) => {
-    clientIdCounter = (clientIdCounter + 1) % Number.MAX_SAFE_INTEGER;
-    const clientId = `web-${clientIdCounter}`;
+    const clientId = `web-${crypto.randomUUID()}`;
     webMonitor.addClient(clientId, ws);
     log.info(`WebSocket client connected: ${clientId}`);
 
@@ -548,6 +563,14 @@ async function main(): Promise<void> {
 
       // Resolve the channel for this message (default to "web")
       const resolvedChannelId = message.channelId ?? "web";
+
+      // Validate channelId to prevent injection
+      if (!/^[a-zA-Z0-9_-]+$/.test(resolvedChannelId)) {
+        if (client.ws.readyState === WebSocket.OPEN) {
+          client.ws.send(JSON.stringify({ type: "error", message: "Invalid channelId" }));
+        }
+        return;
+      }
 
       // Load recent chat history for conversation context
       const historyMessages: Array<{ role: "user" | "assistant"; content: string; timestamp: number }> = [];
@@ -614,7 +637,10 @@ async function main(): Promise<void> {
     }
     processingClients.add(clientId);
 
-    const actionText = `[Canvas Action] User ${action.action}${action.componentId ? ` on "${action.componentId}"` : ""}${action.value !== undefined ? ` with value: ${JSON.stringify(action.value)}` : ""}`;
+    const safeAction = String(action.action).slice(0, 100);
+    const safeComponentId = action.componentId ? String(action.componentId).slice(0, 100) : undefined;
+    const safeValue = action.value !== undefined ? JSON.stringify(action.value).slice(0, 1000) : undefined;
+    const actionText = `[Canvas Action] User ${safeAction}${safeComponentId ? ` on "${safeComponentId}"` : ""}${safeValue ? ` with value: ${safeValue}` : ""}`;
 
     try {
       // Load conversation history for context

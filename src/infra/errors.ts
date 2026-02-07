@@ -4,6 +4,7 @@ export class AppError extends Error {
 
   constructor(message: string, code: string, statusCode = 500) {
     super(message);
+    Object.setPrototypeOf(this, new.target.prototype);
     this.name = "AppError";
     this.code = code;
     this.statusCode = statusCode;
@@ -33,7 +34,7 @@ export class MemoryError extends AppError {
 
 export function formatError(err: unknown): string {
   if (err instanceof Error) {
-    return err.message;
+    return err.stack ?? err.message;
   }
   return String(err);
 }

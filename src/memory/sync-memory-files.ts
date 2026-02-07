@@ -14,24 +14,34 @@ export function syncMemoryFiles(
   const MAX_FILE_COUNT = 1000;
   const MAX_FILE_SIZE_BYTES = 1_048_576; // 1MB per file
 
-  const currentFiles = collectFiles(dir);
+  // Sort deterministically before truncating to prevent nondeterministic inclusion
+  const sortedFiles = collectFiles(dir).sort((a, b) => a.path.localeCompare(b.path));
 
-  // Enforce file count limit to prevent OOM
-  if (currentFiles.length > MAX_FILE_COUNT) {
-    currentFiles.length = MAX_FILE_COUNT;
-  }
+  // Enforce file count limit to prevent OOM (immutable slice instead of .length mutation)
+  const currentFiles = sortedFiles.length > MAX_FILE_COUNT
+    ? sortedFiles.slice(0, MAX_FILE_COUNT)
+    : sortedFiles;
 
   // Read all file contents BEFORE opening the transaction to avoid holding
   // the SQLite write lock during synchronous I/O
   const fileContents = new Map<string, { content: string; hash: string }>();
   for (const file of currentFiles) {
-    const fileStat = lstatSync(resolve(dir, file.path));
+    const fullPath = resolve(dir, file.path);
+    const fileStat = lstatSync(fullPath);
+    // Skip symlinks (defense against TOCTOU symlink swap between collectFiles and here)
+    if (fileStat.isSymbolicLink()) {
+      continue;
+    }
     // Skip files exceeding the size limit to prevent OOM
     if (fileStat.size > MAX_FILE_SIZE_BYTES) {
       continue;
     }
-    const content = readFileSync(resolve(dir, file.path), "utf-8");
-    fileContents.set(file.path, { content, hash: hashContent(content) });
+    try {
+      const content = readFileSync(fullPath, "utf-8");
+      fileContents.set(file.path, { content, hash: hashContent(content) });
+    } catch {
+      // Skip files that became unreadable between stat and read
+    }
   }
 
   const existingFiles = db.prepare("SELECT id, path, hash FROM memory_files WHERE source = 'file'").all() as Array<{
@@ -41,7 +51,7 @@ export function syncMemoryFiles(
   }>;
 
   const existingByPath = new Map(existingFiles.map((f) => [f.path, f]));
-  const currentPaths = new Set(currentFiles.map((f) => f.path));
+  const currentPaths = new Set(currentFiles.filter((f) => fileContents.has(f.path)).map((f) => f.path));
 
   db.exec("BEGIN");
   try {
@@ -55,7 +65,8 @@ export function syncMemoryFiles(
 
     // Add or update files
     for (const file of currentFiles) {
-      const entry = fileContents.get(file.path)!;
+      const entry = fileContents.get(file.path);
+      if (!entry) continue; // skip oversized files
       const existing = existingByPath.get(file.path);
 
       if (!existing) {
@@ -110,7 +121,7 @@ function isTextFile(path: string): boolean {
   const textExtensions = [
     ".txt", ".md", ".ts", ".js", ".json", ".yaml", ".yml", ".toml", ".csv",
     ".html", ".css", ".py", ".go", ".rs", ".java", ".sh", ".rb", ".php",
-    ".sql", ".xml", ".env", ".ini", ".cfg",
+    ".sql", ".xml", ".ini", ".cfg",
   ];
   return textExtensions.some((ext) => path.endsWith(ext));
 }

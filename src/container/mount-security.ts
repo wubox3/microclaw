@@ -178,7 +178,7 @@ function isValidContainerPath(containerPath: string): boolean {
   if (!containerPath || containerPath.trim() === "") {
     return false;
   }
-  if (containerPath.includes("\0")) {
+  if (containerPath.includes("\0") || containerPath.includes("%")) {
     return false;
   }
   if (containerPath.startsWith("/")) {
@@ -201,6 +201,7 @@ export interface MountValidationResult {
 
 export function validateMount(
   mount: AdditionalMount,
+  opts?: { isMainMount?: boolean },
 ): MountValidationResult {
   const allowlist = loadMountAllowlist();
 
@@ -255,7 +256,7 @@ export function validateMount(
   }
 
   // Enforce nonMainReadOnly: non-main mounts are always read-only
-  if (allowlist.nonMainReadOnly) {
+  if (allowlist.nonMainReadOnly && !opts?.isMainMount) {
     effectiveReadonly = true;
   }
 

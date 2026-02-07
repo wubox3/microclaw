@@ -147,14 +147,18 @@ function createProfileContext(
 
   const openTab = async (url: string): Promise<BrowserTab> => {
     // Block unsafe URL schemes to prevent SSRF
-    const urlLower = url.toLowerCase();
-    if (
-      urlLower.startsWith("javascript:") ||
-      urlLower.startsWith("data:") ||
-      urlLower.startsWith("vbscript:") ||
-      urlLower.startsWith("file:")
-    ) {
-      throw new Error(`Unsafe URL scheme: "${url.slice(0, url.indexOf(":") + 1)}"`);
+    // Trim whitespace and use case-insensitive check to prevent bypass via " javascript:" etc.
+    const trimmedUrl = url.trim();
+    const ALLOWED_SCHEMES = new Set(["http:", "https:", "about:"]);
+    let scheme: string;
+    try {
+      scheme = new URL(trimmedUrl).protocol.toLowerCase();
+    } catch {
+      // URLs without explicit scheme (e.g., "example.com") - allow, Chrome will add https://
+      scheme = "";
+    }
+    if (scheme && !ALLOWED_SCHEMES.has(scheme)) {
+      throw new Error(`Unsafe URL scheme: "${scheme}"`);
     }
 
     // For remote profiles, use Playwright's persistent connection to create tabs

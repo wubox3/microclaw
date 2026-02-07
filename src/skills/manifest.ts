@@ -39,13 +39,22 @@ export function readSkillManifest(skillDir: string): SkillManifest | null {
   }
 }
 
+const SKILL_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+const MAX_SKILL_ID_LENGTH = 64;
+
 export function validateManifest(manifest: SkillManifest): string[] {
   const errors: string[] = [];
   if (!manifest.id) {
     errors.push("Manifest missing required field: id");
+  } else if (manifest.id.length > MAX_SKILL_ID_LENGTH) {
+    errors.push("Manifest id must be at most " + String(MAX_SKILL_ID_LENGTH) + " characters");
+  } else if (!SKILL_ID_PATTERN.test(manifest.id)) {
+    errors.push("Manifest id must match [a-zA-Z0-9_-]+");
   }
   if (!manifest.name) {
     errors.push("Manifest missing required field: name");
+  } else if (manifest.name.length > 128) {
+    errors.push("Manifest name must be at most 128 characters");
   }
   return errors;
 }

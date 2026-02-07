@@ -11,19 +11,15 @@ export type LlmAssistantMessage = { role: "assistant"; content: string; toolCall
 export type LlmToolResultMessage = { role: "tool"; toolCallId: string; content: string; isError?: boolean };
 export type LlmMessage = LlmUserMessage | LlmAssistantMessage | LlmToolResultMessage;
 
-export type LlmSendParams = {
+export type LlmParams = {
   messages: LlmMessage[];
   system?: string;
   tools?: LlmToolDefinition[];
   temperature?: number;
 };
 
-export type LlmStreamParams = {
-  messages: LlmMessage[];
-  system?: string;
-  tools?: LlmToolDefinition[];
-  temperature?: number;
-};
+export type LlmSendParams = LlmParams;
+export type LlmStreamParams = LlmParams;
 
 export type LlmClient = {
   sendMessage: (params: LlmSendParams) => Promise<AgentResponse>;

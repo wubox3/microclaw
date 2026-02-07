@@ -17,8 +17,8 @@ const DEFAULT_MAX_TOKENS = 4096;
 
 const OAUTH_BETA_HEADERS = {
   "anthropic-beta": "claude-code-20250219,oauth-2025-04-20",
-  "user-agent": "claude-cli/2.1.2 (external, cli)",
-  "x-app": "cli",
+  "user-agent": "microclaw/1.0.0",
+  "x-app": "microclaw",
 };
 
 function toAnthropicMessages(messages: LlmMessage[]): Anthropic.Messages.MessageParam[] {
@@ -65,6 +65,7 @@ function toAnthropicMessages(messages: LlmMessage[]): Anthropic.Messages.Message
       }
       result.push({ role: "user", content: toolResults });
     } else {
+      log.warn(`Unrecognized message role skipped: ${(msg as { role: string }).role}`);
       i++;
     }
   }
@@ -73,6 +74,10 @@ function toAnthropicMessages(messages: LlmMessage[]): Anthropic.Messages.Message
 
 export function createAnthropicClient(options: AnthropicClientOptions): LlmClient {
   const isOAuth = options.auth.isOAuth;
+
+  if (!isOAuth && !options.auth.apiKey) {
+    throw new Error("ANTHROPIC_API_KEY is required when not using OAuth");
+  }
 
   const client = isOAuth
     ? new Anthropic({

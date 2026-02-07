@@ -33,7 +33,7 @@ export function createWebMonitor(): WebMonitor {
           const raw = String(data);
           // Reject payloads over 1MB to prevent abuse
           const MAX_PAYLOAD_BYTES = 1_048_576;
-          if (raw.length > MAX_PAYLOAD_BYTES) {
+          if (Buffer.byteLength(raw, 'utf-8') > MAX_PAYLOAD_BYTES) {
             return;
           }
           const parsed = JSON.parse(raw) as Record<string, unknown>;
@@ -60,9 +60,10 @@ export function createWebMonitor(): WebMonitor {
           if (typeof parsed.text !== "string" || parsed.text.trim().length === 0) {
             return;
           }
+          const MAX_TEXT_LENGTH = 50_000;
           const msg: WebInboundMessage = {
             id: typeof parsed.id === "string" ? parsed.id : String(Date.now()),
-            text: parsed.text,
+            text: parsed.text.slice(0, MAX_TEXT_LENGTH),
             senderId: id,
             senderName: typeof parsed.senderName === "string" ? parsed.senderName : undefined,
             timestamp: Date.now(),
@@ -86,6 +87,8 @@ export function createWebMonitor(): WebMonitor {
     removeClient: (id) => {
       const client = clients.get(id);
       if (client) {
+        client.ws.removeAllListeners("message");
+        client.ws.removeAllListeners("close");
         client.ws.close();
         clients.delete(id);
       }

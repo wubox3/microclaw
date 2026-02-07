@@ -35,7 +35,12 @@ async function pruneIfNeeded(filePath: string, opts: { maxBytes: number; keepLin
   const kept = lines.slice(Math.max(0, lines.length - opts.keepLines));
   const tmp = `${filePath}.${process.pid}.${Math.random().toString(16).slice(2)}.tmp`;
   await fs.writeFile(tmp, `${kept.join("\n")}\n`, "utf-8");
-  await fs.rename(tmp, filePath);
+  try {
+    await fs.rename(tmp, filePath);
+  } catch (renameErr) {
+    await fs.unlink(tmp).catch(() => {});
+    throw renameErr;
+  }
 }
 
 export async function appendCronRunLog(
@@ -54,6 +59,11 @@ export async function appendCronRunLog(
         maxBytes: opts?.maxBytes ?? 2_000_000,
         keepLines: opts?.keepLines ?? 2_000,
       });
+    })
+    .finally(() => {
+      if (writesByPath.get(resolved) === next) {
+        writesByPath.delete(resolved);
+      }
     });
   writesByPath.set(resolved, next);
   await next;
@@ -91,6 +101,10 @@ export async function readCronRunLogEntries(
         continue;
       }
       if (jobId && obj.jobId !== jobId) {
+        continue;
+      }
+      const VALID_STATUSES = new Set(["ok", "error", "skipped"]);
+      if (obj.status !== undefined && !VALID_STATUSES.has(obj.status)) {
         continue;
       }
       parsed.push(obj as CronRunLogEntry);

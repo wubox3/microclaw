@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { resolve, basename } from "node:path";
 import type { MicroClawConfig } from "../config/types.js";
 import type { MemorySearchManager } from "../memory/types.js";
 import type { Agent } from "../agent/agent.js";
@@ -35,16 +35,17 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
   app.use("*", async (c, next) => {
     if (STATE_MUTATING_METHODS.has(c.req.method)) {
       const origin = c.req.header("Origin");
-      if (origin) {
-        try {
-          const url = new URL(origin);
-          const validHosts = ["localhost", "127.0.0.1", "::1"];
-          if (!validHosts.includes(url.hostname)) {
-            return c.json({ success: false, error: "CSRF: invalid origin" }, 403);
-          }
-        } catch {
-          return c.json({ success: false, error: "CSRF: malformed origin" }, 403);
+      if (!origin) {
+        return c.json({ success: false, error: "CSRF: missing origin header" }, 403);
+      }
+      try {
+        const url = new URL(origin);
+        const validHosts = ["localhost", "127.0.0.1", "::1"];
+        if (!validHosts.includes(url.hostname)) {
+          return c.json({ success: false, error: "CSRF: invalid origin" }, 403);
         }
+      } catch {
+        return c.json({ success: false, error: "CSRF: malformed origin" }, 403);
       }
     }
     await next();
@@ -183,6 +184,47 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     }
   });
 
+  // Sound effects: serve custom .mp3 overrides from dataDir/sounds/
+  const ALLOWED_SOUND_NAMES = new Set(["wake", "listen", "send", "error", "talk-start", "talk-end"]);
+
+  // Preflight: tell client which custom sounds are available (avoids blind 404s)
+  app.get("/api/sounds/available", (c) => {
+    const soundsDir = resolve(deps.dataDir, "sounds");
+    if (!existsSync(soundsDir)) {
+      return c.json({ sounds: [] });
+    }
+    try {
+      const files = readdirSync(soundsDir);
+      const available = files
+        .filter((f) => f.endsWith(".mp3"))
+        .map((f) => basename(f, ".mp3"))
+        .filter((name) => ALLOWED_SOUND_NAMES.has(name));
+      return c.json({ sounds: available });
+    } catch {
+      return c.json({ sounds: [] });
+    }
+  });
+
+  app.get("/sounds/:name", (c) => {
+    const raw = c.req.param("name").replace(/\.mp3$/i, "");
+    if (!ALLOWED_SOUND_NAMES.has(raw)) {
+      return c.text("Not found", 404);
+    }
+    const soundPath = resolve(deps.dataDir, "sounds", raw + ".mp3");
+    if (!existsSync(soundPath)) {
+      return c.text("Not found", 404);
+    }
+    try {
+      const buf = readFileSync(soundPath);
+      return c.body(buf, 200, {
+        "Content-Type": "audio/mpeg",
+        "Cache-Control": "public, max-age=3600",
+      });
+    } catch {
+      return c.text("Not found", 404);
+    }
+  });
+
   // Voice wake word endpoints
   app.get("/api/voicewake", async (c) => {
     try {
@@ -245,6 +287,10 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     }
     if (typeof body.text !== "string" || body.text.trim().length === 0) {
       return c.json({ success: false, error: "text must be a non-empty string" }, 400);
+    }
+    const MAX_TTS_TEXT_LENGTH = 4096;
+    if (body.text.length > MAX_TTS_TEXT_LENGTH) {
+      return c.json({ success: false, error: `text must be at most ${MAX_TTS_TEXT_LENGTH} characters` }, 400);
     }
     const VALID_VOICES = new Set(["alloy", "ash", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer"]);
     let voice: string | undefined;
@@ -432,29 +478,36 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
   };
   const cssContent = safeReadFile(resolve(publicDir, "styles.css"));
   const jsContent = safeReadFile(resolve(publicDir, "app.js"));
+  const soundFxJsContent = safeReadFile(resolve(publicDir, "sound-fx.js"));
   const voiceJsContent = safeReadFile(resolve(publicDir, "voice.js"));
   const canvasJsContent = safeReadFile(resolve(publicDir, "canvas.js"));
   const cronJsContent = safeReadFile(resolve(publicDir, "cron.js"));
   const htmlContent = safeReadFile(resolve(publicDir, "index.html"));
 
+  const STATIC_CACHE = "public, max-age=300";
+
   app.get("/styles.css", (c) => {
-    return c.text(cssContent, 200, { "Content-Type": "text/css" });
+    return c.text(cssContent, 200, { "Content-Type": "text/css", "Cache-Control": STATIC_CACHE });
   });
 
   app.get("/app.js", (c) => {
-    return c.text(jsContent, 200, { "Content-Type": "application/javascript" });
+    return c.text(jsContent, 200, { "Content-Type": "application/javascript", "Cache-Control": STATIC_CACHE });
+  });
+
+  app.get("/sound-fx.js", (c) => {
+    return c.text(soundFxJsContent, 200, { "Content-Type": "application/javascript", "Cache-Control": STATIC_CACHE });
   });
 
   app.get("/voice.js", (c) => {
-    return c.text(voiceJsContent, 200, { "Content-Type": "application/javascript" });
+    return c.text(voiceJsContent, 200, { "Content-Type": "application/javascript", "Cache-Control": STATIC_CACHE });
   });
 
   app.get("/canvas.js", (c) => {
-    return c.text(canvasJsContent, 200, { "Content-Type": "application/javascript" });
+    return c.text(canvasJsContent, 200, { "Content-Type": "application/javascript", "Cache-Control": STATIC_CACHE });
   });
 
   app.get("/cron.js", (c) => {
-    return c.text(cronJsContent, 200, { "Content-Type": "application/javascript" });
+    return c.text(cronJsContent, 200, { "Content-Type": "application/javascript", "Cache-Control": STATIC_CACHE });
   });
 
   app.get("/", (c) => {

@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { BrowserFormField } from "../client-actions-core.js";
 import type { BrowserRouteContext } from "../server-context.js";
 import type { BrowserRouteRegistrar } from "./types.js";
@@ -346,6 +347,16 @@ export function registerBrowserAgentActRoutes(
     const timeoutMs = toNumber(body.timeoutMs);
     if (!paths.length) {
       return jsonError(res, 400, "paths are required");
+    }
+    // Validate file paths: reject null bytes, non-absolute paths, and path traversal
+    for (const p of paths) {
+      if (p.includes("\0")) {
+        return jsonError(res, 400, "file paths must not contain null bytes");
+      }
+      const resolved = path.resolve(p);
+      if (resolved !== path.normalize(p)) {
+        return jsonError(res, 400, `file path must be absolute and normalized: "${p}"`);
+      }
     }
     try {
       const tab = await profileCtx.ensureTabAvailable(targetId);

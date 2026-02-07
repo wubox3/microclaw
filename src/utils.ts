@@ -34,6 +34,10 @@ export function normalizeE164(phone: string): string {
   } else if (digits.startsWith("00")) {
     digits = digits.slice(2);
   }
+  // 10-digit numbers are standard US/CA format; prepend country code 1
+  if (digits.length === 10) {
+    digits = "1" + digits;
+  }
   if (digits.length < 7 || digits.length > 15) {
     return "";
   }

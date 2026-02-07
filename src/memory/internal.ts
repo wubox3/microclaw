@@ -4,7 +4,7 @@ const CHUNK_SIZE = 512;
 const CHUNK_OVERLAP = 64;
 
 export function hashContent(content: string): string {
-  return createHash("sha256").update(content).digest("hex").slice(0, 16);
+  return createHash("sha256").update(content).digest("hex").slice(0, 32);
 }
 
 export function chunkText(text: string, chunkSize = CHUNK_SIZE, overlap = CHUNK_OVERLAP): string[] {

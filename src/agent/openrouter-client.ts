@@ -163,11 +163,16 @@ export function createOpenRouterClient(
 
       yield { type: "message_start" };
 
-      for await (const chunk of stream) {
-        const delta = chunk.choices[0]?.delta;
-        if (delta?.content) {
-          yield { type: "text_delta", text: delta.content };
+      try {
+        for await (const chunk of stream) {
+          const delta = chunk.choices[0]?.delta;
+          if (delta?.content) {
+            yield { type: "text_delta", text: delta.content };
+          }
         }
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        throw new Error(`OpenRouter stream iteration failed: ${detail}`);
       }
 
       yield { type: "message_stop" };

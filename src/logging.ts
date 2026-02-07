@@ -12,10 +12,19 @@ const LOG_LEVEL_MAP: Record<LogLevel, number> = {
   fatal: 6,
 };
 
+const VALID_LOG_LEVELS = new Set(Object.keys(LOG_LEVEL_MAP));
+
+function resolveLogLevel(envLevel: string | undefined): number {
+  if (envLevel && VALID_LOG_LEVELS.has(envLevel)) {
+    return LOG_LEVEL_MAP[envLevel as LogLevel];
+  }
+  return LOG_LEVEL_MAP.info;
+}
+
 export function createLogger(name: string, minLevel?: LogLevel): Logger<unknown> {
   return new Logger({
     name,
-    minLevel: minLevel ? LOG_LEVEL_MAP[minLevel] : 3,
+    minLevel: minLevel ? LOG_LEVEL_MAP[minLevel] : resolveLogLevel(process.env.LOG_LEVEL),
     prettyLogTemplate: "{{dateIsoStr}} {{logLevelName}} [{{name}}] ",
   });
 }

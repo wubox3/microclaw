@@ -113,7 +113,11 @@ export async function stopBrowserServer(): Promise<void> {
 
   if (current.server) {
     await new Promise<void>((resolve) => {
-      current.server?.close(() => resolve());
+      const timeout = setTimeout(() => resolve(), 5000);
+      current.server?.close(() => {
+        clearTimeout(timeout);
+        resolve();
+      });
     });
   }
 

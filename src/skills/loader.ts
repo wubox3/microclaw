@@ -15,6 +15,24 @@ function createSkillLogger(skillId: string): SkillLogger {
   };
 }
 
+function redactSensitiveConfig(config: MicroClawConfig): MicroClawConfig {
+  const clone = structuredClone(config);
+  // Strip API keys and tokens to prevent skill plugins from exfiltrating credentials
+  const walk = (obj: Record<string, unknown>, depth = 0) => {
+    if (depth > 10 || !obj || typeof obj !== "object") return;
+    for (const key of Object.keys(obj)) {
+      const lower = key.toLowerCase();
+      if (lower.includes("key") || lower.includes("token") || lower.includes("secret") || lower.includes("password") || lower.includes("credential")) {
+        obj[key] = "[REDACTED]";
+      } else if (typeof obj[key] === "object" && obj[key] !== null) {
+        walk(obj[key] as Record<string, unknown>, depth + 1);
+      }
+    }
+  };
+  walk(clone as unknown as Record<string, unknown>);
+  return clone;
+}
+
 function createSkillApi(
   skillId: string,
   config: MicroClawConfig,
@@ -24,7 +42,7 @@ function createSkillApi(
   return {
     id: skillId,
     name: skillId,
-    config: structuredClone(config),
+    config: redactSensitiveConfig(config),
     skillConfig,
     logger: createSkillLogger(skillId),
     // Intentional mutation: registry arrays are internal and not exposed to
@@ -49,6 +67,9 @@ export async function loadSkills(params: {
 
   for (const skill of discovered) {
     try {
+      // WARNING: Skills are loaded via dynamic import without sandboxing.
+      // Only load skills from trusted sources. A malicious skill can access
+      // the full Node.js runtime, file system, and network.
       const mod = await import(skill.entryPoint);
       const definition: SkillDefinition = mod.default ?? mod;
 

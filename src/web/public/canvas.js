@@ -10,6 +10,7 @@
   var toggleBtn = null;
   var iframeReady = false;
   var pendingMessages = [];
+  var MAX_PENDING_MESSAGES = 1000;
 
   function init() {
     panel = document.getElementById('canvas-panel');
@@ -102,12 +103,14 @@
         break;
 
       case 'canvas_update':
-      case 'canvas_eval':
       case 'canvas_a2ui':
       case 'canvas_a2ui_reset':
         if (iframeReady) {
           sendToIframe(data);
         } else {
+          if (pendingMessages.length >= MAX_PENDING_MESSAGES) {
+            pendingMessages.shift();
+          }
           pendingMessages.push(data);
         }
         break;

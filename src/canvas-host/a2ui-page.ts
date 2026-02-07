@@ -255,16 +255,14 @@ export function generateA2uiPage(): string {
 
   var DANGEROUS_TAGS = ['script', 'style', 'iframe', 'object', 'embed', 'form', 'base', 'link', 'meta', 'svg', 'math', 'foreignobject', 'animate', 'animatetransform', 'set', 'use', 'mtext', 'mglyph', 'annotation-xml'];
 
-  function sanitizeHtml(html) {
-    var temp = document.createElement('div');
-    temp.innerHTML = html || '';
+  function sanitizePass(container) {
     // Remove dangerous tags
     for (var dt = 0; dt < DANGEROUS_TAGS.length; dt++) {
-      var dangerous = temp.querySelectorAll(DANGEROUS_TAGS[dt]);
+      var dangerous = container.querySelectorAll(DANGEROUS_TAGS[dt]);
       for (var d = 0; d < dangerous.length; d++) dangerous[d].remove();
     }
     // Remove event handler attributes and dangerous URIs
-    var allEls = temp.querySelectorAll('*');
+    var allEls = container.querySelectorAll('*');
     for (var e = 0; e < allEls.length; e++) {
       var attrs = allEls[e].attributes;
       for (var a = attrs.length - 1; a >= 0; a--) {
@@ -291,6 +289,19 @@ export function generateA2uiPage(): string {
         }
       }
     }
+  }
+
+  function sanitizeHtml(html) {
+    // Double-parse to defend against mutation XSS (mXSS):
+    // Browser can re-interpret DOM on first innerHTML parse in ways that bypass
+    // a single sanitization pass. Parse→sanitize→serialize→re-parse→sanitize→serialize
+    // ensures mutations are caught on the second pass.
+    var temp = document.createElement('div');
+    temp.innerHTML = html || '';
+    sanitizePass(temp);
+    var firstPass = temp.innerHTML;
+    temp.innerHTML = firstPass;
+    sanitizePass(temp);
     return temp.innerHTML;
   }
 

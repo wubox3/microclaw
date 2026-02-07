@@ -160,8 +160,9 @@ async function runDirectChat(params: {
           query: lastUserMessage.content,
           limit: 5,
         });
-      } catch {
-        // Memory search failure is non-fatal
+      } catch (err) {
+        // Memory search failure is non-fatal but worth logging
+        log.warn(`Memory search failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
   }

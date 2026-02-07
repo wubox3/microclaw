@@ -49,7 +49,8 @@ export function createWebMonitor(): WebMonitor {
             };
             for (const handler of [...canvasActionHandlers]) {
               try {
-                handler(id, action);
+                // Wrap in Promise.resolve to catch async handler rejections
+                void Promise.resolve(handler(id, action)).catch(() => {});
               } catch {
                 // Prevent one handler failure from blocking others
               }
@@ -71,7 +72,8 @@ export function createWebMonitor(): WebMonitor {
           };
           for (const handler of [...messageHandlers]) {
             try {
-              handler(id, msg);
+              // Wrap in Promise.resolve to catch async handler rejections
+              void Promise.resolve(handler(id, msg)).catch(() => {});
             } catch {
               // Prevent one handler failure from blocking others
             }

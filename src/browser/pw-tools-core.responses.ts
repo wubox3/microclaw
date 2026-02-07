@@ -12,7 +12,8 @@ function matchUrlPattern(pattern: string, url: string): boolean {
   }
   if (p.includes("*")) {
     const escaped = p.replace(/[|\\{}()[\]^$+?.]/g, "\\$&");
-    const regex = new RegExp(`^${escaped.replace(/\*\*/g, ".*").replace(/\*/g, ".*")}$`);
+    // Replace ** first with a placeholder to avoid double-replacement of * in .*
+    const regex = new RegExp(`^${escaped.replace(/\*\*/g, "\x00GLOBSTAR\x00").replace(/\*/g, "[^/]*").replace(/\x00GLOBSTAR\x00/g, ".*")}$`);
     return regex.test(url);
   }
   return url.includes(p);

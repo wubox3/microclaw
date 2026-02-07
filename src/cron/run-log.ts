@@ -16,7 +16,14 @@ export type CronRunLogEntry = {
 export function resolveCronRunLogPath(params: { storePath: string; jobId: string }) {
   const storePath = path.resolve(params.storePath);
   const dir = path.dirname(storePath);
-  return path.join(dir, "runs", `${params.jobId}.jsonl`);
+  // Sanitize jobId to prevent path traversal (strip path separators and null bytes)
+  const safeJobId = params.jobId.replace(/[/\\:\0]/g, "_");
+  const resolved = path.join(dir, "runs", `${safeJobId}.jsonl`);
+  const runsDir = path.join(dir, "runs");
+  if (!resolved.startsWith(runsDir + path.sep) && resolved !== runsDir) {
+    throw new Error(`Invalid job ID: resolved path escapes runs directory`);
+  }
+  return resolved;
 }
 
 const writesByPath = new Map<string, Promise<void>>();

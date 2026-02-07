@@ -18,5 +18,12 @@ export async function locked<T>(state: CronServiceState, fn: () => Promise<T>): 
   state.op = keepAlive;
   storeLocks.set(storePath, keepAlive);
 
-  return (await next) as T;
+  try {
+    return (await next) as T;
+  } finally {
+    // Clean up store lock once the chain settles to prevent memory leak
+    if (storeLocks.get(storePath) === keepAlive) {
+      storeLocks.delete(storePath);
+    }
+  }
 }

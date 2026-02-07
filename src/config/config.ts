@@ -29,6 +29,18 @@ function validateConfig(value: unknown): MicroClawConfig {
   if (obj.container !== undefined && (typeof obj.container !== "object" || obj.container === null || Array.isArray(obj.container))) {
     throw new Error("Config 'container' must be an object");
   }
+  if (obj.voice !== undefined && (typeof obj.voice !== "object" || obj.voice === null || Array.isArray(obj.voice))) {
+    throw new Error("Config 'voice' must be an object");
+  }
+  if (obj.browser !== undefined && (typeof obj.browser !== "object" || obj.browser === null || Array.isArray(obj.browser))) {
+    throw new Error("Config 'browser' must be an object");
+  }
+  if (obj.cron !== undefined && (typeof obj.cron !== "object" || obj.cron === null || Array.isArray(obj.cron))) {
+    throw new Error("Config 'cron' must be an object");
+  }
+  if (obj.skills !== undefined && (typeof obj.skills !== "object" || obj.skills === null || Array.isArray(obj.skills))) {
+    throw new Error("Config 'skills' must be an object");
+  }
   const web = obj.web as Record<string, unknown> | undefined;
   if (web?.port !== undefined && typeof web.port !== "number") {
     throw new Error("Config 'web.port' must be a number");

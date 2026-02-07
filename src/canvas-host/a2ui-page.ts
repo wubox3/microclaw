@@ -253,7 +253,7 @@ export function generateA2uiPage(): string {
     }, PARENT_ORIGIN);
   }
 
-  var DANGEROUS_TAGS = ['script', 'style', 'iframe', 'object', 'embed', 'form', 'base', 'link', 'meta', 'svg', 'math', 'foreignobject', 'animate', 'animatetransform', 'set', 'use', 'mtext', 'mglyph', 'annotation-xml'];
+  var DANGEROUS_TAGS = ['script', 'style', 'iframe', 'object', 'embed', 'form', 'base', 'link', 'meta', 'svg', 'math', 'foreignobject', 'animate', 'animatetransform', 'set', 'use', 'mtext', 'mglyph', 'annotation-xml', 'noscript', 'template', 'textarea', 'title'];
 
   function sanitizePass(container) {
     // Remove dangerous tags

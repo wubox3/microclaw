@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import fs from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve as resolvePath } from "node:path";
 import { tmpdir } from "node:os";
 
 const MEDIA_DIR = join(tmpdir(), "microclaw", "media");
@@ -97,12 +97,24 @@ export function storeScreenshot(data: Buffer, filename?: string): string {
   if (!existsSync(MEDIA_DIR)) {
     mkdirSync(MEDIA_DIR, { recursive: true });
   }
-  const name = filename ?? `screenshot-${Date.now()}.png`;
-  const filePath = join(MEDIA_DIR, name);
+  // Sanitize filename to prevent path traversal
+  const rawName = filename ?? `screenshot-${Date.now()}.png`;
+  const safeName = rawName.replace(/[/\\:\0]/g, "_");
+  const filePath = join(MEDIA_DIR, safeName);
+  // Verify resolved path stays within MEDIA_DIR
+  const resolved = resolvePath(filePath);
+  if (!resolved.startsWith(resolvePath(MEDIA_DIR) + "/") && resolved !== resolvePath(MEDIA_DIR)) {
+    throw new Error("Screenshot filename escapes media directory");
+  }
   writeFileSync(filePath, data);
   return filePath;
 }
 
 export function loadScreenshot(filePath: string): Buffer {
-  return readFileSync(filePath);
+  // Validate that the path is within the media directory
+  const resolved = resolvePath(filePath);
+  if (!resolved.startsWith(resolvePath(MEDIA_DIR) + "/")) {
+    throw new Error("Screenshot path must be within media directory");
+  }
+  return readFileSync(resolved);
 }

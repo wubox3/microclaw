@@ -3,7 +3,7 @@ import { existsSync, rmSync } from "node:fs";
 import path, { resolve, basename } from "node:path";
 import { readSkillManifest, validateManifest } from "./manifest.js";
 
-export const VALID_DIR_NAME = /^(?!\.$)(?!\.\.$)[a-zA-Z0-9._-]+$/;
+export const VALID_DIR_NAME = /^(?!\.)(?!\.\.$)[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 export const VALID_GIT_URL = /^(https?:\/\/[^\s]+|git@[^\s:]+:[^\s]+|git:\/\/[^\s]+)$/;
 
 export function parseArgs(argv: readonly string[]): { url: string; name: string | null } {

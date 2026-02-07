@@ -164,9 +164,13 @@ export async function waitForDownloadViaPlaywright(opts: {
 }> {
   if (opts.path?.trim()) {
     const resolvedOut = path.resolve(opts.path.trim());
-    const BLOCKED_PREFIXES = ["/etc/", "/usr/", "/bin/", "/sbin/", "/sys/", "/proc/", "/dev/", "/root/"];
-    if (BLOCKED_PREFIXES.some((p) => resolvedOut.startsWith(p)) || resolvedOut.includes("\0")) {
-      throw new Error("Download path is not allowed");
+    if (resolvedOut.includes("\0")) {
+      throw new Error("Download path must not contain null bytes");
+    }
+    // Allowlist: only permit downloads under /tmp/ or user home directory
+    const ALLOWED_PREFIXES = ["/tmp/", `${process.env.HOME ?? "/nonexistent"}/`];
+    if (!ALLOWED_PREFIXES.some((p) => resolvedOut.startsWith(p))) {
+      throw new Error("Download path must be under /tmp/ or user home directory");
     }
   }
   const page = await getPageForTargetId(opts);

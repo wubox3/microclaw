@@ -489,16 +489,29 @@ async function main(): Promise<void> {
     server: server as unknown as import("http").Server,
     path: "/ws",
     verifyClient: ({ req }: { req: import("http").IncomingMessage }) => {
+      const ALLOWED_HOSTS = ["localhost", "127.0.0.1", "::1"];
+      // Validate Host header to prevent DNS rebinding attacks
+      const host = req.headers.host;
+      if (host) {
+        const hostWithoutPort = host.replace(/:\d+$/, "");
+        if (!ALLOWED_HOSTS.includes(hostWithoutPort)) {
+          return false;
+        }
+      }
       const origin = req.headers.origin;
       if (origin) {
         try {
           const url = new URL(origin);
-          if (!["localhost", "127.0.0.1", "::1"].includes(url.hostname)) {
+          if (!ALLOWED_HOSTS.includes(url.hostname)) {
             return false;
           }
         } catch {
           return false;
         }
+      }
+      // Reject connections that have neither Host nor Origin header
+      if (!host && !origin) {
+        return false;
       }
       return true;
     },

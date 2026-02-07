@@ -111,5 +111,5 @@ export function buildFtsQuery(query: string): string {
     }
     return `"${sanitized}"`;
   }
-  return tokens.map((t) => `"${t}"`).join(" AND ");
+  return tokens.map((t) => `"${t.replace(/"/g, '""')}"`).join(" AND ");
 }

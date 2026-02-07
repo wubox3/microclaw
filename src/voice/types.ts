@@ -1,6 +1,6 @@
 export type { TtsConfig, VoiceWakeConfigOptions, VoiceConfig } from "../config/types.js";
 
-export type TtsProvider = "openai";
+export type TtsProvider = "openai" | "openrouter";
 
 export type VoiceWakeConfig = {
   triggers: string[];
@@ -18,11 +18,9 @@ export type TtsResult = {
 export type ResolvedTtsConfig = {
   enabled: boolean;
   provider: TtsProvider;
-  openai: {
-    apiKey?: string;
-    model: string;
-    voice: string;
-  };
+  apiKey?: string;
+  model: string;
+  voice: string;
   maxTextLength: number;
   timeoutMs: number;
 };

@@ -53,12 +53,10 @@ export type ContainerConfigOptions = {
 
 export type TtsConfig = {
   enabled?: boolean;
-  provider?: "openai";
-  openai?: {
-    apiKey?: string;
-    model?: string;
-    voice?: string;
-  };
+  provider?: "openai" | "openrouter";
+  apiKey?: string;
+  model?: string;
+  voice?: string;
   maxTextLength?: number;
   timeoutMs?: number;
 };

@@ -264,7 +264,10 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
   // Voice config status endpoint
   app.get("/api/voice/config", (c) => {
     const ttsConfig = resolveTtsConfig(deps.config);
-    const hasApiKey = Boolean(ttsConfig.openai.apiKey || process.env.OPENAI_API_KEY);
+    const envKey = ttsConfig.provider === "openrouter"
+      ? process.env.OPENROUTER_API_KEY
+      : process.env.OPENAI_API_KEY;
+    const hasApiKey = Boolean(ttsConfig.apiKey || envKey);
     const ttsConfigured = ttsConfig.enabled && hasApiKey;
     return c.json({
       success: true,
@@ -272,7 +275,7 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
         ttsEnabled: ttsConfig.enabled,
         ttsConfigured,
         provider: ttsConfig.provider,
-        voice: ttsConfig.openai.voice,
+        voice: ttsConfig.voice,
       },
     });
   });

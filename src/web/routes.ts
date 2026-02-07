@@ -5,8 +5,11 @@ import type { MicroClawConfig } from "../config/types.js";
 import type { MemorySearchManager } from "../memory/types.js";
 import type { Agent } from "../agent/agent.js";
 import type { WebMonitor } from "../channels/web/monitor.js";
+import type { CronService } from "../cron/service.js";
+import { normalizeCronJobCreate, normalizeCronJobPatch } from "../cron/normalize.js";
+import { readCronRunLogEntries, resolveCronRunLogPath } from "../cron/run-log.js";
 import { listChatChannels } from "../channels/registry.js";
-import { textToSpeech } from "../voice/tts.js";
+import { textToSpeech, resolveTtsConfig } from "../voice/tts.js";
 import { loadVoiceWakeConfig, setVoiceWakeTriggers } from "../voice/voicewake.js";
 import { createCanvasRoutes } from "../canvas-host/server.js";
 import { createLogger } from "../logging.js";
@@ -19,6 +22,8 @@ export type WebAppDeps = {
   memoryManager?: MemorySearchManager;
   webMonitor: WebMonitor;
   dataDir: string;
+  cronService?: CronService;
+  cronStorePath?: string;
 };
 
 export function createWebRoutes(deps: WebAppDeps): Hono {
@@ -56,7 +61,12 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
       return c.json({ success: true, data: { ready: false, reason: "Memory not configured" } });
     }
     const status = await deps.memoryManager.getStatus();
-    return c.json({ success: true, data: status });
+    try {
+      const counts = await deps.memoryManager.getRecordCounts();
+      return c.json({ success: true, data: { ...status, counts } });
+    } catch {
+      return c.json({ success: true, data: status });
+    }
   });
 
   app.post("/api/memory/search", async (c) => {
@@ -209,6 +219,22 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     }
   });
 
+  // Voice config status endpoint
+  app.get("/api/voice/config", (c) => {
+    const ttsConfig = resolveTtsConfig(deps.config);
+    const hasApiKey = Boolean(ttsConfig.openai.apiKey ?? process.env.OPENAI_API_KEY);
+    return c.json({
+      success: true,
+      data: {
+        ttsEnabled: ttsConfig.enabled,
+        ttsConfigured: ttsConfig.enabled && hasApiKey,
+        provider: ttsConfig.provider,
+        voice: ttsConfig.openai.voice,
+        model: ttsConfig.openai.model,
+      },
+    });
+  });
+
   // TTS endpoint
   app.post("/api/tts", async (c) => {
     let body: Record<string, unknown>;
@@ -254,6 +280,142 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
       return c.json({ success: false, error: "TTS request failed" }, 500);
     }
   });
+
+  // Cron API routes
+  if (deps.cronService) {
+    const cronService = deps.cronService;
+    const cronStorePath = deps.cronStorePath ?? "";
+
+    app.get("/api/cron/status", async (c) => {
+      try {
+        const status = await cronService.status();
+        return c.json({ success: true, data: status });
+      } catch (err) {
+        log.error(`Cron status failed: ${err instanceof Error ? err.message : String(err)}`);
+        return c.json({ success: false, error: "Failed to get cron status" }, 500);
+      }
+    });
+
+    app.get("/api/cron/jobs", async (c) => {
+      try {
+        const includeDisabled = c.req.query("includeDisabled") === "true";
+        const jobs = await cronService.list({ includeDisabled });
+        return c.json({ success: true, data: jobs });
+      } catch (err) {
+        log.error(`Cron list failed: ${err instanceof Error ? err.message : String(err)}`);
+        return c.json({ success: false, error: "Failed to list cron jobs" }, 500);
+      }
+    });
+
+    app.post("/api/cron/jobs", async (c) => {
+      let body: Record<string, unknown>;
+      try {
+        body = await c.req.json();
+      } catch {
+        return c.json({ success: false, error: "Invalid JSON body" }, 400);
+      }
+      const job = normalizeCronJobCreate(body);
+      if (!job) {
+        return c.json({ success: false, error: "Invalid job definition" }, 400);
+      }
+      try {
+        const result = await cronService.add(job);
+        return c.json({ success: true, data: result }, 201);
+      } catch (err) {
+        log.error(`Cron add failed: ${err instanceof Error ? err.message : String(err)}`);
+        return c.json({ success: false, error: err instanceof Error ? err.message : "Failed to add cron job" }, 400);
+      }
+    });
+
+    app.patch("/api/cron/jobs/:id", async (c) => {
+      const id = c.req.param("id");
+      if (!id || !/^[a-f0-9-]+$/i.test(id)) {
+        return c.json({ success: false, error: "Invalid job ID" }, 400);
+      }
+      let body: Record<string, unknown>;
+      try {
+        body = await c.req.json();
+      } catch {
+        return c.json({ success: false, error: "Invalid JSON body" }, 400);
+      }
+      const patch = normalizeCronJobPatch(body);
+      if (!patch) {
+        return c.json({ success: false, error: "Invalid patch" }, 400);
+      }
+      try {
+        const result = await cronService.update(id, patch);
+        return c.json({ success: true, data: result });
+      } catch (err) {
+        log.error(`Cron update failed: ${err instanceof Error ? err.message : String(err)}`);
+        return c.json({ success: false, error: err instanceof Error ? err.message : "Failed to update cron job" }, 400);
+      }
+    });
+
+    app.delete("/api/cron/jobs/:id", async (c) => {
+      const id = c.req.param("id");
+      if (!id || !/^[a-f0-9-]+$/i.test(id)) {
+        return c.json({ success: false, error: "Invalid job ID" }, 400);
+      }
+      try {
+        const result = await cronService.remove(id);
+        return c.json({ success: true, data: result });
+      } catch (err) {
+        log.error(`Cron remove failed: ${err instanceof Error ? err.message : String(err)}`);
+        return c.json({ success: false, error: err instanceof Error ? err.message : "Failed to remove cron job" }, 400);
+      }
+    });
+
+    app.post("/api/cron/jobs/:id/run", async (c) => {
+      const id = c.req.param("id");
+      if (!id || !/^[a-f0-9-]+$/i.test(id)) {
+        return c.json({ success: false, error: "Invalid job ID" }, 400);
+      }
+      try {
+        const result = await cronService.run(id, "force");
+        return c.json({ success: true, data: result });
+      } catch (err) {
+        log.error(`Cron run failed: ${err instanceof Error ? err.message : String(err)}`);
+        return c.json({ success: false, error: err instanceof Error ? err.message : "Failed to run cron job" }, 400);
+      }
+    });
+
+    app.get("/api/cron/jobs/:id/runs", async (c) => {
+      const id = c.req.param("id");
+      if (!id || !/^[a-f0-9-]+$/i.test(id)) {
+        return c.json({ success: false, error: "Invalid job ID" }, 400);
+      }
+      const limitParam = c.req.query("limit");
+      const limit = limitParam ? Math.max(1, Math.min(Number(limitParam) || 50, 5000)) : 50;
+      try {
+        const logPath = resolveCronRunLogPath({ storePath: cronStorePath, jobId: id });
+        const entries = await readCronRunLogEntries(logPath, { jobId: id, limit });
+        return c.json({ success: true, data: entries });
+      } catch (err) {
+        log.error(`Cron runs failed: ${err instanceof Error ? err.message : String(err)}`);
+        return c.json({ success: false, error: "Failed to read run history" }, 500);
+      }
+    });
+
+    app.post("/api/cron/wake", async (c) => {
+      let body: Record<string, unknown>;
+      try {
+        body = await c.req.json();
+      } catch {
+        return c.json({ success: false, error: "Invalid JSON body" }, 400);
+      }
+      if (typeof body.text !== "string" || body.text.trim().length === 0) {
+        return c.json({ success: false, error: "text must be a non-empty string" }, 400);
+      }
+      const mode = body.mode === "now" ? "now" : "next-heartbeat";
+      try {
+        const result = cronService.wake({ mode: mode as "now" | "next-heartbeat", text: body.text });
+        return c.json({ success: true, data: result });
+      } catch (err) {
+        log.error(`Cron wake failed: ${err instanceof Error ? err.message : String(err)}`);
+        return c.json({ success: false, error: "Failed to send wake event" }, 500);
+      }
+    });
+  }
 
   // Mount canvas routes
   const canvasApp = createCanvasRoutes(deps.dataDir);

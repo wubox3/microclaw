@@ -34,6 +34,7 @@ type RawMessage = {
   rowid: number;
   text: string;
   msg_date: number;
+  is_from_me: number;
   sender_id: string | null;
   chat_identifier: string | null;
   display_name: string | null;
@@ -47,6 +48,7 @@ function buildPollQuery(afterRowId: number): string {
     "  m.ROWID as rowid,",
     "  m.text,",
     "  m.date as msg_date,",
+    "  m.is_from_me,",
     "  h.id as sender_id,",
     "  c.chat_identifier,",
     "  c.display_name,",
@@ -56,7 +58,6 @@ function buildPollQuery(afterRowId: number): string {
     "LEFT JOIN chat_message_join cmj ON m.ROWID = cmj.message_id",
     "LEFT JOIN chat c ON cmj.chat_id = c.ROWID",
     `WHERE m.ROWID > ${safeId}`,
-    "  AND m.is_from_me = 0",
     "  AND m.text IS NOT NULL",
     "  AND m.text != ''",
     "ORDER BY m.ROWID ASC",
@@ -164,8 +165,10 @@ export async function startIMessageGateway(
     for (const msg of messages) {
       lastRowId = Math.max(lastRowId, msg.rowid);
 
-      if (!msg.sender_id || !msg.text) continue;
-      if (!isAllowed(msg.sender_id, allowFrom)) continue;
+      if (!msg.text) continue;
+
+      const senderId = msg.is_from_me ? "me" : (msg.sender_id ?? "unknown");
+      if (!msg.is_from_me && msg.sender_id && !isAllowed(msg.sender_id, allowFrom)) continue;
 
       const text =
         msg.text.length > MAX_MESSAGE_LENGTH
@@ -173,12 +176,12 @@ export async function startIMessageGateway(
           : msg.text;
 
       const inbound: GatewayInboundMessage = {
-        from: msg.sender_id,
+        from: senderId,
         text,
         chatType: resolveChatType(msg.group_id),
-        chatId: msg.chat_identifier ?? msg.sender_id,
+        chatId: msg.chat_identifier ?? senderId,
         timestamp: appleTimestampToUnixMs(msg.msg_date),
-        senderName: msg.display_name ?? undefined,
+        senderName: msg.is_from_me ? "Me" : (msg.display_name ?? undefined),
       };
 
       try {

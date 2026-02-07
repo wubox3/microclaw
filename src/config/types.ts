@@ -73,6 +73,12 @@ export type VoiceConfig = {
   wake?: VoiceWakeConfigOptions;
 };
 
+export type CronConfig = {
+  enabled?: boolean;
+  store?: string;
+  maxConcurrentRuns?: number;
+};
+
 export type MicroClawConfig = {
   channels?: Partial<Record<ChatChannelId, ChannelConfig>>;
   memory?: MemoryConfig;
@@ -82,4 +88,5 @@ export type MicroClawConfig = {
   container?: ContainerConfigOptions;
   voice?: VoiceConfig;
   browser?: BrowserConfig;
+  cron?: CronConfig;
 };

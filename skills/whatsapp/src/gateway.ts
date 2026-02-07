@@ -6,16 +6,15 @@ import {
   DisconnectReason,
   jidNormalizedUser,
   type WASocket,
-  type BaileysEventMap,
+  type WAMessage,
+  type ConnectionState,
 } from "@whiskeysockets/baileys";
-import { Boom } from "@hapi/boom";
 import type { GatewayInboundMessage } from "../../../src/channels/plugins/types.js";
 
 const MAX_MESSAGE_LENGTH = 8000;
 const MAX_RECONNECT_ATTEMPTS = 10;
-const BASE_RECONNECT_DELAY_MS = 2000;
-const MAX_RECONNECT_DELAY_MS = 60_000;
-const PAIRING_CODE_DELAY_MS = 5000;
+const BASE_RECONNECT_DELAY_MS = 3000;
+const MAX_RECONNECT_DELAY_MS = 30_000;
 
 export type WhatsAppGatewayHandle = {
   readonly sock: WASocket;
@@ -54,6 +53,13 @@ function resolveTimestamp(ts: unknown): number {
   return Date.now();
 }
 
+/** Minimal pino-compatible silent logger to suppress Baileys noise */
+function makeSilentLogger(): unknown {
+  const noop = () => {};
+  const child = () => makeSilentLogger();
+  return { level: "silent", trace: noop, debug: noop, info: noop, warn: noop, error: noop, fatal: noop, child };
+}
+
 export async function startWhatsAppGateway(
   params: WhatsAppGatewayParams,
 ): Promise<WhatsAppGatewayHandle> {
@@ -62,39 +68,36 @@ export async function startWhatsAppGateway(
 
   await mkdir(authDir, { recursive: true });
 
-  const { state, saveCreds } = await useMultiFileAuthState(authDir);
-
   let stopped = false;
   let currentSock: WASocket;
   let reconnectAttempts = 0;
-  let pairingCodeTimer: ReturnType<typeof setTimeout> | undefined;
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 
-  const needsPairing = (): boolean =>
-    Boolean(phoneNumber) && !state.creds.registered;
+  const connectSocket = async (): Promise<WASocket> => {
+    if (stopped) throw new Error("Gateway stopped");
 
-  const connectSocket = (): WASocket => {
-    // Reset creds.me before connecting if pairing isn't complete.
-    // requestPairingCode sets creds.me which causes reconnects to use
-    // login mode (pull: true). The server rejects that since no device
-    // is paired yet. Clearing it forces registration mode.
-    if (needsPairing()) {
-      state.creds.me = undefined as never;
-    }
+    const { state, saveCreds } = await useMultiFileAuthState(authDir);
+
+    const usePairingCode = Boolean(phoneNumber) && !state.creds.registered;
 
     const sock = makeWASocket({
       auth: state,
-      printQRInTerminal: true,
+      printQRInTerminal: !usePairingCode,
+      logger: makeSilentLogger() as never,
     });
 
     sock.ev.on("creds.update", saveCreds);
 
-    // Request pairing code after WS handshake settles
-    if (needsPairing()) {
-      const stripped = phoneNumber!.replace(/[^0-9]/g, "");
-      pairingCodeTimer = setTimeout(() => {
-        if (stopped) return;
-        sock.requestPairingCode(stripped)
+    let pairingCodeRequested = false;
+
+    sock.ev.on("connection.update", (update: Partial<ConnectionState>) => {
+      const { connection, lastDisconnect, qr } = update;
+
+      // Request pairing code when we get a QR (means socket is ready but not authed)
+      if (usePairingCode && !pairingCodeRequested && qr) {
+        pairingCodeRequested = true;
+        // Baileys requires phone number without +, (), -, spaces — digits only with country code
+        sock.requestPairingCode(normalizePhone(phoneNumber!))
           .then((code: string) => {
             logger?.info(`\n========================================`);
             logger?.info(`  WhatsApp pairing code: ${code}`);
@@ -104,46 +107,40 @@ export async function startWhatsAppGateway(
           .catch((err: unknown) => {
             logger?.error(`Failed to request pairing code: ${err instanceof Error ? err.message : String(err)}`);
           });
-      }, PAIRING_CODE_DELAY_MS);
-    }
-
-    sock.ev.on("connection.update", (update) => {
-      const { connection, lastDisconnect } = update;
+      } else if (!usePairingCode && qr) {
+        logger?.info("WhatsApp QR code displayed in terminal — scan to authenticate");
+      }
 
       if (connection === "close") {
-        if (pairingCodeTimer) {
-          clearTimeout(pairingCodeTimer);
-          pairingCodeTimer = undefined;
-        }
+        const statusCode = (lastDisconnect?.error as { output?: { statusCode?: number } })
+          ?.output?.statusCode;
 
-        const boom = lastDisconnect?.error as Boom | undefined;
-        const statusCode = boom?.output?.statusCode ?? 0;
-        const isLoggedOut = statusCode === DisconnectReason.loggedOut;
-
-        if (isLoggedOut) {
+        if (statusCode === DisconnectReason.loggedOut) {
           logger?.warn("WhatsApp logged out — will not reconnect");
           return;
         }
 
         if (!stopped && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-          const delay = needsPairing()
-            ? PAIRING_CODE_DELAY_MS
-            : Math.min(
-                BASE_RECONNECT_DELAY_MS * Math.pow(2, reconnectAttempts),
-                MAX_RECONNECT_DELAY_MS,
-              );
           reconnectAttempts++;
-          logger?.info(`WhatsApp disconnected, reconnecting in ${delay}ms (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+          const delay = Math.min(
+            BASE_RECONNECT_DELAY_MS * Math.pow(2, reconnectAttempts - 1),
+            MAX_RECONNECT_DELAY_MS,
+          );
+          logger?.info(`WhatsApp disconnected (status: ${statusCode}), reconnecting in ${delay}ms (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
           reconnectTimer = setTimeout(() => {
             reconnectTimer = undefined;
             if (!stopped) {
-              const oldSock = currentSock;
-              currentSock = connectSocket();
-              try {
-                oldSock.end(undefined);
-              } catch {
-                // old socket may already be closed
-              }
+              connectSocket().then((newSock) => {
+                const oldSock = currentSock;
+                currentSock = newSock;
+                try {
+                  oldSock.end(undefined);
+                } catch {
+                  // old socket may already be closed
+                }
+              }).catch((err) => {
+                logger?.error(`Reconnect failed: ${err instanceof Error ? err.message : String(err)}`);
+              });
             }
           }, delay);
         } else if (!stopped) {
@@ -153,38 +150,27 @@ export async function startWhatsAppGateway(
 
       if (connection === "open") {
         reconnectAttempts = 0;
-        if (pairingCodeTimer) {
-          clearTimeout(pairingCodeTimer);
-          pairingCodeTimer = undefined;
-        }
         logger?.info("WhatsApp connection established");
       }
     });
 
-    sock.ev.on(
-      "messages.upsert" as keyof BaileysEventMap,
-      (upsert: { messages: Array<Record<string, unknown>>; type: string }) => {
-        if (upsert.type !== "notify") return;
-
-        for (const msg of upsert.messages) {
-          try {
-            processMessage(msg);
-          } catch (err) {
-            logger?.error(`Failed to process WhatsApp message: ${err instanceof Error ? err.message : String(err)}`);
-          }
+    sock.ev.on("messages.upsert", ({ messages }: { messages: WAMessage[] }) => {
+      for (const msg of messages) {
+        if (!msg.message || msg.key.fromMe) continue;
+        try {
+          processMessage(msg);
+        } catch (err) {
+          logger?.error(`Failed to process WhatsApp message: ${err instanceof Error ? err.message : String(err)}`);
         }
-      },
-    );
+      }
+    });
 
     return sock;
   };
 
-  const processMessage = (msg: Record<string, unknown>): void => {
-    const key = msg.key as { fromMe?: boolean; remoteJid?: string; participant?: string } | undefined;
+  const processMessage = (msg: WAMessage): void => {
+    const key = msg.key;
     if (!key) return;
-
-    // Skip messages sent by ourselves
-    if (key.fromMe) return;
 
     const remoteJid = key.remoteJid;
     if (!remoteJid) return;
@@ -194,22 +180,18 @@ export async function startWhatsAppGateway(
     if (!isAllowed(senderJid, allowFrom)) return;
 
     // Extract text content
-    const message = msg.message as Record<string, unknown> | undefined;
+    const message = msg.message;
     if (!message) return;
 
     const rawText = extractText(message);
     if (!rawText) return;
 
-    // Truncate oversized messages to prevent abuse
     const text = rawText.length > MAX_MESSAGE_LENGTH
       ? rawText.slice(0, MAX_MESSAGE_LENGTH)
       : rawText;
 
-    // Determine chat type
     const isGroup = remoteJid.endsWith("@g.us");
     const chatType = isGroup ? "group" : "direct";
-
-    // Build sender name
     const pushName = typeof msg.pushName === "string" ? msg.pushName : undefined;
 
     const inbound: GatewayInboundMessage = {
@@ -226,7 +208,7 @@ export async function startWhatsAppGateway(
     });
   };
 
-  currentSock = connectSocket();
+  currentSock = await connectSocket();
 
   const handle: WhatsAppGatewayHandle = {
     get sock() {
@@ -234,10 +216,6 @@ export async function startWhatsAppGateway(
     },
     stop: async () => {
       stopped = true;
-      if (pairingCodeTimer) {
-        clearTimeout(pairingCodeTimer);
-        pairingCodeTimer = undefined;
-      }
       if (reconnectTimer != null) {
         clearTimeout(reconnectTimer);
         reconnectTimer = undefined;
@@ -246,7 +224,7 @@ export async function startWhatsAppGateway(
         const timeout = setTimeout(() => {
           resolve();
         }, 2000);
-        currentSock.ev.on("connection.update", (update) => {
+        currentSock.ev.on("connection.update", (update: Partial<ConnectionState>) => {
           if (update.connection === "close") {
             clearTimeout(timeout);
             resolve();
@@ -261,18 +239,15 @@ export async function startWhatsAppGateway(
 }
 
 function extractText(message: Record<string, unknown>): string | undefined {
-  // Plain text
   if (typeof message.conversation === "string") {
     return message.conversation;
   }
 
-  // Extended text (replies, links)
   const extText = message.extendedTextMessage as Record<string, unknown> | undefined;
   if (extText && typeof extText.text === "string") {
     return extText.text;
   }
 
-  // Image/video/document with caption
   for (const key of ["imageMessage", "videoMessage", "documentMessage"]) {
     const media = message[key] as Record<string, unknown> | undefined;
     if (media && typeof media.caption === "string") {

@@ -19,6 +19,11 @@ import { createCanvasState } from "./canvas-host/types.js";
 import { createCanvasTool } from "./agent/canvas-tool.js";
 import { startBrowserServer, stopBrowserServer } from "./browser/server.js";
 import { createBrowserTool } from "./browser/browser-tool.js";
+import { CronService } from "./cron/service.js";
+import { resolveCronStorePath } from "./cron/store.js";
+import { runCronIsolatedAgentTurn } from "./cron/isolated-agent.js";
+import { appendCronRunLog, resolveCronRunLogPath } from "./cron/run-log.js";
+import { createCronTool } from "./agent/cron-tool.js";
 import type { MemorySearchManager } from "./memory/types.js";
 import type { AgentTool } from "./agent/types.js";
 import type { SkillToolFactory } from "./skills/types.js";
@@ -144,7 +149,7 @@ async function main(): Promise<void> {
     });
   }
 
-  // 9. Create agent
+  // 9. Create agent (cron tool added after agent creation)
   const agent = createAgent({
     config,
     auth,
@@ -154,6 +159,90 @@ async function main(): Promise<void> {
     additionalTools: additionalTools.length > 0 ? additionalTools : undefined,
   });
   log.info("Agent initialized");
+
+  // 9a. Build and start cron scheduler
+  const cronEnabled = config.cron?.enabled !== false;
+  const cronStorePath = resolveCronStorePath(config.cron?.store, config);
+  const cronService = new CronService({
+    log: {
+      debug: (obj, msg) => log.debug(msg ?? JSON.stringify(obj)),
+      info: (obj, msg) => log.info(msg ?? JSON.stringify(obj)),
+      warn: (obj, msg) => log.warn(msg ?? JSON.stringify(obj)),
+      error: (obj, msg) => log.error(msg ?? JSON.stringify(obj)),
+    },
+    storePath: cronStorePath,
+    cronEnabled,
+    enqueueSystemEvent: (text, opts) => {
+      // For microclaw, system events are handled by sending through agent.chat
+      log.info(`Cron system event${opts?.agentId ? ` [${opts.agentId}]` : ""}: ${text.slice(0, 100)}`);
+      // Broadcast to web UI
+      webMonitor.broadcast(JSON.stringify({
+        type: "channel_message",
+        channelId: "cron",
+        from: "system",
+        text,
+        timestamp: Date.now(),
+        senderName: "Cron Scheduler",
+        isFromSelf: false,
+      }));
+    },
+    requestHeartbeatNow: () => {
+      // No-op for microclaw (no heartbeat system)
+    },
+    runIsolatedAgentJob: async (params) => {
+      const result = await runCronIsolatedAgentTurn({
+        agent,
+        job: params.job,
+        message: params.message,
+        webMonitor,
+      });
+      // Append to run log
+      try {
+        const logPath = resolveCronRunLogPath({ storePath: cronStorePath, jobId: params.job.id });
+        await appendCronRunLog(logPath, {
+          ts: Date.now(),
+          jobId: params.job.id,
+          action: "finished",
+          status: result.status,
+          error: result.error,
+          summary: result.summary,
+          runAtMs: Date.now(),
+        });
+      } catch {
+        // Best-effort logging
+      }
+      return result;
+    },
+    onEvent: (evt) => {
+      if (evt.action === "finished") {
+        log.info(`Cron job ${evt.jobId} finished: ${evt.status ?? "unknown"}`);
+        // Append to run log for main session jobs too
+        const logPath = resolveCronRunLogPath({ storePath: cronStorePath, jobId: evt.jobId });
+        appendCronRunLog(logPath, {
+          ts: Date.now(),
+          jobId: evt.jobId,
+          action: "finished",
+          status: evt.status,
+          error: evt.error,
+          summary: evt.summary,
+          runAtMs: evt.runAtMs,
+          durationMs: evt.durationMs,
+          nextRunAtMs: evt.nextRunAtMs,
+        }).catch(() => {});
+      }
+    },
+  });
+
+  try {
+    await cronService.start();
+    log.info(`Cron scheduler ${cronEnabled ? "started" : "disabled"}`);
+  } catch (err) {
+    log.error(`Cron scheduler failed to start: ${formatError(err)}`);
+  }
+
+  // Register cron tool with agent
+  additionalTools.push(createCronTool({ cronService, storePath: cronStorePath }));
+  log.info("Cron tool registered");
 
   // 9b. Start channel gateway lifecycles
   const activeGateways: Array<{ channelId: string; accountId: string; plugin: ChannelPlugin }> = [];
@@ -176,6 +265,31 @@ async function main(): Promise<void> {
 
     const onMessage = async (msg: GatewayInboundMessage): Promise<void> => {
       const chatKey = `${channelId}:${msg.chatId}`;
+      const isFromSelf = msg.from === "me";
+
+      // Broadcast to webchat clients so all messages appear in the channel view
+      webMonitor.broadcast(JSON.stringify({
+        type: "channel_message",
+        channelId,
+        from: msg.from,
+        text: msg.text,
+        timestamp: msg.timestamp,
+        senderName: msg.senderName ?? msg.from,
+        isFromSelf,
+      }));
+
+      // Self-sent messages: persist to history but don't trigger agent
+      if (isFromSelf) {
+        if (memoryManager) {
+          memoryManager.saveExchange({
+            channelId,
+            userMessage: msg.text,
+            assistantMessage: "",
+            timestamp: msg.timestamp,
+          }).catch(() => {});
+        }
+        return;
+      }
 
       // Per-chat concurrency guard
       if (processingGatewayChats.has(chatKey)) {
@@ -216,6 +330,17 @@ async function main(): Promise<void> {
             text: response.text,
             chatType: msg.chatType,
           });
+
+          // Broadcast agent reply to web UI so it appears in the channel view
+          webMonitor.broadcast(JSON.stringify({
+            type: "channel_message",
+            channelId,
+            from: "assistant",
+            text: response.text,
+            timestamp: Date.now(),
+            senderName: "MicroClaw",
+            isFromSelf: true,
+          }));
         }
 
         // Persist exchange
@@ -283,6 +408,8 @@ async function main(): Promise<void> {
     memoryManager,
     webMonitor,
     dataDir,
+    cronService,
+    cronStorePath,
   });
 
   // 12. Start server
@@ -316,6 +443,14 @@ async function main(): Promise<void> {
         }
       }),
     );
+
+    // Stop cron scheduler
+    try {
+      cronService.stop();
+      log.info("Cron scheduler stopped");
+    } catch (err) {
+      log.error(`Failed to stop cron scheduler: ${formatError(err)}`);
+    }
 
     stopBrowserServer().catch(() => {});
     if (containerEnabled) {
@@ -358,11 +493,15 @@ async function main(): Promise<void> {
 
     // Send memory status on connect
     if (memoryManager) {
-      memoryManager.getStatus().then((status) => {
+      Promise.all([
+        memoryManager.getStatus(),
+        memoryManager.getRecordCounts(),
+      ]).then(([status, counts]) => {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({
             type: "memory_status",
             status: `${status.provider}/${status.model} (${status.dimensions}d)`,
+            counts,
           }));
         }
       }).catch(() => {
@@ -400,11 +539,14 @@ async function main(): Promise<void> {
         client.ws.send(JSON.stringify({ type: "typing" }));
       }
 
+      // Resolve the channel for this message (default to "web")
+      const resolvedChannelId = message.channelId ?? "web";
+
       // Load recent chat history for conversation context
       const historyMessages: Array<{ role: "user" | "assistant"; content: string; timestamp: number }> = [];
       if (memoryManager) {
         try {
-          const history = await memoryManager.loadChatHistory({ channelId: "web", limit: 20 });
+          const history = await memoryManager.loadChatHistory({ channelId: resolvedChannelId, limit: 20 });
           for (const msg of history) {
             historyMessages.push({ role: msg.role, content: msg.content, timestamp: msg.timestamp });
           }
@@ -419,7 +561,7 @@ async function main(): Promise<void> {
           ...historyMessages,
           { role: "user", content: message.text, timestamp: message.timestamp },
         ],
-        channelId: "web",
+        channelId: resolvedChannelId,
       });
 
       // Send response
@@ -429,13 +571,14 @@ async function main(): Promise<void> {
           type: "message",
           text: response.text,
           timestamp: responseTimestamp,
+          channelId: resolvedChannelId,
         }));
       }
 
       // Persist exchange (non-fatal)
       if (memoryManager) {
         memoryManager.saveExchange({
-          channelId: "web",
+          channelId: resolvedChannelId,
           userMessage: message.text,
           assistantMessage: response.text,
           timestamp: message.timestamp,

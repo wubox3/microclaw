@@ -2,7 +2,7 @@ import { mkdirSync, existsSync } from "node:fs";
 import { resolve as resolvePath } from "node:path";
 import type { MicroClawConfig } from "../config/types.js";
 import type { AuthCredentials } from "../infra/auth.js";
-import type { MemorySearchManager, MemorySearchParams, MemorySearchResult, MemoryProviderStatus } from "./types.js";
+import type { MemorySearchManager, MemorySearchParams, MemorySearchResult, MemoryProviderStatus, MemoryRecordCounts } from "./types.js";
 import { createLogger } from "../logging.js";
 import { openDatabase, closeDatabase } from "./sqlite.js";
 import { MEMORY_SCHEMA, FTS_SYNC_TRIGGERS, CHAT_SCHEMA } from "./memory-schema.js";
@@ -87,6 +87,16 @@ export function createMemoryManager(params: {
         keywordWeight: embeddingProvider ? keywordWeight : 1,
         limit,
       });
+    },
+
+    getRecordCounts: async (): Promise<MemoryRecordCounts> => {
+      if (closed) {
+        return { files: 0, chunks: 0, chatMessages: 0 };
+      }
+      const files = (db.prepare("SELECT COUNT(*) AS cnt FROM memory_files").get() as { cnt: number }).cnt;
+      const chunks = (db.prepare("SELECT COUNT(*) AS cnt FROM memory_chunks").get() as { cnt: number }).cnt;
+      const chatMessages = (db.prepare("SELECT COUNT(*) AS cnt FROM chat_messages").get() as { cnt: number }).cnt;
+      return { files, chunks, chatMessages };
     },
 
     getStatus: async (): Promise<MemoryProviderStatus> => ({

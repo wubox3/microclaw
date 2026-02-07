@@ -76,7 +76,7 @@ export function createAnthropicClient(options: AnthropicClientOptions): LlmClien
 
   const client = isOAuth
     ? new Anthropic({
-        apiKey: "placeholder", // SDK requires a non-empty string even for OAuth
+        apiKey: null,
         authToken: options.auth.authToken,
         defaultHeaders: OAUTH_BETA_HEADERS,
       })

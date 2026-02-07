@@ -37,11 +37,18 @@ export type MemorySearchParams = {
   keywordWeight?: number;
 };
 
+export type MemoryRecordCounts = {
+  files: number;
+  chunks: number;
+  chatMessages: number;
+};
+
 export type MemoryProviderStatus = {
   provider: string;
   model: string;
   dimensions: number;
   ready: boolean;
+  counts?: MemoryRecordCounts;
 };
 
 export type EmbeddingResult = {
@@ -63,6 +70,7 @@ export type ChatMessageRecord = {
 export type MemorySearchManager = {
   search: (params: MemorySearchParams) => Promise<MemorySearchResult[]>;
   getStatus: () => Promise<MemoryProviderStatus>;
+  getRecordCounts: () => Promise<MemoryRecordCounts>;
   syncFiles: (dir: string) => Promise<{ added: number; updated: number; removed: number }>;
   saveExchange: (params: {
     channelId: string;

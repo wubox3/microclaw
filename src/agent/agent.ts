@@ -160,7 +160,7 @@ async function runDirectChat(params: {
   }
 
   const llmMessages: LlmMessage[] = messages
-    .filter((m) => m.role === "user" || m.role === "assistant")
+    .filter((m) => (m.role === "user" || m.role === "assistant") && m.content.trim().length > 0)
     .map((m) => ({
       role: m.role as "user" | "assistant",
       content: m.content,

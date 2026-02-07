@@ -15,6 +15,7 @@
   var recognition = null;
   var currentAudio = null;
   var talkPhase = 'idle'; // idle | listening | thinking | speaking
+  var voiceConfigured = false; // Whether TTS is enabled and has API key
 
   // ─── DOM Elements (set in init) ───
   var micBtn = null;
@@ -457,6 +458,65 @@
     }
   }
 
+  // ─── Voice Setup Dialog ───
+  function showVoiceSetupDialog(reason) {
+    var dialog = document.getElementById('voice-setup-dialog');
+    var messageEl = document.getElementById('voice-setup-message');
+    if (!dialog) return;
+
+    if (reason === 'not-enabled') {
+      messageEl.textContent = 'Voice features require TTS (Text-to-Speech) to be enabled in configuration.';
+    } else if (reason === 'no-api-key') {
+      messageEl.textContent = 'Voice TTS is enabled but no OpenAI API key is configured.';
+    } else {
+      messageEl.textContent = 'Voice features require TTS (Text-to-Speech) to be configured.';
+    }
+
+    dialog.classList.remove('hidden');
+  }
+
+  function hideVoiceSetupDialog() {
+    var dialog = document.getElementById('voice-setup-dialog');
+    if (dialog) {
+      dialog.classList.add('hidden');
+    }
+  }
+
+  function initVoiceSetupDialog() {
+    var closeBtn = document.getElementById('voice-setup-close');
+    var dismissBtn = document.getElementById('voice-setup-dismiss');
+    var overlay = document.getElementById('voice-setup-dialog');
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', hideVoiceSetupDialog);
+    }
+    if (dismissBtn) {
+      dismissBtn.addEventListener('click', hideVoiceSetupDialog);
+    }
+    if (overlay) {
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) {
+          hideVoiceSetupDialog();
+        }
+      });
+    }
+  }
+
+  // ─── Load Voice Config from Server ───
+  function loadVoiceConfig() {
+    fetch('/api/voice/config')
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data.success && data.data) {
+          voiceConfigured = data.data.ttsConfigured === true;
+        }
+      })
+      .catch(function() {
+        // Assume not configured on error
+        voiceConfigured = false;
+      });
+  }
+
   // ─── Load Wake Triggers from Server ───
   function loadWakeTriggers() {
     fetch('/api/voicewake')
@@ -513,6 +573,9 @@
       voiceStatus = document.getElementById('voice-status');
       voiceOrb = document.getElementById('voice-orb');
 
+      initVoiceSetupDialog();
+      loadVoiceConfig();
+
       if (!speechSupported) {
         setVoiceStatus('Speech recognition not supported in this browser');
         if (micBtn) micBtn.disabled = true;
@@ -527,6 +590,10 @@
       if (micBtn) {
         micBtn.addEventListener('mousedown', function() {
           if (talkMode) return;
+          if (!voiceConfigured) {
+            showVoiceSetupDialog('not-enabled');
+            return;
+          }
           startPushToTalk();
         });
         micBtn.addEventListener('mouseup', function() {
@@ -543,6 +610,10 @@
         micBtn.addEventListener('touchstart', function(e) {
           e.preventDefault();
           if (talkMode) return;
+          if (!voiceConfigured) {
+            showVoiceSetupDialog('not-enabled');
+            return;
+          }
           startPushToTalk();
         });
         micBtn.addEventListener('touchend', function(e) {
@@ -556,6 +627,10 @@
       if (wakeToggle) {
         wakeToggle.addEventListener('click', function() {
           if (talkMode) return;
+          if (!voiceConfigured && !wakeEnabled) {
+            showVoiceSetupDialog('not-enabled');
+            return;
+          }
           wakeEnabled = !wakeEnabled;
           if (wakeEnabled) {
             startWakeListening();
@@ -574,6 +649,10 @@
           if (talkMode) {
             stopTalkMode();
           } else {
+            if (!voiceConfigured) {
+              showVoiceSetupDialog('not-enabled');
+              return;
+            }
             startTalkMode();
           }
         });

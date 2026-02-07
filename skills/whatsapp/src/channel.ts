@@ -1,6 +1,9 @@
 import type { ChannelPlugin } from "../../../src/channels/plugins/types.js";
 import type { MicroClawConfig } from "../../../src/config/types.js";
 import { startWhatsAppGateway, type WhatsAppGatewayHandle } from "./gateway.js";
+import { createLogger } from "../../../src/logging.js";
+
+const log = createLogger("channels:whatsapp");
 
 function resolvePhoneNumber(cfg: MicroClawConfig): string | undefined {
   return process.env.WHATSAPP_PHONE_NUMBER || cfg.channels?.whatsapp?.accountId || undefined;
@@ -69,6 +72,7 @@ export function createWhatsAppPlugin(): ChannelPlugin {
           allowFrom,
           phoneNumber,
           onMessage: onMessage ?? (async () => {}),
+          logger: log,
         });
 
         return activeHandle;

@@ -66,6 +66,33 @@
       <iframe id="canvas-iframe" src="/canvas/a2ui" sandbox="allow-scripts"></iframe>
     </aside>
   </div>
+  <!-- Voice Setup Dialog -->
+  <div id="voice-setup-dialog" class="dialog-overlay hidden">
+    <div class="dialog-box">
+      <div class="dialog-header">
+        <h3>Voice Setup Required</h3>
+        <button id="voice-setup-close" class="dialog-close">&times;</button>
+      </div>
+      <div class="dialog-body">
+        <p id="voice-setup-message">Voice features require TTS (Text-to-Speech) to be configured.</p>
+        <div class="dialog-instructions">
+          <p>To enable voice, add the following to your <code>microclaw.config.yaml</code>:</p>
+          <pre><code>voice:
+  tts:
+    enabled: true
+    provider: openai
+    openai:
+      apiKey: your-openai-api-key
+      voice: alloy  # Options: alloy, ash, coral, echo, fable, onyx, nova, sage, shimmer</code></pre>
+          <p>Or set the <code>OPENAI_API_KEY</code> environment variable and enable TTS in config.</p>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button id="voice-setup-dismiss" class="dialog-btn">Got it</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/voice.js"></script>
   <script src="/canvas.js"></script>
   <script src="/app.js"></script>

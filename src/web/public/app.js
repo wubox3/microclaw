@@ -16,9 +16,12 @@
   var ws = null;
   var isConnected = false;
   var isFirstConnect = true;
-  var messageHistory = [];
   var reconnectDelay = 1000;
   var MAX_RECONNECT_DELAY = 30000;
+
+  // Per-channel message history keyed by channel id
+  var channelHistories = {};
+  var activeChannelId = 'web';
 
   // Channels
   var channels = [
@@ -32,9 +35,18 @@
     { id: 'imessage', label: 'iMessage' },
   ];
 
-  function trimHistory() {
-    if (messageHistory.length > MAX_HISTORY_SIZE) {
-      messageHistory = messageHistory.slice(-MAX_HISTORY_SIZE);
+  function getHistory() {
+    if (!channelHistories[activeChannelId]) {
+      channelHistories[activeChannelId] = [];
+    }
+    return channelHistories[activeChannelId];
+  }
+
+  function pushHistory(entry) {
+    var history = getHistory();
+    history.push(entry);
+    if (history.length > MAX_HISTORY_SIZE) {
+      channelHistories[activeChannelId] = history.slice(-MAX_HISTORY_SIZE);
     }
   }
 
@@ -53,11 +65,13 @@
       el.appendChild(document.createTextNode(ch.label));
       el.addEventListener('click', (function(channel, element) {
         return function() {
+          if (activeChannelId === channel.id) return;
           document.querySelectorAll('.channel-item').forEach(function(item) {
             item.classList.remove('active');
           });
           element.classList.add('active');
           document.getElementById('chat-title').textContent = channel.label;
+          switchChannel(channel.id);
         };
       })(ch, el));
       channelList.appendChild(el);
@@ -101,19 +115,41 @@
     connectionStatus.className = 'status-dot ' + (connected ? 'connected' : 'disconnected');
   }
 
-  function loadHistory() {
-    fetch('/api/chat/history?channelId=web&limit=50')
+  function switchChannel(channelId) {
+    activeChannelId = channelId;
+    messagesEl.innerHTML = '';
+    hideTyping();
+
+    // Restore cached messages if we already loaded this channel
+    var cached = channelHistories[channelId];
+    if (cached && cached.length > 0) {
+      for (var i = 0; i < cached.length; i++) {
+        addMessage(cached[i].role, cached[i].content, cached[i].timestamp);
+      }
+    }
+
+    // Always fetch latest from server
+    loadHistory(channelId);
+  }
+
+  function loadHistory(channelId) {
+    var ch = channelId || activeChannelId;
+    fetch('/api/chat/history?channelId=' + encodeURIComponent(ch) + '&limit=50')
       .then(function(res) { return res.json(); })
       .then(function(data) {
-        if (data.success && data.data && data.data.length > 0) {
-          messagesEl.innerHTML = '';
-          messageHistory = [];
+        if (data.success && data.data) {
+          channelHistories[ch] = [];
+          // Only update DOM if this channel is still active
+          if (ch === activeChannelId) {
+            messagesEl.innerHTML = '';
+          }
           for (var i = 0; i < data.data.length; i++) {
             var msg = data.data[i];
-            addMessage(msg.role, msg.content, msg.timestamp);
-            messageHistory.push({ role: msg.role, content: msg.content, timestamp: msg.timestamp });
+            channelHistories[ch].push({ role: msg.role, content: msg.content, timestamp: msg.timestamp });
+            if (ch === activeChannelId) {
+              addMessage(msg.role, msg.content, msg.timestamp);
+            }
           }
-          trimHistory();
         }
       })
       .catch(function() {
@@ -141,18 +177,49 @@
         var data = JSON.parse(event.data);
         if (data.type === 'message') {
           hideTyping();
-          addMessage('assistant', data.text, data.timestamp);
-          messageHistory.push({ role: 'assistant', content: data.text, timestamp: data.timestamp });
-          trimHistory();
+          var msgChannelId = data.channelId || activeChannelId;
+          pushHistory({ role: 'assistant', content: data.text, timestamp: data.timestamp });
+          // Only render if the response is for the active channel
+          if (msgChannelId === activeChannelId) {
+            addMessage('assistant', data.text, data.timestamp);
+          }
 
           // Notify voice module of assistant response for TTS
           if (window.MicroClawVoice && window.MicroClawVoice.onAssistantMessage) {
             window.MicroClawVoice.onAssistantMessage(data.text);
           }
+        } else if (data.type === 'channel_message') {
+          // Real-time message from a channel gateway (iMessage, Telegram, etc.)
+          var role = data.isFromSelf ? 'user' : 'assistant';
+          var label = (data.senderName || data.from) + ': ' + data.text;
+          var entry = { role: role, content: label, timestamp: data.timestamp };
+
+          // Store in the correct channel history
+          if (!channelHistories[data.channelId]) {
+            channelHistories[data.channelId] = [];
+          }
+          channelHistories[data.channelId].push(entry);
+
+          // Render if viewing that channel
+          if (data.channelId === activeChannelId) {
+            addMessage(role, label, data.timestamp);
+          }
         } else if (data.type === 'typing') {
           showTyping();
         } else if (data.type === 'memory_status') {
-          memoryStatus.textContent = data.status;
+          var countText = '';
+          if (data.counts) {
+            var total = (data.counts.files || 0) + (data.counts.chunks || 0) + (data.counts.chatMessages || 0);
+            countText = ' \u2022 ' + total + ' records';
+            if (total > 0) {
+              var parts = [];
+              if (data.counts.files > 0) parts.push(data.counts.files + ' files');
+              if (data.counts.chunks > 0) parts.push(data.counts.chunks + ' chunks');
+              if (data.counts.chatMessages > 0) parts.push(data.counts.chatMessages + ' chats');
+              countText += ' (' + parts.join(', ') + ')';
+            }
+          }
+          memoryStatus.textContent = data.status + countText;
         } else if (data.type === 'container_status') {
           if (data.enabled && (memoryStatus.textContent || '').indexOf('[container]') === -1) {
             memoryStatus.textContent = (memoryStatus.textContent || '') + ' [container]';
@@ -189,14 +256,14 @@
 
     var now = Date.now();
     addMessage('user', text, now);
-    messageHistory.push({ role: 'user', content: text, timestamp: now });
-    trimHistory();
+    pushHistory({ role: 'user', content: text, timestamp: now });
 
     ws.send(JSON.stringify({
       type: 'message',
       text: text,
       id: now.toString(),
       timestamp: now,
+      channelId: activeChannelId,
     }));
 
     showTyping();

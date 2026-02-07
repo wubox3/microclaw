@@ -242,8 +242,8 @@ function mergeCronPayload(existing: CronPayload, patch: CronPayloadPatch): CronP
   if (typeof patch.thinking === "string") {
     next.thinking = patch.thinking;
   }
-  if (typeof patch.timeoutSeconds === "number") {
-    next.timeoutSeconds = patch.timeoutSeconds;
+  if (typeof patch.timeoutSeconds === "number" && Number.isFinite(patch.timeoutSeconds)) {
+    next.timeoutSeconds = Math.max(1, Math.min(Math.floor(patch.timeoutSeconds), 3600));
   }
   if (typeof patch.deliver === "boolean") {
     next.deliver = patch.deliver;
@@ -313,12 +313,17 @@ function buildPayloadFromPatch(patch: CronPayloadPatch): CronPayload {
     throw new Error('cron.update payload.kind="agentTurn" requires message');
   }
 
+  const safeTimeout =
+    typeof patch.timeoutSeconds === "number" && Number.isFinite(patch.timeoutSeconds)
+      ? Math.max(1, Math.min(Math.floor(patch.timeoutSeconds), 3600))
+      : undefined;
+
   return {
     kind: "agentTurn",
     message: patch.message,
     model: patch.model,
     thinking: patch.thinking,
-    timeoutSeconds: patch.timeoutSeconds,
+    timeoutSeconds: safeTimeout,
     deliver: patch.deliver,
     channel: patch.channel,
     to: patch.to,

@@ -28,6 +28,17 @@ const ALLOWED_ATTRS = new Set([
   "open", "data-a2ui-id", "data-surface", "role", "aria-label", "aria-hidden",
 ]);
 
+function decodeHtmlEntities(str: string): string {
+  return str
+    .replace(/&#x([0-9a-fA-F]+);?/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);?/g, (_, dec: string) => String.fromCharCode(parseInt(dec, 10)))
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&apos;/gi, "'");
+}
+
 function sanitizeHtml(raw: string): string {
   // Strip null bytes and control characters that can confuse HTML parsers
   let html = raw.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
@@ -73,9 +84,12 @@ function sanitizeHtml(raw: string): string {
       const ALLOWED_DATA_ATTRS = new Set(["data-a2ui-id", "data-surface"]);
       if (ALLOWED_ATTRS.has(attrName) || ALLOWED_DATA_ATTRS.has(attrName)) {
         // Extra safety: strip dangerous URIs from href/src
-        if ((attrName === "href" || attrName === "src") &&
-            /^\s*(javascript|vbscript|data\s*:\s*text\/html)\s*:/i.test(attrValue)) {
-          continue;
+        // Decode HTML entities first to prevent &#106;avascript: bypass
+        if (attrName === "href" || attrName === "src") {
+          const decoded = decodeHtmlEntities(attrValue);
+          if (/^\s*(javascript|vbscript|data\s*:\s*text\/html)\s*:/i.test(decoded)) {
+            continue;
+          }
         }
         attrs.push(` ${attrName}="${attrValue.replace(/"/g, "&quot;")}"`);
       }

@@ -83,9 +83,17 @@ export async function startBrowserServer(
   return state;
   };
 
-  startingPromise = doStart().finally(() => {
-    startingPromise = null;
-  });
+  startingPromise = doStart().then(
+    (result) => {
+      // Only clear the guard on failure so successful starts are cached
+      if (!result) startingPromise = null;
+      return result;
+    },
+    (err) => {
+      startingPromise = null;
+      throw err;
+    },
+  );
   return await startingPromise;
 }
 

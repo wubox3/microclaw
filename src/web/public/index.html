@@ -26,6 +26,12 @@
         <div class="nav-section-label">Memory</div>
         <div id="memory-status" class="memory-status">Initializing...</div>
       </div>
+      <div id="cron-panel" class="sidebar-section">
+        <div class="nav-section-label">Jobs</div>
+        <div id="cron-status" class="cron-status">Loading...</div>
+        <div id="cron-list" class="cron-list"></div>
+        <button id="cron-add-btn" class="cron-add-btn">+ New Job</button>
+      </div>
     </aside>
     <main id="chat-area">
       <header id="chat-header">
@@ -93,6 +99,63 @@
     </div>
   </div>
 
+  <!-- Cron Job Dialog -->
+  <div id="cron-dialog" class="dialog-overlay hidden">
+    <div class="dialog-box">
+      <div class="dialog-header">
+        <h3 id="cron-dialog-title">New Job</h3>
+        <button id="cron-dialog-close" class="dialog-close">&times;</button>
+      </div>
+      <div class="dialog-body">
+        <div class="cron-form-group">
+          <label for="cron-field-name">Name</label>
+          <input id="cron-field-name" type="text" placeholder="My scheduled job">
+        </div>
+        <div class="cron-form-group">
+          <label for="cron-field-type">Schedule Type</label>
+          <select id="cron-field-type">
+            <option value="cron">Cron Expression</option>
+            <option value="every">Interval (ms)</option>
+            <option value="at">One-time (datetime)</option>
+          </select>
+        </div>
+        <div class="cron-form-group">
+          <label for="cron-field-value">Schedule Value</label>
+          <input id="cron-field-value" type="text" placeholder="*/5 * * * * (cron expression)">
+        </div>
+        <div class="cron-form-group">
+          <label for="cron-field-target">Session Target</label>
+          <select id="cron-field-target">
+            <option value="main">Main</option>
+            <option value="isolated">Isolated</option>
+          </select>
+        </div>
+        <div class="cron-form-group">
+          <label for="cron-field-payload-kind">Payload Type</label>
+          <select id="cron-field-payload-kind">
+            <option value="systemEvent">System Event</option>
+            <option value="agentTurn">Agent Turn</option>
+          </select>
+        </div>
+        <div class="cron-form-group">
+          <label for="cron-field-message">Message / Payload</label>
+          <textarea id="cron-field-message" rows="3" placeholder="Enter the system event text or agent message"></textarea>
+        </div>
+        <div class="cron-form-group cron-form-check">
+          <label for="cron-field-enabled">
+            <input id="cron-field-enabled" type="checkbox" checked>
+            Enabled
+          </label>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button id="cron-dialog-delete" class="dialog-btn-secondary hidden">Delete</button>
+        <button id="cron-dialog-save" class="dialog-btn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/cron.js"></script>
   <script src="/voice.js"></script>
   <script src="/canvas.js"></script>
   <script src="/app.js"></script>

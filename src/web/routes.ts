@@ -434,6 +434,7 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
   const jsContent = safeReadFile(resolve(publicDir, "app.js"));
   const voiceJsContent = safeReadFile(resolve(publicDir, "voice.js"));
   const canvasJsContent = safeReadFile(resolve(publicDir, "canvas.js"));
+  const cronJsContent = safeReadFile(resolve(publicDir, "cron.js"));
   const htmlContent = safeReadFile(resolve(publicDir, "index.html"));
 
   app.get("/styles.css", (c) => {
@@ -450,6 +451,10 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
 
   app.get("/canvas.js", (c) => {
     return c.text(canvasJsContent, 200, { "Content-Type": "application/javascript" });
+  });
+
+  app.get("/cron.js", (c) => {
+    return c.text(cronJsContent, 200, { "Content-Type": "application/javascript" });
   });
 
   app.get("/", (c) => {

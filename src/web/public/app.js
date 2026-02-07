@@ -230,6 +230,10 @@
           if (window.MicroClawCanvas && window.MicroClawCanvas.handleMessage) {
             window.MicroClawCanvas.handleMessage(data);
           }
+        } else if (data.type === 'cron_status') {
+          if (window.MicroClawCron && window.MicroClawCron.handleMessage) {
+            window.MicroClawCron.handleMessage(data);
+          }
         } else if (data.type === 'error') {
           hideTyping();
           addMessage('assistant', 'Error: ' + data.message, Date.now());
@@ -316,5 +320,10 @@
   // Initialize voice module
   if (window.MicroClawVoice && window.MicroClawVoice.init) {
     window.MicroClawVoice.init();
+  }
+
+  // Initialize cron module
+  if (window.MicroClawCron && window.MicroClawCron.init) {
+    window.MicroClawCron.init();
   }
 })();

@@ -85,12 +85,18 @@ export function createWebMonitor(): WebMonitor {
       ws.on("close", () => {
         clients.delete(id);
       });
+      ws.on("error", () => {
+        // Prevent uncaught error from crashing the process.
+        // The close event will handle cleanup.
+        clients.delete(id);
+      });
     },
     removeClient: (id) => {
       const client = clients.get(id);
       if (client) {
         client.ws.removeAllListeners("message");
         client.ws.removeAllListeners("close");
+        client.ws.removeAllListeners("error");
         client.ws.close();
         clients.delete(id);
       }

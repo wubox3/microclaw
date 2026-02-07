@@ -464,6 +464,8 @@
         currentAudio.pause();
         currentAudio = null;
         isSpeaking = false;
+        setTalkPhase('idle');
+        updateUI();
       }
     },
   };

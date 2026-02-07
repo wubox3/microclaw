@@ -1,20 +1,114 @@
-Microclaw
-is for users who want a balanced framework with key features (7 channels, browser
-automation, hybrid memory, canvas) without enterprise overhead. Good for
-developers who want to extend via plugins
 
-QuickStart:
-git clone https://github.com/wubox3/microclaw.git
+# MicroClaw
+
+**MicroClaw** is a lightweight, developer-friendly AI assistant framework designed to preserve the most important capabilities of large agent platforms while dramatically reducing code size and architectural complexity.
+
+> Delivering most of the capability of large agent platforms at a fraction of the complexity.
+
+---
+
+## Positioning
+
+MicroClaw sits between large, enterprise agent systems and ultra-minimal personal assistants:
+
+```
+Capability
+   ↑
+   │                                   OpenClaw
+   │                             (Enterprise platform)
+   │        MicroClaw
+   │   (Balanced, practical)
+   │
+   │
+   │
+   │
+   │        NanoClaw
+   │     (Minimal personal)
+   └──────── Low Complexity ───────── High Complexity →
+```
+
+This balance allows MicroClaw to provide real-world functionality while remaining maintainable and easy to understand.
+
+---
+
+## At a Glance
+
+| Dimension              | OpenClaw                         | **MicroClaw**              | NanoClaw                 |
+| ---------------------- | -------------------------------- | -------------------------- | ------------------------ |
+| **Philosophy**         | Enterprise-grade platform        | **Balanced middle ground** | Minimalist personal tool |
+| **Lines of Code**      | ~585K TS + Swift/Kotlin          | **~33K TS**                | ~4.3K TS                 |
+| **Source Files**       | 2,232 TS + 438 Swift + 66 Kotlin | **217 TS**                 | 22 TS                    |
+| **Messaging Channels** | 7 core + 30 extensions           | **7+ channels + Web UI**   | 1 (WhatsApp only)        |
+| **LLM Providers**      | 20 providers                     | **Anthropic + OpenRouter** | Claude via Agent SDK     |
+| **Mobile Apps**        | macOS, iOS, Android              | **None**                   | None                     |
+| **Test Coverage**      | 70%+ enforced                    | **Vitest + Playwright**    | None                     |
+| **Dependencies**       | 52 runtime                       | **20 runtime**             | 7 runtime                |
+
+---
 
 
-| Dimension              | Openclaw                                                               | Microclaw                                                                | Nanoclaw                                                          |
-| ---------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------- |
-| **Philosophy**         | Enterprise-grade platform                                              | Balanced middle-ground                                                   | Minimalist personal tool                                          |
-| **Target Users**       | Enterprises, large startups, multi-team deployments, platform builders | Startups, small teams, independent developers building production agents | Hobbyists, solo developers, rapid prototypes, personal automation |
-| **Lines of Code**      | ~585K (TypeScript + Swift + Kotlin)                                    | ~33K (TypeScript)                                                        | ~4.3K (TypeScript)                                                |
-| **Source Files**       | 2,232 TS + 438 Swift + 66 Kotlin                                       | 217 TS                                                                   | 22 TS                                                             |
-| **Messaging Channels** | 7 core channels + 30 extensions                                        | 7+ channels (skill-based) + Web UI                                       | 1 channel (WhatsApp only)                                         |
-| **LLM Providers**      | 20 providers (Anthropic, OpenAI, Gemini, Bedrock, Ollama, etc.)        | Anthropic + OpenRouter (access to many models via routing)               | 1 provider (Claude via Agent SDK)                                 |
-| **Mobile Apps**        | macOS, iOS, Android (native)                                           | None                                                                     | None                                                              |
-| **Test Coverage**      | 70%+ enforced, 1,034 test files                                        | Vitest + Playwright (44 test files)                                      | No automated tests                                                |
-| **Dependencies**       | 52 runtime dependencies                                                | 20 runtime dependencies                                                  | 7 runtime dependencies                                            |
+## Quick Start
+
+### Installation
+
+```bash
+git clone https://github.com/wubo3x/microclaw.git
+cd microclaw
+claude
+```
+
+
+## Design Goals
+
+MicroClaw is designed around three core principles:
+
+### Preserve Essential Capabilities
+
+* Multi-channel messaging
+* Hybrid memory
+* Browser automation
+* Canvas interaction
+* Voice and tools
+* Scheduled tasks
+
+---
+
+### Reduce Complexity
+
+* Smaller codebase
+* Fewer dependencies
+* Clear modular structure
+* Easy debugging
+
+---
+
+### Improve Developer Experience
+
+* Fast setup
+* Simple configuration
+* Hot reload
+* Graceful degradation
+
+---
+
+## Who MicroClaw Is For
+
+* Independent developers building agent tools
+* Small teams deploying assistants
+* Developers who prefer readable code
+* Projects needing multi-channel automation
+
+---
+
+## Philosophy
+
+MicroClaw aims to strike a balance between capability and simplicity:
+
+* Powerful enough for real-world use
+* Small enough to understand
+* Flexible enough to extend
+* Stable enough to maintain
+
+---
+
+

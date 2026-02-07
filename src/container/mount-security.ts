@@ -49,8 +49,10 @@ export function loadMountAllowlist(): MountAllowlist | null {
     return cachedAllowlist;
   }
 
+  // Don't permanently cache load errors — retry on next call
+  // to handle transient failures (e.g., file temporarily unavailable)
   if (allowlistLoadError !== null) {
-    return null;
+    allowlistLoadError = null;
   }
 
   try {

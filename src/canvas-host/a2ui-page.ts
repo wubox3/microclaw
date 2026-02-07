@@ -296,6 +296,8 @@ export function generateA2uiPage(): string {
   function isSafeSrc(src) {
     if (!src) return false;
     var trimmed = String(src).trim().toLowerCase();
+    // Block SVG data URIs which can contain embedded scripts
+    if (trimmed.startsWith('data:image/svg')) return false;
     return trimmed.startsWith('http://') ||
            trimmed.startsWith('https://') ||
            trimmed.startsWith('/') ||

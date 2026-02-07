@@ -15,8 +15,8 @@ export type WebMonitor = {
   addClient: (id: string, ws: WebSocket) => void;
   removeClient: (id: string) => void;
   broadcast: (message: string) => void;
-  onMessage: (handler: (clientId: string, message: WebInboundMessage) => void) => void;
-  onCanvasAction: (handler: CanvasActionHandler) => void;
+  onMessage: (handler: (clientId: string, message: WebInboundMessage) => void) => () => void;
+  onCanvasAction: (handler: CanvasActionHandler) => () => void;
 };
 
 export function createWebMonitor(): WebMonitor {
@@ -97,9 +97,17 @@ export function createWebMonitor(): WebMonitor {
     },
     onMessage: (handler) => {
       messageHandlers.push(handler);
+      return () => {
+        const idx = messageHandlers.indexOf(handler);
+        if (idx >= 0) messageHandlers.splice(idx, 1);
+      };
     },
     onCanvasAction: (handler) => {
       canvasActionHandlers.push(handler);
+      return () => {
+        const idx = canvasActionHandlers.indexOf(handler);
+        if (idx >= 0) canvasActionHandlers.splice(idx, 1);
+      };
     },
   };
 }

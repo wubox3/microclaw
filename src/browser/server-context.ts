@@ -104,8 +104,9 @@ function createProfileContext(
   };
 
   const setProfileRunning = (running: ProfileRuntimeState["running"]) => {
+    const current = state();
     const profileState = getProfileState();
-    profileState.running = running;
+    current.profiles.set(profile.name, { ...profileState, running });
   };
 
   const listTabs = async (): Promise<BrowserTab[]> => {
@@ -152,8 +153,9 @@ function createProfileContext(
       const createPageViaPlaywright = (mod as Partial<PwAiModule> | null)?.createPageViaPlaywright;
       if (typeof createPageViaPlaywright === "function") {
         const page = await createPageViaPlaywright({ cdpUrl: profile.cdpUrl, url });
-        const profileState = getProfileState();
-        profileState.lastTargetId = page.targetId;
+        const current2 = state();
+        const profileState2 = getProfileState();
+        current2.profiles.set(profile.name, { ...profileState2, lastTargetId: page.targetId });
         return {
           targetId: page.targetId,
           title: page.title,
@@ -171,8 +173,9 @@ function createProfileContext(
       .catch(() => null);
 
     if (createdViaCdp) {
-      const profileState = getProfileState();
-      profileState.lastTargetId = createdViaCdp;
+      const cdpState = state();
+      const cdpProfileState = getProfileState();
+      cdpState.profiles.set(profile.name, { ...cdpProfileState, lastTargetId: createdViaCdp });
       const deadline = Date.now() + 2000;
       while (Date.now() < deadline) {
         const tabs = await listTabs().catch(() => [] as BrowserTab[]);
@@ -213,8 +216,9 @@ function createProfileContext(
     if (!created.id) {
       throw new Error("Failed to open tab (missing id)");
     }
-    const profileState = getProfileState();
-    profileState.lastTargetId = created.id;
+    const openTabState = state();
+    const openTabProfileState = getProfileState();
+    openTabState.profiles.set(profile.name, { ...openTabProfileState, lastTargetId: created.id });
     return {
       targetId: created.id,
       title: created.title ?? "",
@@ -423,7 +427,8 @@ function createProfileContext(
     if (!chosen) {
       throw new Error("tab not found");
     }
-    profileState.lastTargetId = chosen.targetId;
+    const tabState = state();
+    tabState.profiles.set(profile.name, { ...getProfileState(), lastTargetId: chosen.targetId });
     return chosen;
   };
 
@@ -446,15 +451,15 @@ function createProfileContext(
           cdpUrl: profile.cdpUrl,
           targetId: resolved.targetId,
         });
-        const profileState = getProfileState();
-        profileState.lastTargetId = resolved.targetId;
+        const focusState = state();
+        focusState.profiles.set(profile.name, { ...getProfileState(), lastTargetId: resolved.targetId });
         return;
       }
     }
 
     await fetchOk(appendCdpPath(profile.cdpUrl, `/json/activate/${resolved.targetId}`));
-    const profileState = getProfileState();
-    profileState.lastTargetId = resolved.targetId;
+    const activateState = state();
+    activateState.profiles.set(profile.name, { ...getProfileState(), lastTargetId: resolved.targetId });
   };
 
   const closeTab = async (targetId: string): Promise<void> => {

@@ -82,10 +82,12 @@ async function openaiTTS(params: {
 
     if (!response.ok) {
       const isAuthError = response.status === 401 || response.status === 403;
-      const body = isAuthError
-        ? "Authentication failed"
-        : await response.text().catch(() => "").then((t) => t.slice(0, 200));
-      throw new Error(`OpenAI TTS API error (${response.status}): ${body}`);
+      if (!isAuthError) {
+        // Log full error internally but don't expose to callers
+        const body = await response.text().catch(() => "");
+        log.error(`OpenAI TTS API error (${response.status}): ${body.slice(0, 500)}`);
+      }
+      throw new Error(`OpenAI TTS API error (${response.status}): ${isAuthError ? "Authentication failed" : "Request failed"}`);
     }
 
     return Buffer.from(await response.arrayBuffer());

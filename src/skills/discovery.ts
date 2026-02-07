@@ -21,7 +21,12 @@ export function discoverSkills(skillsDir: string): DiscoveredSkill[] {
 
   for (const entry of entries) {
     const skillDir = resolve(skillsDir, entry);
-    const stat = statSync(skillDir);
+    let stat;
+    try {
+      stat = statSync(skillDir);
+    } catch {
+      continue;
+    }
     if (!stat.isDirectory()) {
       continue;
     }

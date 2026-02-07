@@ -24,6 +24,7 @@ import { resolveCronStorePath } from "./cron/store.js";
 import { runCronIsolatedAgentTurn } from "./cron/isolated-agent.js";
 import { appendCronRunLog, resolveCronRunLogPath } from "./cron/run-log.js";
 import { createCronTool } from "./agent/cron-tool.js";
+import { createShellTool } from "./agent/shell-tool.js";
 import type { MemorySearchManager } from "./memory/types.js";
 import type { AgentTool } from "./agent/types.js";
 import type { SkillToolFactory } from "./skills/types.js";
@@ -110,6 +111,12 @@ async function main(): Promise<void> {
   // Add canvas tool
   additionalTools.push(createCanvasTool({ webMonitor, canvasState }));
   log.info("Canvas tool registered");
+
+  // Add shell command execution tool (skip in container mode where sandbox provides its own shell)
+  if (!containerEnabled) {
+    additionalTools.push(createShellTool({ cwd: process.cwd() }));
+    log.info("Shell tool registered");
+  }
 
   // Start browser control server
   if (config.browser?.enabled !== false) {
@@ -240,8 +247,8 @@ async function main(): Promise<void> {
     log.error(`Cron scheduler failed to start: ${formatError(err)}`);
   }
 
-  // Register cron tool with agent
-  additionalTools.push(createCronTool({ cronService, storePath: cronStorePath }));
+  // Register cron tool with agent (via addTool so it's available after agent creation)
+  agent.addTool(createCronTool({ cronService, storePath: cronStorePath }));
   log.info("Cron tool registered");
 
   // 9b. Start channel gateway lifecycles
@@ -475,8 +482,8 @@ async function main(): Promise<void> {
       });
     });
   };
-  process.on("SIGTERM", () => { shutdown(); });
-  process.on("SIGINT", () => { shutdown(); });
+  process.on("SIGTERM", () => { shutdown().catch((err) => log.error(`Shutdown error: ${formatError(err)}`)); });
+  process.on("SIGINT", () => { shutdown().catch((err) => log.error(`Shutdown error: ${formatError(err)}`)); });
 
   // 13b. Attach WebSocket
   const wss = new WebSocketServer({
@@ -677,7 +684,7 @@ process.on("unhandledRejection", (err) => {
 process.on("uncaughtException", (err) => {
   log.error(`Uncaught exception: ${formatError(err)}`);
   // Best-effort credential cleanup (no-op if file doesn't exist)
-  try { unlinkSync(resolvePath(process.cwd(), "data", "env", "env")); } catch {}
+  try { removeFilteredEnvFile(); } catch {}
   process.exit(1);
 });
 

@@ -27,6 +27,7 @@ export type Agent = {
     messages: AgentMessage[];
     channelId?: string;
   }) => Promise<AgentResponse>;
+  addTool: (tool: AgentTool) => void;
 };
 
 export function createAgent(context: AgentContext): Agent {
@@ -46,6 +47,9 @@ export function createAgent(context: AgentContext): Agent {
   const channelLocks = new Map<string, Promise<AgentResponse>>();
 
   return {
+    addTool: (tool: AgentTool) => {
+      tools.push(tool);
+    },
     chat: async ({ messages, channelId }) => {
       // Container mode: spawn Docker container with Claude Agent SDK
       if (context.containerEnabled) {
@@ -63,7 +67,12 @@ export function createAgent(context: AgentContext): Agent {
               sessions,
             })
           )
-          .finally(() => channelLocks.delete(cid));
+          .finally(() => {
+            // Only delete if we're still the latest entry to avoid orphaning downstream chains
+            if (channelLocks.get(cid) === current) {
+              channelLocks.delete(cid);
+            }
+          });
         channelLocks.set(cid, current);
         return current;
       }
@@ -108,6 +117,14 @@ async function runContainerChat(params: {
   // Track session for conversation continuity
   if (output.newSessionId) {
     sessions.set(channelId, output.newSessionId);
+    // Evict oldest entries if sessions map exceeds limit to prevent memory leak
+    const MAX_SESSIONS = 10000;
+    if (sessions.size > MAX_SESSIONS) {
+      const firstKey = sessions.keys().next().value;
+      if (firstKey !== undefined) {
+        sessions.delete(firstKey);
+      }
+    }
   }
 
   if (output.status === "error") {
@@ -182,7 +199,7 @@ async function runDirectChat(params: {
 
   // Handle tool calls in a loop (max 5 iterations), preserving full conversation
   const conversationMessages: LlmMessage[] = [...llmMessages];
-  const MAX_TOOL_ITERATIONS = 5;
+  const MAX_TOOL_ITERATIONS = 5000;
   let iterations = 0;
   while (response.toolCalls && response.toolCalls.length > 0 && iterations < MAX_TOOL_ITERATIONS) {
     iterations++;

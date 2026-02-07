@@ -42,6 +42,9 @@ export function createMemoryManager(params: {
   }
 
   const chatPersistence = createChatPersistence({ db, embeddingProvider });
+  const countAllStmt = db.prepare(
+    "SELECT (SELECT COUNT(*) FROM memory_files) AS files, (SELECT COUNT(*) FROM memory_chunks) AS chunks, (SELECT COUNT(*) FROM chat_messages) AS chatMessages",
+  );
   let closed = false;
 
   return {
@@ -93,10 +96,8 @@ export function createMemoryManager(params: {
       if (closed) {
         return { files: 0, chunks: 0, chatMessages: 0 };
       }
-      const files = (db.prepare("SELECT COUNT(*) AS cnt FROM memory_files").get() as { cnt: number }).cnt;
-      const chunks = (db.prepare("SELECT COUNT(*) AS cnt FROM memory_chunks").get() as { cnt: number }).cnt;
-      const chatMessages = (db.prepare("SELECT COUNT(*) AS cnt FROM chat_messages").get() as { cnt: number }).cnt;
-      return { files, chunks, chatMessages };
+      const row = countAllStmt.get() as { files: number; chunks: number; chatMessages: number };
+      return { files: row.files, chunks: row.chunks, chatMessages: row.chatMessages };
     },
 
     getStatus: async (): Promise<MemoryProviderStatus> => ({

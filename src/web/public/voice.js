@@ -16,6 +16,7 @@
   var currentAudio = null;
   var talkPhase = 'idle'; // idle | listening | thinking | speaking
   var voiceConfigured = false; // Whether TTS is enabled and has API key
+  var voiceConfigLoaded = false; // Whether config has been fetched
 
   // ─── DOM Elements (set in init) ───
   var micBtn = null;
@@ -505,15 +506,19 @@
   // ─── Load Voice Config from Server ───
   function loadVoiceConfig() {
     fetch('/api/voice/config')
-      .then(function(res) { return res.json(); })
+      .then(function(res) {
+        if (!res.ok) throw new Error('Voice config fetch failed');
+        return res.json();
+      })
       .then(function(data) {
         if (data.success && data.data) {
           voiceConfigured = data.data.ttsConfigured === true;
         }
+        voiceConfigLoaded = true;
       })
       .catch(function() {
-        // Assume not configured on error
         voiceConfigured = false;
+        voiceConfigLoaded = true;
       });
   }
 
@@ -590,7 +595,7 @@
       if (micBtn) {
         micBtn.addEventListener('mousedown', function() {
           if (talkMode) return;
-          if (!voiceConfigured) {
+          if (voiceConfigLoaded && !voiceConfigured) {
             showVoiceSetupDialog('not-enabled');
             return;
           }
@@ -610,7 +615,7 @@
         micBtn.addEventListener('touchstart', function(e) {
           e.preventDefault();
           if (talkMode) return;
-          if (!voiceConfigured) {
+          if (voiceConfigLoaded && !voiceConfigured) {
             showVoiceSetupDialog('not-enabled');
             return;
           }
@@ -627,7 +632,7 @@
       if (wakeToggle) {
         wakeToggle.addEventListener('click', function() {
           if (talkMode) return;
-          if (!voiceConfigured && !wakeEnabled) {
+          if (voiceConfigLoaded && !voiceConfigured && !wakeEnabled) {
             showVoiceSetupDialog('not-enabled');
             return;
           }
@@ -649,7 +654,7 @@
           if (talkMode) {
             stopTalkMode();
           } else {
-            if (!voiceConfigured) {
+            if (voiceConfigLoaded && !voiceConfigured) {
               showVoiceSetupDialog('not-enabled');
               return;
             }

@@ -191,7 +191,7 @@
         } else if (data.type === 'channel_message') {
           // Real-time message from a channel gateway (iMessage, Telegram, etc.)
           var role = data.isFromSelf ? 'user' : 'assistant';
-          var label = (data.senderName || data.from) + ': ' + data.text;
+          var label = (data.senderName || data.from || 'Unknown') + ': ' + (data.text || '');
           var entry = { role: role, content: label, timestamp: data.timestamp };
 
           // Store in the correct channel history

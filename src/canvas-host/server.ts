@@ -58,6 +58,9 @@ export function createCanvasRoutes(dataDir: string): Hono {
       if (stats.isSymbolicLink()) {
         return c.json({ error: "Symlinks not allowed" }, 403);
       }
+      if (!stats.isFile()) {
+        return c.json({ error: "Not a regular file" }, 400);
+      }
       const data = await readFile(normalizedFull);
       const ext = extname(normalizedFull).toLowerCase();
       const contentType = MIME_TYPES[ext] ?? "application/octet-stream";

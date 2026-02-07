@@ -2,7 +2,7 @@ import type { CronPayload } from "../types.js";
 
 /** Inline normalizeAgentId: lowercase + sanitize. */
 function normalizeAgentId(raw: string): string {
-  return raw.toLowerCase().replace(/[^a-zA-Z0-9_-]/g, "");
+  return raw.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 64);
 }
 
 /** Inline truncateText: simple slice-based truncation. */
@@ -17,7 +17,7 @@ export function normalizeRequiredName(raw: unknown) {
   if (typeof raw !== "string") {
     throw new Error("cron job name is required");
   }
-  const name = raw.trim();
+  const name = raw.trim().slice(0, 200);
   if (!name) {
     throw new Error("cron job name is required");
   }
@@ -28,7 +28,7 @@ export function normalizeOptionalText(raw: unknown) {
   if (typeof raw !== "string") {
     return undefined;
   }
-  const trimmed = raw.trim();
+  const trimmed = raw.trim().slice(0, 2000);
   return trimmed ? trimmed : undefined;
 }
 

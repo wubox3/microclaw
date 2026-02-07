@@ -4,7 +4,7 @@ import { migrateLegacyCronPayload } from "./payload-migration.js";
 
 /** Inline sanitizeAgentId replacement. */
 function sanitizeAgentId(raw: string): string {
-  return raw.toLowerCase().replace(/[^a-zA-Z0-9_-]/g, "");
+  return raw.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 64);
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -72,8 +72,10 @@ function coercePayload(payload: UnknownRecord) {
 function coerceDelivery(delivery: UnknownRecord) {
   const next: UnknownRecord = { ...delivery };
   if (typeof delivery.mode === "string") {
+    const VALID_MODES = new Set(["none", "announce"]);
     const mode = delivery.mode.trim().toLowerCase();
-    next.mode = mode === "deliver" ? "announce" : mode;
+    const normalized = mode === "deliver" ? "announce" : mode;
+    next.mode = VALID_MODES.has(normalized) ? normalized : "none";
   }
   if (typeof delivery.channel === "string") {
     const trimmed = delivery.channel.trim().toLowerCase();

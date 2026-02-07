@@ -35,7 +35,7 @@ function isKnownVoice(voice: string): boolean {
 export function resolveTtsConfig(config: MicroClawConfig): ResolvedTtsConfig {
   const raw = config.voice?.tts ?? {};
   return {
-    enabled: raw.enabled ?? true,
+    enabled: raw.enabled ?? false,
     provider: raw.provider ?? DEFAULT_PROVIDER,
     apiKey: raw.apiKey,
     model: raw.model ?? DEFAULT_MODEL,

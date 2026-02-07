@@ -136,6 +136,8 @@ export async function stopBrowserServer(): Promise<void> {
     // ignore
   }
 
-  // Bug 8 fix: nullify state AFTER Playwright cleanup is complete
+  // Nullify state and startingPromise AFTER Playwright cleanup is complete
+  // so a subsequent startBrowserServer doesn't return a stale cached promise
   state = null;
+  startingPromise = null;
 }

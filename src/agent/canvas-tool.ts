@@ -17,26 +17,27 @@ const ALLOWED_TAGS = new Set([
   "u", "s", "del", "ins", "code", "pre", "blockquote", "a", "img", "sub",
   "sup", "small", "mark", "abbr", "time", "details", "summary", "figure",
   "figcaption", "section", "article", "header", "footer", "nav", "main",
-  "aside", "label", "input", "button", "select", "option", "textarea",
+  "aside", "label", "button", "select", "option",
   "fieldset", "legend", "progress", "meter",
 ]);
 
 const ALLOWED_ATTRS = new Set([
-  "class", "id", "style", "title", "alt", "src", "href", "width", "height",
+  "class", "id", "title", "alt", "src", "href", "width", "height",
   "colspan", "rowspan", "target", "rel", "type", "placeholder", "value",
   "disabled", "checked", "readonly", "min", "max", "step", "name", "for",
   "open", "data-a2ui-id", "data-surface", "role", "aria-label", "aria-hidden",
 ]);
 
 function decodeHtmlEntities(str: string): string {
+  // Decode &amp; LAST to prevent double-decode chains like &amp;lt; → &lt; → <
   return str
     .replace(/&#x([0-9a-fA-F]+);?/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)))
     .replace(/&#(\d+);?/g, (_, dec: string) => String.fromCharCode(parseInt(dec, 10)))
-    .replace(/&amp;/gi, "&")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
-    .replace(/&apos;/gi, "'");
+    .replace(/&apos;/gi, "'")
+    .replace(/&amp;/gi, "&");
 }
 
 function sanitizeHtml(raw: string): string {
@@ -60,7 +61,7 @@ function sanitizeHtml(raw: string): string {
       .replace(/\bon\w+\s*=/gi, "x-removed=")
       .replace(/j\s*a\s*v\s*a\s*s\s*c\s*r\s*i\s*p\s*t\s*:/gi, "removed:")
       .replace(/v\s*b\s*s\s*c\s*r\s*i\s*p\s*t\s*:/gi, "removed:")
-      .replace(/data\s*:\s*text\/html/gi, "removed:");
+      .replace(/d\s*a\s*t\s*a\s*:/gi, "removed:");
     if (html === prev) break;
   }
 
@@ -87,7 +88,7 @@ function sanitizeHtml(raw: string): string {
         // Decode HTML entities first to prevent &#106;avascript: bypass
         if (attrName === "href" || attrName === "src") {
           const decoded = decodeHtmlEntities(attrValue);
-          if (/^\s*(javascript|vbscript|data\s*:\s*text\/html)\s*:/i.test(decoded)) {
+          if (/^\s*(javascript|vbscript|data)\s*:/i.test(decoded)) {
             continue;
           }
         }

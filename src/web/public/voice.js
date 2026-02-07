@@ -15,6 +15,8 @@
   var voiceProvider = '';
   var recognition = null;
   var currentAudio = null;
+  var micPermissionGranted = false;
+  var silenceTimer = null;
 
   // ─── Sound Effects (loaded from sound-fx.js) ───
   var SoundFX = window.MicroClawSoundFX || { init: function() {}, play: function() {} };
@@ -26,6 +28,22 @@
   var voiceStatus = null;
   var voiceOrb = null;
   var voiceProviderEl = null;
+
+  // ─── Microphone Permission ───
+  function requestMicPermission() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      return;
+    }
+
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(function(stream) {
+        stream.getTracks().forEach(function(track) { track.stop(); });
+        micPermissionGranted = true;
+      })
+      .catch(function() {
+        micPermissionGranted = false;
+      });
+  }
 
   // ─── Speech Recognition Setup ───
   function createRecognition() {
@@ -45,6 +63,20 @@
       return;
     }
 
+    // Gate on mic permission — request if not yet granted
+    if (!micPermissionGranted) {
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(function(stream) {
+          stream.getTracks().forEach(function(track) { track.stop(); });
+          micPermissionGranted = true;
+          startVoice();
+        })
+        .catch(function() {
+          setVoiceStatus('Microphone permission denied');
+        });
+      return;
+    }
+
     voiceOn = true;
     SoundFX.play('talk-start');
     setTalkPhase('listening');
@@ -56,6 +88,10 @@
     voiceOn = false;
     SoundFX.play('talk-end');
     setTalkPhase('idle');
+    if (silenceTimer) {
+      clearTimeout(silenceTimer);
+      silenceTimer = null;
+    }
     if (recognition) {
       try { recognition.stop(); } catch (e) { /* ignore */ }
       recognition = null;
@@ -78,7 +114,6 @@
 
     isListening = true;
     var finalTranscript = '';
-    var silenceTimer = null;
 
     recognition.onresult = function(event) {
       var interimTranscript = '';
@@ -122,7 +157,7 @@
 
     recognition.onerror = function(event) {
       if (event.error === 'not-allowed') {
-        setVoiceStatus('Microphone permission denied');
+        setVoiceStatus('Microphone denied — allow mic at: chrome://settings/content/microphone');
         stopVoice();
         return;
       }
@@ -179,6 +214,14 @@
       return response.blob();
     })
     .then(function(blob) {
+      // Recheck voiceOn — user may have toggled off during async fetch
+      if (!voiceOn) {
+        isSpeaking = false;
+        setTalkPhase('idle');
+        setVoiceStatus('');
+        updateUI();
+        return;
+      }
       var audioUrl = URL.createObjectURL(blob);
       try {
         currentAudio = new Audio(audioUrl);
@@ -243,15 +286,19 @@
     });
   }
 
-  // ─── Push-to-Talk (mic button) ───
-  function startPushToTalk() {
-    if (!speechSupported) {
-      setVoiceStatus('Speech recognition not supported');
+  // ─── Mic Button: Click-to-Record ───
+  function toggleMicCapture() {
+    if (voiceOn) return;
+
+    // If already listening, stop
+    if (isListening && recognition) {
+      try { recognition.stop(); } catch (e) { /* ignore */ }
       return;
     }
 
-    if (voiceOn) {
-      stopVoice();
+    if (!speechSupported) {
+      setVoiceStatus('Speech recognition not supported');
+      return;
     }
 
     recognition = createRecognition();
@@ -286,7 +333,7 @@
       isListening = false;
       updateUI();
       if (event.error === 'not-allowed') {
-        setVoiceStatus('Microphone permission denied');
+        setVoiceStatus('Microphone denied — allow mic at: chrome://settings/content/microphone');
         return;
       }
       if (event.error !== 'no-speech' && event.error !== 'aborted') {
@@ -303,12 +350,6 @@
       isListening = false;
       setVoiceStatus('Failed to start recognition');
       updateUI();
-    }
-  }
-
-  function stopPushToTalk() {
-    if (recognition) {
-      try { recognition.stop(); } catch (e) { /* ignore */ }
     }
   }
 
@@ -402,6 +443,9 @@
         return;
       }
 
+      // Request mic permission eagerly so clicks work instantly
+      requestMicPermission();
+
       // Single voice on/off toggle
       if (voiceToggle) {
         voiceToggle.addEventListener('click', function() {
@@ -413,31 +457,10 @@
         });
       }
 
-      // Mic button: push-to-talk
+      // Mic button: click to start recording, auto-stops after silence
       if (micBtn) {
-        micBtn.addEventListener('mousedown', function() {
-          if (voiceOn) return;
-          startPushToTalk();
-        });
-        micBtn.addEventListener('mouseup', function() {
-          if (voiceOn) return;
-          stopPushToTalk();
-        });
-        micBtn.addEventListener('mouseleave', function() {
-          if (voiceOn) return;
-          if (isListening) {
-            stopPushToTalk();
-          }
-        });
-        micBtn.addEventListener('touchstart', function(e) {
-          e.preventDefault();
-          if (voiceOn) return;
-          startPushToTalk();
-        });
-        micBtn.addEventListener('touchend', function(e) {
-          e.preventDefault();
-          if (voiceOn) return;
-          stopPushToTalk();
+        micBtn.addEventListener('click', function() {
+          toggleMicCapture();
         });
       }
 

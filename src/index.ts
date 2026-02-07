@@ -204,21 +204,7 @@ async function main(): Promise<void> {
         message: params.message,
         webMonitor,
       });
-      // Append to run log
-      try {
-        const logPath = resolveCronRunLogPath({ storePath: cronStorePath, jobId: params.job.id });
-        await appendCronRunLog(logPath, {
-          ts: Date.now(),
-          jobId: params.job.id,
-          action: "finished",
-          status: result.status,
-          error: result.error,
-          summary: result.summary,
-          runAtMs: Date.now(),
-        });
-      } catch {
-        // Best-effort logging
-      }
+      // Run log is appended by the onEvent handler below to avoid double-logging
       return result;
     },
     onEvent: (evt) => {

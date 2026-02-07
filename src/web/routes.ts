@@ -44,6 +44,13 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
         if (!validHosts.includes(url.hostname)) {
           return c.json({ success: false, error: "CSRF: invalid origin" }, 403);
         }
+        // Also validate port to prevent cross-port CSRF from other local services
+        const hostHeader = c.req.header("Host") ?? "";
+        const expectedPort = hostHeader.split(":")[1] ?? "";
+        const originPort = url.port || (url.protocol === "https:" ? "443" : "80");
+        if (expectedPort && originPort !== expectedPort) {
+          return c.json({ success: false, error: "CSRF: origin port mismatch" }, 403);
+        }
       } catch {
         return c.json({ success: false, error: "CSRF: malformed origin" }, 403);
       }

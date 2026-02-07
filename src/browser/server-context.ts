@@ -56,6 +56,8 @@ async function fetchJson<T>(url: string, timeoutMs = 1500, init?: RequestInit): 
     const headers = getHeadersWithAuth(url, (init?.headers as Record<string, string>) || {});
     const res = await fetch(url, { ...init, headers, signal: ctrl.signal });
     if (!res.ok) {
+      // Drain body to release the socket back to the connection pool
+      await res.text().catch(() => {});
       throw new Error(`HTTP ${res.status}`);
     }
     return (await res.json()) as T;
@@ -71,6 +73,8 @@ async function fetchOk(url: string, timeoutMs = 1500, init?: RequestInit): Promi
     const headers = getHeadersWithAuth(url, (init?.headers as Record<string, string>) || {});
     const res = await fetch(url, { ...init, headers, signal: ctrl.signal });
     if (!res.ok) {
+      // Drain body to release the socket back to the connection pool
+      await res.text().catch(() => {});
       throw new Error(`HTTP ${res.status}`);
     }
   } finally {

@@ -36,6 +36,8 @@ export function armTimer(state: CronServiceState) {
 export async function onTimer(state: CronServiceState) {
   await locked(state, async () => {
     if (state.running) {
+      // Re-arm so we don't lose the timer while a job is executing
+      armTimer(state);
       return;
     }
     state.running = true;

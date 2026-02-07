@@ -343,7 +343,9 @@ function mergeCronDelivery(
   };
 
   if (typeof patch.mode === "string") {
-    next.mode = (patch.mode as string) === "deliver" ? "announce" : patch.mode;
+    const VALID_MODES = new Set(["none", "announce"]);
+    const normalized = (patch.mode as string) === "deliver" ? "announce" : patch.mode;
+    next.mode = VALID_MODES.has(normalized) ? normalized : "none";
   }
   if ("channel" in patch) {
     const channel = typeof patch.channel === "string" ? patch.channel.trim() : "";

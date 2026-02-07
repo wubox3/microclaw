@@ -18,6 +18,9 @@ export function resolveCronRunLogPath(params: { storePath: string; jobId: string
   const dir = path.dirname(storePath);
   // Sanitize jobId to prevent path traversal (strip path separators and null bytes)
   const safeJobId = params.jobId.replace(/[/\\:\0]/g, "_");
+  if (!safeJobId) {
+    throw new Error("Invalid job ID: empty after sanitization");
+  }
   const resolved = path.join(dir, "runs", `${safeJobId}.jsonl`);
   const runsDir = path.join(dir, "runs");
   if (!resolved.startsWith(runsDir + path.sep) && resolved !== runsDir) {
@@ -27,6 +30,7 @@ export function resolveCronRunLogPath(params: { storePath: string; jobId: string
 }
 
 const writesByPath = new Map<string, Promise<void>>();
+const VALID_STATUSES = new Set(["ok", "error", "skipped"]);
 
 async function pruneIfNeeded(filePath: string, opts: { maxBytes: number; keepLines: number }) {
   const stat = await fs.stat(filePath).catch(() => null);
@@ -110,7 +114,6 @@ export async function readCronRunLogEntries(
       if (jobId && obj.jobId !== jobId) {
         continue;
       }
-      const VALID_STATUSES = new Set(["ok", "error", "skipped"]);
       if (obj.status !== undefined && !VALID_STATUSES.has(obj.status)) {
         continue;
       }

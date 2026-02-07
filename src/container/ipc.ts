@@ -96,10 +96,20 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
               log.warn(
                 `Failed to process IPC message ${file}: ${err instanceof Error ? err.message : String(err)}`,
               );
-              // Move to errors directory
+              // Move to errors directory (capped at 100 files)
               const errorsDir = path.join(ipcBaseDir, "errors");
               fs.mkdirSync(errorsDir, { recursive: true });
               try {
+                // Evict oldest error files if at capacity
+                const MAX_ERROR_FILES = 100;
+                const errorFiles = fs.readdirSync(errorsDir)
+                  .filter((f) => f.endsWith(".json"))
+                  .sort();
+                if (errorFiles.length >= MAX_ERROR_FILES) {
+                  for (const old of errorFiles.slice(0, errorFiles.length - MAX_ERROR_FILES + 1)) {
+                    try { fs.unlinkSync(path.join(errorsDir, old)); } catch { /* best-effort */ }
+                  }
+                }
                 fs.renameSync(filePath, path.join(errorsDir, `${channelId}-${file}`));
               } catch {
                 try {

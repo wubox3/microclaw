@@ -36,7 +36,7 @@ async function executeBrowserAction(
   try {
     switch (action) {
       case "status": {
-        const result = await fetchBrowserJson(`/status${profileQuery}`);
+        const result = await fetchBrowserJson(`/${profileQuery}`);
         return { content: formatResult(result) };
       }
 
@@ -90,10 +90,11 @@ async function executeBrowserAction(
 
       case "close": {
         const targetId = params.targetId as string;
-        const result = await fetchBrowserJson(`/tabs/close${profileQuery}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ targetId }),
+        if (!targetId) {
+          return { content: "Missing required parameter: targetId", isError: true };
+        }
+        const result = await fetchBrowserJson(`/tabs/${encodeURIComponent(targetId)}${profileQuery}`, {
+          method: "DELETE",
         });
         return { content: formatResult(result) };
       }
@@ -111,11 +112,10 @@ async function executeBrowserAction(
       }
 
       case "screenshot": {
-        const qs = new URLSearchParams();
-        if (profile) qs.set("profile", profile);
-        if (params.targetId) qs.set("targetId", String(params.targetId));
-        const qStr = qs.toString() ? `?${qs.toString()}` : "";
-        const result = await fetchBrowserJson(`/screenshot${qStr}`, {
+        const result = await fetchBrowserJson(`/screenshot${profileQuery}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targetId: params.targetId }),
           timeoutMs: 15000,
         });
         return { content: formatResult(result) };
@@ -154,7 +154,7 @@ async function executeBrowserAction(
       }
 
       case "upload": {
-        const result = await fetchBrowserJson(`/upload${profileQuery}`, {
+        const result = await fetchBrowserJson(`/hooks/file-chooser${profileQuery}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -166,7 +166,7 @@ async function executeBrowserAction(
       }
 
       case "dialog": {
-        const result = await fetchBrowserJson(`/dialog${profileQuery}`, {
+        const result = await fetchBrowserJson(`/hooks/dialog${profileQuery}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

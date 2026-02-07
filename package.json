@@ -21,6 +21,7 @@
     "@anthropic-ai/sdk": "^0.39.0",
     "@hapi/boom": "^10.0.1",
     "@hono/node-server": "^1.14.1",
+    "@slack/bolt": "^4.6.0",
     "@whiskeysockets/baileys": "^6.7.16",
     "discord.js": "^14.25.1",
     "dotenv": "^17.2.4",

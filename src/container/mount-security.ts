@@ -19,7 +19,6 @@ const log = createLogger("mount-security");
 let cachedAllowlist: MountAllowlist | null = null;
 let cachedAllowlistTimestamp = 0;
 const ALLOWLIST_CACHE_TTL_MS = 60_000;
-let allowlistLoadError: string | null = null;
 
 const DEFAULT_BLOCKED_PATTERNS = [
   ".ssh",
@@ -43,7 +42,6 @@ const DEFAULT_BLOCKED_PATTERNS = [
 
 export function invalidateAllowlistCache(): void {
   cachedAllowlist = null;
-  allowlistLoadError = null;
 }
 
 export function loadMountAllowlist(): MountAllowlist | null {
@@ -54,15 +52,8 @@ export function loadMountAllowlist(): MountAllowlist | null {
     cachedAllowlist = null;
   }
 
-  // Don't permanently cache load errors — retry on next call
-  // to handle transient failures (e.g., file temporarily unavailable)
-  if (allowlistLoadError !== null) {
-    allowlistLoadError = null;
-  }
-
   try {
     if (!fs.existsSync(MOUNT_ALLOWLIST_PATH)) {
-      allowlistLoadError = `Mount allowlist not found at ${MOUNT_ALLOWLIST_PATH}`;
       log.warn(
         `Mount allowlist not found at ${MOUNT_ALLOWLIST_PATH} - additional mounts will be BLOCKED`,
       );
@@ -98,10 +89,9 @@ export function loadMountAllowlist(): MountAllowlist | null {
 
     return cachedAllowlist;
   } catch (err) {
-    allowlistLoadError =
-      err instanceof Error ? err.message : String(err);
+    const loadError = err instanceof Error ? err.message : String(err);
     log.error(
-      `Failed to load mount allowlist: ${allowlistLoadError} - additional mounts will be BLOCKED`,
+      `Failed to load mount allowlist: ${loadError} - additional mounts will be BLOCKED`,
     );
     return null;
   }

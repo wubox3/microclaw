@@ -1,17 +1,11 @@
 import type { CronPayload } from "../types.js";
+import { truncateText } from "../text-utils.js";
 
 /** Inline normalizeAgentId: lowercase + sanitize. */
 function normalizeAgentId(raw: string): string {
   return raw.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 64);
 }
 
-/** Inline truncateText: simple slice-based truncation. */
-function truncateText(input: string, maxLen: number): string {
-  if (input.length <= maxLen) {
-    return input;
-  }
-  return `${input.slice(0, Math.max(0, maxLen - 1)).trimEnd()}\u2026`;
-}
 
 export function normalizeRequiredName(raw: unknown) {
   if (typeof raw !== "string") {

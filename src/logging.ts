@@ -15,8 +15,9 @@ const LOG_LEVEL_MAP: Record<LogLevel, number> = {
 const VALID_LOG_LEVELS = new Set(Object.keys(LOG_LEVEL_MAP));
 
 function resolveLogLevel(envLevel: string | undefined): number {
-  if (envLevel && VALID_LOG_LEVELS.has(envLevel)) {
-    return LOG_LEVEL_MAP[envLevel as LogLevel];
+  const normalized = envLevel?.toLowerCase();
+  if (normalized && VALID_LOG_LEVELS.has(normalized)) {
+    return LOG_LEVEL_MAP[normalized as LogLevel];
   }
   return LOG_LEVEL_MAP.info;
 }

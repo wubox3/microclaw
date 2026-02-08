@@ -78,6 +78,10 @@ async function callTtsApi(params: {
 }): Promise<Buffer> {
   const { text, apiKey, model, voice, provider, timeoutMs } = params;
 
+  if (!text || !text.trim()) {
+    throw new Error("TTS text cannot be empty");
+  }
+
   if (!isKnownVoice(voice)) {
     log.warn(`Voice "${voice}" is not in the known voices list, passing through to API`);
   }
@@ -100,12 +104,19 @@ async function callTtsApi(params: {
     });
 
     if (!response.ok) {
+      let errorDetail = "";
+      try {
+        errorDetail = (await response.text()).slice(0, 500);
+      } catch {}
+
       const isAuthError = response.status === 401 || response.status === 403;
       if (!isAuthError) {
-        log.error(`TTS API error (${provider}): HTTP ${response.status}`);
+        log.error(`TTS API error (${provider}): HTTP ${response.status} - ${errorDetail}`);
       }
       throw new Error(
-        `TTS API error (${response.status}): ${isAuthError ? "Authentication failed" : "Request failed"}`,
+        isAuthError
+          ? `TTS authentication failed (HTTP ${response.status})`
+          : `TTS request failed (HTTP ${response.status}): ${errorDetail || "unknown error"}`,
       );
     }
 

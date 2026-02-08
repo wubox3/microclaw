@@ -1,4 +1,5 @@
-import { readFileSync, existsSync } from "node:fs";
+import { readFile, access } from "node:fs/promises";
+import { constants } from "node:fs";
 import { resolve } from "node:path";
 
 export type SkillManifest = {
@@ -12,13 +13,15 @@ export type SkillManifest = {
 
 const MANIFEST_FILENAME = "microclaw.skill.json";
 
-export function readSkillManifest(skillDir: string): SkillManifest | null {
+export async function readSkillManifest(skillDir: string): Promise<SkillManifest | null> {
   const manifestPath = resolve(skillDir, MANIFEST_FILENAME);
-  if (!existsSync(manifestPath)) {
+  try {
+    await access(manifestPath, constants.R_OK);
+  } catch {
     return null;
   }
   try {
-    const raw = readFileSync(manifestPath, "utf-8");
+    const raw = await readFile(manifestPath, "utf-8");
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
       return null;
@@ -26,8 +29,11 @@ export function readSkillManifest(skillDir: string): SkillManifest | null {
     if (typeof parsed.id !== "string" || typeof parsed.name !== "string") {
       return null;
     }
-    // Reject entry fields with path traversal segments
+    // Reject entry fields with path traversal segments or absolute paths
     if (typeof parsed.entry === "string") {
+      if (parsed.entry.startsWith("/") || /^[a-zA-Z]:/.test(parsed.entry)) {
+        return null;
+      }
       const segments = parsed.entry.split(/[/\\]/);
       if (segments.some((s: string) => s === "..")) {
         return null;

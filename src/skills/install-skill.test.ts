@@ -109,6 +109,12 @@ describe("install-skill", () => {
       ).toThrow("--name contains invalid characters");
     });
 
+    it("exits when --name value starts with --", () => {
+      expect(() =>
+        parseArgs(["node", "script", "https://github.com/user/repo", "--name", "--verbose"]),
+      ).toThrow("--name value must not start with --");
+    });
+
     it("accepts SSH URL format", () => {
       const result = parseArgs(["node", "script", "git@github.com:user/repo.git"]);
       expect(result).toEqual({ url: "git@github.com:user/repo.git", name: null });
@@ -142,8 +148,8 @@ describe("install-skill", () => {
       expect(isWithinDir("/root/skills", "/root/skills/my-skill")).toBe(true);
     });
 
-    it("returns false when child equals parent", () => {
-      expect(isWithinDir("/root/skills", "/root/skills")).toBe(false);
+    it("returns true when child equals parent (identity case)", () => {
+      expect(isWithinDir("/root/skills", "/root/skills")).toBe(true);
     });
 
     it("returns false when child is outside parent", () => {

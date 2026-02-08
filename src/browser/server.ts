@@ -11,6 +11,7 @@ import { setBrowserControlBaseUrl } from "./client-fetch.js";
 
 let state: BrowserServerState | null = null;
 let startingPromise: Promise<BrowserServerState | null> | null = null;
+let generation = 0;
 const log = createSubsystemLogger("browser");
 const logServer = log.child("server");
 
@@ -21,6 +22,7 @@ export type StartBrowserServerOptions = {
 export async function startBrowserServer(
   options?: StartBrowserServerOptions,
 ): Promise<BrowserServerState | null> {
+  const myGeneration = ++generation;
   if (state) {
     return state;
   }
@@ -57,6 +59,14 @@ export async function startBrowserServer(
 
   if (!server) {
     return null;
+  }
+
+  if (myGeneration !== generation) {
+    // A stop was called during our startup, abort and clean up
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+    });
+    return state; // will be null
   }
 
   state = {
@@ -98,6 +108,7 @@ export async function startBrowserServer(
 }
 
 export async function stopBrowserServer(): Promise<void> {
+  generation++;
   const current = state;
   if (!current) {
     return;

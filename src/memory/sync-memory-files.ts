@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, lstatSync } from "node:fs";
 import { resolve, relative } from "node:path";
 import type { SqliteDb } from "./sqlite.js";
 import { hashContent, chunkText } from "./internal.js";
+import { withTransaction } from "./sqlite.js";
 import { createLogger } from "../logging.js";
 
 const log = createLogger("sync-memory");
@@ -64,8 +65,7 @@ export function syncMemoryFiles(
   const updateFileStmt = db.prepare("UPDATE memory_files SET hash = ?, updated_at = unixepoch() WHERE id = ?");
   const insertChunkStmt = db.prepare("INSERT INTO memory_chunks (file_id, content, start_line, end_line, hash) VALUES (?, ?, ?, ?, ?)");
 
-  db.exec("BEGIN");
-  try {
+  withTransaction(db, () => {
     // Remove files no longer present (CASCADE deletes chunks and embeddings)
     for (const existing of existingFiles) {
       if (!currentPaths.has(existing.path)) {
@@ -91,12 +91,7 @@ export function syncMemoryFiles(
         updated++;
       }
     }
-
-    db.exec("COMMIT");
-  } catch (err) {
-    try { db.exec("ROLLBACK"); } catch { /* ignore rollback failure */ }
-    throw err;
-  }
+  });
 
   return { added, updated, removed };
 }

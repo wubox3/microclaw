@@ -5,6 +5,8 @@ import { randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import WebSocket, { WebSocketServer } from "ws";
 import { rawDataToString } from "./compat/ws.js";
+import { isLoopbackHost } from "./config.js";
+import { createSubsystemLogger } from "./compat/logging.js";
 
 type CdpCommand = {
   id: number;
@@ -76,6 +78,7 @@ type ConnectedTarget = {
   targetInfo: TargetInfo;
 };
 
+const relayLog = createSubsystemLogger("browser").child("extension-relay");
 const RELAY_AUTH_HEADER = "x-microclaw-relay-token";
 
 function headerValue(value: string | string[] | undefined): string | undefined {
@@ -101,18 +104,7 @@ export type ChromeExtensionRelayServer = {
   stop: () => Promise<void>;
 };
 
-function isLoopbackHost(host: string) {
-  const h = host.trim().toLowerCase();
-  return (
-    h === "localhost" ||
-    h === "127.0.0.1" ||
-    h === "0.0.0.0" ||
-    h === "[::1]" ||
-    h === "::1" ||
-    h === "[::]" ||
-    h === "::"
-  );
-}
+// isLoopbackHost is imported from config.ts
 
 function isLoopbackAddress(ip: string | undefined): boolean {
   if (!ip) {
@@ -230,6 +222,7 @@ export async function ensureChromeExtensionRelayServer(opts: {
       timer: NodeJS.Timeout;
     }
   >();
+  const MAX_SAFE_EXTENSION_ID = 2 ** 31; // Use 2^31 for safety margin against integer overflow
   let nextExtensionId = 1;
 
   const sendToExtension = async (payload: ExtensionForwardCommandMessage): Promise<unknown> => {
@@ -343,7 +336,8 @@ export async function ensureChromeExtensionRelayServer(opts: {
         throw new Error("target not found");
       }
       default: {
-        const id = nextExtensionId++;
+        const id = nextExtensionId;
+        nextExtensionId = nextExtensionId >= MAX_SAFE_EXTENSION_ID ? 1 : nextExtensionId + 1;
         return await sendToExtension({
           id,
           method: "forwardCDPCommand",
@@ -438,7 +432,7 @@ export async function ensureChromeExtensionRelayServer(opts: {
       void (async () => {
         try {
           await sendToExtension({
-            id: nextExtensionId++,
+            id: (() => { const id = nextExtensionId; nextExtensionId = nextExtensionId >= MAX_SAFE_EXTENSION_ID ? 1 : nextExtensionId + 1; return id; })(),
             method: "forwardCDPCommand",
             params: { method: "Target.activateTarget", params: { targetId } },
           });
@@ -462,16 +456,17 @@ export async function ensureChromeExtensionRelayServer(opts: {
       void (async () => {
         try {
           await sendToExtension({
-            id: nextExtensionId++,
+            id: (() => { const id = nextExtensionId; nextExtensionId = nextExtensionId >= MAX_SAFE_EXTENSION_ID ? 1 : nextExtensionId + 1; return id; })(),
             method: "forwardCDPCommand",
             params: { method: "Target.closeTarget", params: { targetId } },
           });
-        } catch {
-          // ignore
+          res.writeHead(200);
+          res.end("OK");
+        } catch (err) {
+          res.writeHead(500);
+          res.end(err instanceof Error ? err.message : "Close failed");
         }
       })();
-      res.writeHead(200);
-      res.end("OK");
       return;
     }
 
@@ -503,13 +498,17 @@ export async function ensureChromeExtensionRelayServer(opts: {
         rejectUpgrade(socket, 403, "Forbidden: invalid origin");
         return;
       }
+      // Validate extension ID format (32 lowercase alpha chars a-p per Chrome's encoding)
+      const extensionIdRegex = /^[a-p]{32}$/;
+      const originExtensionId = origin.slice("chrome-extension://".length).replace(/\/$/, "");
       const expectedExtensionId = process.env.MICROCLAW_EXTENSION_ID?.trim();
       if (expectedExtensionId) {
-        const originExtensionId = origin.slice("chrome-extension://".length).replace(/\/$/, "");
-        if (originExtensionId !== expectedExtensionId) {
+        if (!extensionIdRegex.test(originExtensionId) || originExtensionId !== expectedExtensionId) {
           rejectUpgrade(socket, 403, "Forbidden: extension ID mismatch");
           return;
         }
+      } else {
+        relayLog.warn("MICROCLAW_EXTENSION_ID not set - any Chrome extension can connect to relay");
       }
       if (extensionWs) {
         rejectUpgrade(socket, 409, "Extension already connected");
@@ -595,6 +594,12 @@ export async function ensureChromeExtensionRelayServer(opts: {
             return;
           }
           if (attached?.sessionId && attached?.targetInfo?.targetId) {
+            const MAX_CONNECTED_TARGETS = 200;
+            if (connectedTargets.size >= MAX_CONNECTED_TARGETS && !connectedTargets.has(attached.sessionId)) {
+              // Remove oldest entry to prevent unbounded growth
+              const firstKey = connectedTargets.keys().next().value;
+              if (firstKey) connectedTargets.delete(firstKey);
+            }
             const prev = connectedTargets.get(attached.sessionId);
             const nextTargetId = attached.targetInfo.targetId;
             const prevTargetId = prev?.targetId;

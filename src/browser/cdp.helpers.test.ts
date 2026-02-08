@@ -159,6 +159,7 @@ describe("fetchJson", () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 404,
+      text: () => Promise.resolve(""),
     });
     await expect(fetchJson("http://localhost:9222/json/version")).rejects.toThrow("HTTP 404");
   });
@@ -197,6 +198,7 @@ describe("fetchOk", () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 500,
+      text: () => Promise.resolve(""),
     });
     await expect(fetchOk("http://localhost:9222/")).rejects.toThrow("HTTP 500");
   });

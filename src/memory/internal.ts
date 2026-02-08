@@ -28,7 +28,11 @@ export function chunkText(text: string, chunkSize = CHUNK_SIZE, overlap = CHUNK_
         overlapSize += currentChunk[i]!.length + 1;
         overlapLines++;
       }
-      currentChunk = currentChunk.slice(-Math.max(1, overlapLines));
+      if (currentChunk.length === 1 && currentChunk[0].length > chunkSize) {
+        currentChunk = []; // No overlap for oversized single lines
+      } else {
+        currentChunk = currentChunk.slice(-Math.max(1, overlapLines));
+      }
       currentSize = currentChunk.reduce((sum, l) => sum + l.length + 1, 0);
     }
   }
@@ -40,7 +44,7 @@ export function chunkText(text: string, chunkSize = CHUNK_SIZE, overlap = CHUNK_
   return chunks;
 }
 
-export function cosineSimilarity(a: number[], b: number[]): number {
+export function cosineSimilarity(a: ArrayLike<number>, b: ArrayLike<number>): number {
   if (a.length !== b.length) {
     return 0;
   }

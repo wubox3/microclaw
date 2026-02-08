@@ -2,6 +2,9 @@ import type { CronService } from "../cron/service.js";
 import { normalizeCronJobCreate, normalizeCronJobPatch } from "../cron/normalize.js";
 import { readCronRunLogEntries, resolveCronRunLogPath } from "../cron/run-log.js";
 import type { AgentTool, AgentToolResult } from "./types.js";
+import { createLogger } from "../logging.js";
+
+const log = createLogger("cron-tool");
 
 const CRON_ACTIONS = ["status", "list", "add", "update", "remove", "run", "runs", "wake"] as const;
 
@@ -203,7 +206,9 @@ WAKE MODES (for wake action):
             return errorResult(`Unknown action: ${action}`);
         }
       } catch (err) {
-        return errorResult(err instanceof Error ? err.message : String(err));
+        const msg = err instanceof Error ? err.message : String(err);
+        log.error("Cron tool error (" + action + "): " + msg);
+        return errorResult(msg);
       }
     },
   };

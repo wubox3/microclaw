@@ -63,7 +63,8 @@ export function computeJobNextRunAtMs(job: CronJob, nowMs: number): number | und
           : typeof schedule.at === "string"
             ? parseAbsoluteTimeMs(schedule.at)
             : null;
-    return atMs !== null ? atMs : undefined;
+    if (atMs === null) return undefined;
+    return atMs > Date.now() ? atMs : undefined;
   }
   return computeNextRunAtMs(job.schedule, nowMs);
 }
@@ -73,9 +74,11 @@ export function recomputeNextRuns(state: CronServiceState) {
     return;
   }
   const now = state.deps.nowMs();
-  for (const job of state.store.jobs) {
+  for (let i = 0; i < state.store.jobs.length; i++) {
+    let job = state.store.jobs[i];
     if (!job.state) {
-      job.state = {};
+      job = { ...job, state: {} };
+      state.store.jobs[i] = job;
     }
     if (!job.enabled) {
       job.state.nextRunAtMs = undefined;
@@ -154,7 +157,7 @@ export function createJob(state: CronServiceState, input: CronJobCreate): CronJo
   return job;
 }
 
-export function applyJobPatch(job: CronJob, patch: CronJobPatch) {
+export function applyJobPatch(state: CronServiceState, id: string, job: CronJob, patch: CronJobPatch): CronJob {
   // Deep-clone so validation failures don't leave the original job
   // half-patched via shared nested object references.
   const draft = structuredClone(job);
@@ -211,8 +214,11 @@ export function applyJobPatch(job: CronJob, patch: CronJobPatch) {
   assertSupportedJobSpec(draft);
   assertDeliverySupport(draft);
 
-  // Validation passed — copy draft fields back to the original job.
-  Object.assign(job, draft);
+  // Replace the job in the store array immutably.
+  const index = state.store!.jobs.findIndex(j => j.id === id);
+  if (index === -1) throw new Error("unknown cron job id");
+  state.store!.jobs[index] = { ...draft, updatedAtMs: Date.now() };
+  return state.store!.jobs[index];
 }
 
 function mergeCronPayload(existing: CronPayload, patch: CronPayloadPatch): CronPayload {

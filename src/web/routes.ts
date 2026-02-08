@@ -16,6 +16,14 @@ import { createLogger } from "../logging.js";
 
 const log = createLogger("web-routes");
 
+const safeErrorMessage = (err: unknown, fallback: string): string => {
+  if (err instanceof Error) {
+    // Strip file paths and stack traces
+    return err.message.replace(/\/[^\s]+/g, "[path]").slice(0, 200);
+  }
+  return fallback;
+};
+
 export type WebAppDeps = {
   config: MicroClawConfig;
   agent: Agent;
@@ -46,10 +54,21 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
         }
         // Also validate port to prevent cross-port CSRF from other local services
         const hostHeader = c.req.header("Host") ?? "";
-        const expectedPort = hostHeader.split(":")[1] ?? "";
+        const [hostName, hostPort] = hostHeader.split(":");
+        const expectedPort = hostPort ?? "";
         const originPort = url.port || (url.protocol === "https:" ? "443" : "80");
-        if (expectedPort && originPort !== expectedPort) {
-          return c.json({ success: false, error: "CSRF: origin port mismatch" }, 403);
+        // Always validate port - when Host has no port, compare against origin's default
+        if (expectedPort) {
+          if (originPort !== expectedPort) {
+            return c.json({ success: false, error: "CSRF: origin port mismatch" }, 403);
+          }
+        } else {
+          // Host has no port - only allow if Origin also uses default port
+          const originUsesDefault = (url.protocol === "https:" && (originPort === "443" || !url.port)) ||
+            (url.protocol === "http:" && (originPort === "80" || !url.port));
+          if (!originUsesDefault) {
+            return c.json({ success: false, error: "CSRF: origin port mismatch" }, 403);
+          }
         }
       } catch {
         return c.json({ success: false, error: "CSRF: malformed origin" }, 403);
@@ -217,7 +236,11 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     if (!ALLOWED_SOUND_NAMES.has(raw)) {
       return c.text("Not found", 404);
     }
-    const soundPath = resolve(deps.dataDir, "sounds", raw + ".mp3");
+    const soundsDir = resolve(deps.dataDir, "sounds");
+    const soundPath = resolve(soundsDir, raw + ".mp3");
+    if (!soundPath.startsWith(soundsDir + "/")) {
+      return c.json({ success: false, error: "Invalid sound name" }, 400);
+    }
     if (!existsSync(soundPath)) {
       return c.text("Not found", 404);
     }
@@ -379,7 +402,7 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
         return c.json({ success: true, data: result }, 201);
       } catch (err) {
         log.error(`Cron add failed: ${err instanceof Error ? err.message : String(err)}`);
-        return c.json({ success: false, error: err instanceof Error ? err.message : "Failed to add cron job" }, 400);
+        return c.json({ success: false, error: safeErrorMessage(err, "Failed to add cron job") }, 400);
       }
     });
 
@@ -403,7 +426,7 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
         return c.json({ success: true, data: result });
       } catch (err) {
         log.error(`Cron update failed: ${err instanceof Error ? err.message : String(err)}`);
-        return c.json({ success: false, error: err instanceof Error ? err.message : "Failed to update cron job" }, 400);
+        return c.json({ success: false, error: safeErrorMessage(err, "Failed to update cron job") }, 400);
       }
     });
 
@@ -417,7 +440,7 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
         return c.json({ success: true, data: result });
       } catch (err) {
         log.error(`Cron remove failed: ${err instanceof Error ? err.message : String(err)}`);
-        return c.json({ success: false, error: err instanceof Error ? err.message : "Failed to remove cron job" }, 400);
+        return c.json({ success: false, error: safeErrorMessage(err, "Failed to remove cron job") }, 400);
       }
     });
 
@@ -431,7 +454,7 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
         return c.json({ success: true, data: result });
       } catch (err) {
         log.error(`Cron run failed: ${err instanceof Error ? err.message : String(err)}`);
-        return c.json({ success: false, error: err instanceof Error ? err.message : "Failed to run cron job" }, 400);
+        return c.json({ success: false, error: safeErrorMessage(err, "Failed to run cron job") }, 400);
       }
     });
 
@@ -477,7 +500,7 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
   const canvasApp = createCanvasRoutes(deps.dataDir);
   app.route("/canvas", canvasApp);
 
-  // Static files (read once at startup, not per-request)
+  // Static files (read once at startup, not per-request in production)
   const safeReadFile = (filePath: string): string => {
     try {
       return readFileSync(filePath, "utf-8");
@@ -486,42 +509,58 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
       return "";
     }
   };
-  const cssContent = safeReadFile(resolve(publicDir, "styles.css"));
-  const jsContent = safeReadFile(resolve(publicDir, "app.js"));
-  const soundFxJsContent = safeReadFile(resolve(publicDir, "sound-fx.js"));
-  const voiceJsContent = safeReadFile(resolve(publicDir, "voice.js"));
-  const canvasJsContent = safeReadFile(resolve(publicDir, "canvas.js"));
-  const cronJsContent = safeReadFile(resolve(publicDir, "cron.js"));
-  const htmlContent = safeReadFile(resolve(publicDir, "index.html"));
+
+  const getStaticContent = (filePath: string, cached: string): string => {
+    if (process.env.NODE_ENV === "development") {
+      return safeReadFile(filePath);
+    }
+    return cached;
+  };
+
+  const cssPath = resolve(publicDir, "styles.css");
+  const jsPath = resolve(publicDir, "app.js");
+  const soundFxJsPath = resolve(publicDir, "sound-fx.js");
+  const voiceJsPath = resolve(publicDir, "voice.js");
+  const canvasJsPath = resolve(publicDir, "canvas.js");
+  const cronJsPath = resolve(publicDir, "cron.js");
+  const htmlPath = resolve(publicDir, "index.html");
+
+  const cssContent = safeReadFile(cssPath);
+  const jsContent = safeReadFile(jsPath);
+  const soundFxJsContent = safeReadFile(soundFxJsPath);
+  const voiceJsContent = safeReadFile(voiceJsPath);
+  const canvasJsContent = safeReadFile(canvasJsPath);
+  const cronJsContent = safeReadFile(cronJsPath);
+  const htmlContent = safeReadFile(htmlPath);
 
   const STATIC_CACHE = "public, max-age=300";
 
   app.get("/styles.css", (c) => {
-    return c.text(cssContent, 200, { "Content-Type": "text/css", "Cache-Control": STATIC_CACHE });
+    return c.text(getStaticContent(cssPath, cssContent), 200, { "Content-Type": "text/css", "Cache-Control": STATIC_CACHE });
   });
 
   app.get("/app.js", (c) => {
-    return c.text(jsContent, 200, { "Content-Type": "application/javascript", "Cache-Control": STATIC_CACHE });
+    return c.text(getStaticContent(jsPath, jsContent), 200, { "Content-Type": "application/javascript", "Cache-Control": STATIC_CACHE });
   });
 
   app.get("/sound-fx.js", (c) => {
-    return c.text(soundFxJsContent, 200, { "Content-Type": "application/javascript", "Cache-Control": STATIC_CACHE });
+    return c.text(getStaticContent(soundFxJsPath, soundFxJsContent), 200, { "Content-Type": "application/javascript", "Cache-Control": STATIC_CACHE });
   });
 
   app.get("/voice.js", (c) => {
-    return c.text(voiceJsContent, 200, { "Content-Type": "application/javascript", "Cache-Control": STATIC_CACHE });
+    return c.text(getStaticContent(voiceJsPath, voiceJsContent), 200, { "Content-Type": "application/javascript", "Cache-Control": STATIC_CACHE });
   });
 
   app.get("/canvas.js", (c) => {
-    return c.text(canvasJsContent, 200, { "Content-Type": "application/javascript", "Cache-Control": STATIC_CACHE });
+    return c.text(getStaticContent(canvasJsPath, canvasJsContent), 200, { "Content-Type": "application/javascript", "Cache-Control": STATIC_CACHE });
   });
 
   app.get("/cron.js", (c) => {
-    return c.text(cronJsContent, 200, { "Content-Type": "application/javascript", "Cache-Control": STATIC_CACHE });
+    return c.text(getStaticContent(cronJsPath, cronJsContent), 200, { "Content-Type": "application/javascript", "Cache-Control": STATIC_CACHE });
   });
 
   app.get("/", (c) => {
-    return c.html(htmlContent);
+    return c.html(getStaticContent(htmlPath, htmlContent));
   });
 
   return app;

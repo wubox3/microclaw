@@ -1,4 +1,4 @@
-import { readdirSync, statSync, existsSync } from "node:fs";
+import { readdir, stat as fsStat, access } from "node:fs/promises";
 import { resolve, join, relative, isAbsolute } from "node:path";
 import { readSkillManifest, validateManifest, type SkillManifest } from "./manifest.js";
 import { createLogger } from "../logging.js";
@@ -11,28 +11,30 @@ export type DiscoveredSkill = {
   entryPoint: string;
 };
 
-export function discoverSkills(skillsDir: string): DiscoveredSkill[] {
-  if (!existsSync(skillsDir)) {
+export async function discoverSkills(skillsDir: string): Promise<DiscoveredSkill[]> {
+  try {
+    await access(skillsDir);
+  } catch {
     return [];
   }
 
-  const entries = readdirSync(skillsDir);
+  const entries = await readdir(skillsDir);
   const discovered: DiscoveredSkill[] = [];
 
   for (const entry of entries) {
     if (entry.startsWith(".")) continue;
     const skillDir = resolve(skillsDir, entry);
-    let stat;
+    let entryStat;
     try {
-      stat = statSync(skillDir);
+      entryStat = await fsStat(skillDir);
     } catch {
       continue;
     }
-    if (!stat.isDirectory()) {
+    if (!entryStat.isDirectory()) {
       continue;
     }
 
-    const manifest = readSkillManifest(skillDir);
+    const manifest = await readSkillManifest(skillDir);
     if (!manifest) {
       continue;
     }
@@ -53,7 +55,9 @@ export function discoverSkills(skillsDir: string): DiscoveredSkill[] {
       continue;
     }
 
-    if (!existsSync(entryPoint)) {
+    try {
+      await access(entryPoint);
+    } catch {
       continue;
     }
 

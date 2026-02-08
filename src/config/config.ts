@@ -55,6 +55,21 @@ function validateConfig(value: unknown): MicroClawConfig {
   if (agent?.provider !== undefined && typeof agent.provider !== "string") {
     throw new Error("Config 'agent.provider' must be a string");
   }
+  if (typeof obj.agent === "object" && obj.agent !== null) {
+    const agentObj = obj.agent as Record<string, unknown>;
+    if ("maxTokens" in agentObj && (typeof agentObj.maxTokens !== "number" || agentObj.maxTokens < 1)) {
+      throw new Error("agent.maxTokens must be a positive number");
+    }
+    if ("temperature" in agentObj && (typeof agentObj.temperature !== "number" || agentObj.temperature < 0 || agentObj.temperature > 2)) {
+      throw new Error("agent.temperature must be between 0 and 2");
+    }
+  }
+  if (typeof obj.container === "object" && obj.container !== null) {
+    const containerObj = obj.container as Record<string, unknown>;
+    if ("timeout" in containerObj && (typeof containerObj.timeout !== "number" || containerObj.timeout < 1000)) {
+      throw new Error("container.timeout must be at least 1000ms");
+    }
+  }
   return value as MicroClawConfig;
 }
 

@@ -161,7 +161,12 @@ function createProfileContext(
       // URLs without explicit scheme (e.g., "example.com") - allow, Chrome will add https://
       scheme = "";
     }
-    if (scheme && !ALLOWED_SCHEMES.has(scheme)) {
+    if (!scheme) {
+      // URL parsing failed - likely a bare hostname like "example.com"
+      // Chrome will prepend https:// automatically, which is safe
+      scheme = "https:";
+    }
+    if (!ALLOWED_SCHEMES.has(scheme)) {
       throw new Error(`Unsafe URL scheme: "${scheme}"`);
     }
 

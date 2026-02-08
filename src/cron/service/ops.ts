@@ -26,7 +26,7 @@ export async function start(state: CronServiceState) {
     state.deps.log.info(
       {
         enabled: true,
-        jobs: state.store?.jobs.length ?? 0,
+        jobs: state.store!.jobs.length,
         nextWakeAtMs: nextWakeAtMs(state) ?? null,
       },
       "cron: started",
@@ -44,7 +44,7 @@ export async function status(state: CronServiceState) {
     return {
       enabled: state.deps.cronEnabled,
       storePath: state.deps.storePath,
-      jobs: state.store?.jobs.length ?? 0,
+      jobs: state.store!.jobs.length,
       nextWakeAtMs: state.deps.cronEnabled ? (nextWakeAtMs(state) ?? null) : null,
     };
   });
@@ -54,7 +54,7 @@ export async function list(state: CronServiceState, opts?: { includeDisabled?: b
   return await locked(state, async () => {
     await ensureLoaded(state);
     const includeDisabled = opts?.includeDisabled === true;
-    const jobs = (state.store?.jobs ?? []).filter((j) => includeDisabled || j.enabled);
+    const jobs = state.store!.jobs.filter((j) => includeDisabled || j.enabled);
     return jobs.toSorted((a, b) => (a.state.nextRunAtMs ?? 0) - (b.state.nextRunAtMs ?? 0));
   });
 }
@@ -64,7 +64,10 @@ export async function add(state: CronServiceState, input: CronJobCreate) {
     warnIfDisabled(state, "add");
     await ensureLoaded(state);
     const job = createJob(state, input);
-    state.store?.jobs.push(job);
+    if (!state.store) {
+      throw new Error("cron store not loaded after ensureLoaded");
+    }
+    state.store.jobs.push(job);
     await persist(state);
     armTimer(state);
     emit(state, {
@@ -82,13 +85,13 @@ export async function update(state: CronServiceState, id: string, patch: CronJob
     await ensureLoaded(state);
     const job = findJobOrThrow(state, id);
     const now = state.deps.nowMs();
-    applyJobPatch(job, patch);
-    job.updatedAtMs = now;
-    if (job.enabled) {
-      job.state.nextRunAtMs = computeJobNextRunAtMs(job, now);
+    const updated = applyJobPatch(state, id, job, patch);
+    updated.updatedAtMs = now;
+    if (updated.enabled) {
+      updated.state.nextRunAtMs = computeJobNextRunAtMs(updated, now);
     } else {
-      job.state.nextRunAtMs = undefined;
-      job.state.runningAtMs = undefined;
+      updated.state.nextRunAtMs = undefined;
+      updated.state.runningAtMs = undefined;
     }
 
     await persist(state);
@@ -96,9 +99,9 @@ export async function update(state: CronServiceState, id: string, patch: CronJob
     emit(state, {
       jobId: id,
       action: "updated",
-      nextRunAtMs: job.state.nextRunAtMs,
+      nextRunAtMs: updated.state.nextRunAtMs,
     });
-    return job;
+    return updated;
   });
 }
 
@@ -106,12 +109,12 @@ export async function remove(state: CronServiceState, id: string) {
   return await locked(state, async () => {
     warnIfDisabled(state, "remove");
     await ensureLoaded(state);
-    const before = state.store?.jobs.length ?? 0;
     if (!state.store) {
-      return { ok: false, removed: false } as const;
+      throw new Error("cron store not loaded after ensureLoaded");
     }
+    const before = state.store.jobs.length;
     state.store.jobs = state.store.jobs.filter((j) => j.id !== id);
-    const removed = (state.store.jobs.length ?? 0) !== before;
+    const removed = state.store.jobs.length !== before;
     await persist(state);
     armTimer(state);
     if (removed) {

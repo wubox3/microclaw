@@ -1,5 +1,8 @@
 import { parseRoleRef } from "./pw-role-snapshot.js";
 
+// Intentionally global mutable state: armCounters is per-process and used to generate
+// monotonically increasing IDs for upload/dialog/download arm operations. Each counter
+// ensures that superseded waiters are invalidated when a new arm is requested.
 const armCounters = { upload: 0, dialog: 0, download: 0 };
 
 export function bumpUploadArmId(): number {

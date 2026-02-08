@@ -66,7 +66,7 @@ describe("createChatPersistence", () => {
 
       expect(rows).toHaveLength(2);
       expect(rows[0]).toMatchObject({ channel_id: "web", role: "user", content: "Hello", timestamp: 1000 });
-      expect(rows[1]).toMatchObject({ channel_id: "web", role: "assistant", content: "Hi there!", timestamp: 1001 });
+      expect(rows[1]).toMatchObject({ channel_id: "web", role: "assistant", content: "Hi there!", timestamp: 1000.5 });
     });
 
     it("creates a memory_file with source='chat'", async () => {

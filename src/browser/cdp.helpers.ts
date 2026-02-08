@@ -1,6 +1,7 @@
 import WebSocket from "ws";
 import { rawDataToString } from "./compat/ws.js";
 import { getChromeExtensionRelayAuthHeaders } from "./extension-relay.js";
+import { isLoopbackHost } from "./config.js";
 
 type CdpResponse = {
   id: number;
@@ -29,18 +30,8 @@ export function sanitizeUrl(url: string): string {
   }
 }
 
-export function isLoopbackHost(host: string) {
-  const h = host.trim().toLowerCase();
-  return (
-    h === "localhost" ||
-    h === "127.0.0.1" ||
-    h === "0.0.0.0" ||
-    h === "[::1]" ||
-    h === "::1" ||
-    h === "[::]" ||
-    h === "::"
-  );
-}
+// isLoopbackHost is imported from config.ts
+export { isLoopbackHost } from "./config.js";
 
 export function getHeadersWithAuth(url: string, headers: Record<string, string> = {}) {
   const relayHeaders = getChromeExtensionRelayAuthHeaders(url);
@@ -73,13 +64,16 @@ export function appendCdpPath(cdpUrl: string, path: string): string {
 
 const CDP_COMMAND_TIMEOUT_MS = 30_000;
 
+const MAX_SAFE_CDP_ID = 2 ** 31; // Use 2^31 for safety margin against integer overflow
+
 function createCdpSender(ws: WebSocket) {
   let nextId = 1;
   const pending = new Map<number, Pending>();
   const timers = new Map<number, ReturnType<typeof setTimeout>>();
 
   const send: CdpSendFn = (method: string, params?: Record<string, unknown>) => {
-    const id = nextId++;
+    const id = nextId;
+    nextId = nextId >= MAX_SAFE_CDP_ID ? 1 : nextId + 1;
     const msg = { id, method, params };
     ws.send(JSON.stringify(msg));
     return new Promise<unknown>((resolve, reject) => {
@@ -156,7 +150,9 @@ export async function fetchJson<T>(url: string, timeoutMs = 1500, init?: Request
     const headers = getHeadersWithAuth(url, (init?.headers as Record<string, string>) || {});
     const res = await fetch(url, { ...init, headers, signal: ctrl.signal });
     if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
+      // Drain the body to release the socket back to the connection pool
+      await res.text().catch(() => {});
+      throw new Error(`HTTP ${res.status} for ${url}`);
     }
     return (await res.json()) as T;
   } finally {
@@ -171,7 +167,9 @@ export async function fetchOk(url: string, timeoutMs = 1500, init?: RequestInit)
     const headers = getHeadersWithAuth(url, (init?.headers as Record<string, string>) || {});
     const res = await fetch(url, { ...init, headers, signal: ctrl.signal });
     if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
+      // Drain the body to release the socket back to the connection pool
+      await res.text().catch(() => {});
+      throw new Error(`HTTP ${res.status} for ${url}`);
     }
   } finally {
     clearTimeout(t);

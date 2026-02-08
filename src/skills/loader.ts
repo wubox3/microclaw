@@ -16,8 +16,18 @@ function createSkillLogger(skillId: string): SkillLogger {
 }
 
 function redactSensitiveConfig(config: MicroClawConfig): MicroClawConfig {
-  const clone = structuredClone(config);
+  let clone: MicroClawConfig;
+  try {
+    clone = structuredClone(config);
+  } catch {
+    try {
+      clone = JSON.parse(JSON.stringify(config));
+    } catch {
+      return config;
+    }
+  }
   // Strip API keys and tokens to prevent skill plugins from exfiltrating credentials
+  // Note: walk() mutates the clone
   const walk = (obj: Record<string, unknown>, depth = 0) => {
     if (depth > 10 || !obj || typeof obj !== "object") return;
     for (const key of Object.keys(obj)) {
@@ -32,6 +42,20 @@ function redactSensitiveConfig(config: MicroClawConfig): MicroClawConfig {
   };
   walk(clone as unknown as Record<string, unknown>);
   return clone;
+}
+
+const SKILL_REGISTER_TIMEOUT_MS = 10_000;
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer!);
+  }
 }
 
 function createSkillApi(
@@ -64,7 +88,7 @@ export async function loadSkills(params: {
   const registry = createSkillRegistry();
   const skillsDir = params.skillsDir ?? resolve(process.cwd(), "skills");
 
-  const discovered = discoverSkills(skillsDir);
+  const discovered = await discoverSkills(skillsDir);
 
   for (const skill of discovered) {
     try {
@@ -90,7 +114,11 @@ export async function loadSkills(params: {
         undefined,
       );
 
-      await definition.register(api);
+      await withTimeout(
+        Promise.resolve(definition.register(api)),
+        SKILL_REGISTER_TIMEOUT_MS,
+        `Skill "${skill.manifest.id}" register`,
+      );
 
       registry.skills.push({
         definition: {

@@ -317,11 +317,15 @@ async function connectBrowser(cdpUrl: string): Promise<ConnectedBrowser> {
     await cached.browser.close().catch(() => {});
     cached = null;
   }
-  if (connecting && connectingUrl !== normalized) {
+  if (connecting) {
+    if (connectingUrl === normalized) {
+      return await connecting;
+    }
     try { await connecting; } catch { /* ignore */ }
-  }
-  if (connecting && connectingUrl === normalized) {
-    return await connecting;
+    // Re-check cached after await since state may have changed
+    if (cached?.cdpUrl === normalized && cached.browser.isConnected()) {
+      return cached;
+    }
   }
 
   const connectWithRetry = async (): Promise<ConnectedBrowser> => {

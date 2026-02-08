@@ -72,6 +72,19 @@ export function createAgent(context: AgentContext): Agent {
             if (channelLocks.get(cid) === current) {
               channelLocks.delete(cid);
             }
+            // Periodic cleanup: if the lock map grows too large, clear settled entries
+            const MAX_CHANNEL_LOCKS = 1000;
+            if (channelLocks.size > MAX_CHANNEL_LOCKS) {
+              for (const [key, promise] of channelLocks) {
+                // Check if promise has settled by racing with an already-resolved value
+                Promise.race([promise, Promise.resolve("__settled__")]).then((v) => {
+                  if (v === "__settled__") return;
+                  channelLocks.delete(key);
+                }).catch(() => {
+                  channelLocks.delete(key);
+                });
+              }
+            }
           });
         channelLocks.set(cid, current);
         return current;
@@ -81,7 +94,12 @@ export function createAgent(context: AgentContext): Agent {
       // Snapshot tools at call time to avoid mutation during iteration
       const toolsSnapshot = [...currentTools];
       // Read user profile (non-blocking, undefined if unavailable)
-      const userProfile = context.memoryManager?.getUserProfile();
+      let userProfile: UserProfile | undefined;
+      try {
+        userProfile = context.memoryManager?.getUserProfile();
+      } catch {
+        // graceful degradation - continue without profile
+      }
       return runDirectChat({ messages, channelId, client, tools: toolsSnapshot, context, userProfile });
     },
   };
@@ -224,32 +242,36 @@ async function runDirectChat(params: {
       toolCalls: response.toolCalls,
     });
 
-    // Execute tools and append each result
+    // Execute tools in parallel and append all results
     const toolContext = { channelId: channelId ?? "web" };
-    for (const toolCall of response.toolCalls) {
-      const tool = tools.find((t) => t.name === toolCall.name);
-      let resultContent: string;
-      let isError = false;
-      if (tool) {
+    const settled = await Promise.allSettled(
+      response.toolCalls.map(async (toolCall) => {
+        const tool = tools.find((t) => t.name === toolCall.name);
+        if (!tool) {
+          return { toolCallId: toolCall.id, content: "Unknown tool: " + toolCall.name, isError: true };
+        }
         try {
           const result = await tool.execute(toolCall.input, toolContext);
-          resultContent = result.content;
-          isError = result.isError ?? false;
+          return { toolCallId: toolCall.id, content: result.content, isError: result.isError ?? false };
         } catch (err) {
-          resultContent = `Tool execution error: ${err instanceof Error ? err.message : String(err)}`;
-          isError = true;
+          return { toolCallId: toolCall.id, content: err instanceof Error ? err.message : String(err), isError: true };
         }
-      } else {
-        resultContent = `Unknown tool: ${toolCall.name}`;
-        isError = true;
-      }
+      })
+    );
+    for (const entry of settled) {
+      const result = entry.status === "fulfilled"
+        ? entry.value
+        : { toolCallId: "unknown", content: String(entry.reason), isError: true };
       conversationMessages.push({
         role: "tool",
-        toolCallId: toolCall.id,
-        content: resultContent,
-        isError,
+        toolCallId: result.toolCallId,
+        content: result.content,
+        isError: result.isError,
       });
     }
+
+    // Break early if conversation messages exceed safety limit after appending tool results
+    if (conversationMessages.length > MAX_CONVERSATION_MESSAGES * 2) break;
 
     response = await client.sendMessage({
       messages: conversationMessages,

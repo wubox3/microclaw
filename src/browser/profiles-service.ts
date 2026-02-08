@@ -60,7 +60,15 @@ let profileMutex = Promise.resolve();
 
 export function createBrowserProfilesService(ctx: BrowserRouteContext) {
   const listProfiles = async (): Promise<ProfileStatus[]> => {
-    return await ctx.listProfiles();
+    let releaseMutex: () => void;
+    const prev = profileMutex;
+    profileMutex = new Promise<void>(r => { releaseMutex = r; });
+    await prev;
+    try {
+      return await ctx.listProfiles();
+    } finally {
+      releaseMutex!();
+    }
   };
 
   const createProfile = async (params: CreateProfileParams): Promise<CreateProfileResult> => {
@@ -128,10 +136,8 @@ export function createBrowserProfilesService(ctx: BrowserRouteContext) {
 
     await writeConfigFile(nextConfig);
 
-    state.resolved = {
-      ...state.resolved,
-      profiles: { ...state.resolved.profiles, [name]: profileConfig },
-    };
+    const newProfiles = { ...state.resolved.profiles, [name]: profileConfig };
+    state.resolved = { ...state.resolved, profiles: newProfiles };
     const resolved = resolveProfile(state.resolved, name);
     if (!resolved) {
       throw new Error(`profile "${name}" not found after creation`);

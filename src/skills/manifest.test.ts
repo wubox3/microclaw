@@ -3,21 +3,21 @@ import { validateManifest, readSkillManifest } from "./manifest.js";
 import type { SkillManifest } from "./manifest.js";
 
 // ---------------------------------------------------------------------------
-// Mock node:fs
+// Mock node:fs/promises
 // ---------------------------------------------------------------------------
 
-vi.mock("node:fs", () => ({
-  existsSync: vi.fn(() => false),
-  readFileSync: vi.fn(() => ""),
+vi.mock("node:fs/promises", () => ({
+  access: vi.fn(() => Promise.reject(new Error("ENOENT"))),
+  readFile: vi.fn(() => Promise.resolve("")),
 }));
 
-const { existsSync, readFileSync } = await import("node:fs");
-const mockExistsSync = vi.mocked(existsSync);
-const mockReadFileSync = vi.mocked(readFileSync);
+const { access, readFile } = await import("node:fs/promises");
+const mockAccess = vi.mocked(access);
+const mockReadFile = vi.mocked(readFile);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockExistsSync.mockReturnValue(false);
+  mockAccess.mockRejectedValue(new Error("ENOENT"));
 });
 
 // ---------------------------------------------------------------------------
@@ -65,21 +65,23 @@ describe("validateManifest", () => {
 // ---------------------------------------------------------------------------
 
 describe("readSkillManifest", () => {
-  it("returns parsed manifest when file exists", () => {
-    mockExistsSync.mockReturnValue(true);
-    mockReadFileSync.mockReturnValue('{"id":"my-skill","name":"My Skill"}');
-    const result = readSkillManifest("/skills/my-skill");
+  it("returns parsed manifest when file exists", async () => {
+    mockAccess.mockResolvedValue(undefined);
+    mockReadFile.mockResolvedValue('{"id":"my-skill","name":"My Skill"}');
+    const result = await readSkillManifest("/skills/my-skill");
     expect(result).toEqual({ id: "my-skill", name: "My Skill" });
   });
 
-  it("returns null when file does not exist", () => {
-    mockExistsSync.mockReturnValue(false);
-    expect(readSkillManifest("/skills/missing")).toBeNull();
+  it("returns null when file does not exist", async () => {
+    mockAccess.mockRejectedValue(new Error("ENOENT"));
+    const result = await readSkillManifest("/skills/missing");
+    expect(result).toBeNull();
   });
 
-  it("returns null for invalid JSON", () => {
-    mockExistsSync.mockReturnValue(true);
-    mockReadFileSync.mockReturnValue("{invalid json}");
-    expect(readSkillManifest("/skills/bad")).toBeNull();
+  it("returns null for invalid JSON", async () => {
+    mockAccess.mockResolvedValue(undefined);
+    mockReadFile.mockResolvedValue("{invalid json}");
+    const result = await readSkillManifest("/skills/bad");
+    expect(result).toBeNull();
   });
 });

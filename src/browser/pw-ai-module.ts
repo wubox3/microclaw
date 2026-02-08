@@ -43,17 +43,15 @@ export async function getPwAiModule(opts?: { mode?: PwAiLoadMode }): Promise<PwA
       pwAiModuleSoft = loadPwAiModule("soft");
     }
     const result = await pwAiModuleSoft;
-    if (result === null) {
-      pwAiModuleSoft = null;
-    }
+    // Don't clear on null - cache the "not available" result permanently
+    // to avoid repeated import attempts that will always fail
     return result;
   }
   if (!pwAiModuleStrict) {
     pwAiModuleStrict = loadPwAiModule("strict");
   }
   const result = await pwAiModuleStrict;
-  if (result === null) {
-    pwAiModuleStrict = null;
-  }
+  // Don't clear on null - cache the "not available" result permanently
+  // to avoid repeated import attempts that will always fail
   return result;
 }

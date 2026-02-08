@@ -168,8 +168,11 @@ export async function waitForDownloadViaPlaywright(opts: {
       throw new Error("Download path must not contain null bytes");
     }
     // Allowlist: only permit downloads under /tmp/ or user home directory
-    const ALLOWED_PREFIXES = ["/tmp/", `${process.env.HOME ?? "/nonexistent"}/`];
-    if (!ALLOWED_PREFIXES.some((p) => resolvedOut.startsWith(p))) {
+    const home = process.env.HOME;
+    const safeHome = (home && home !== "/" && home.length > 1) ? home : null;
+    const allowedPrefixes = ["/tmp/"];
+    if (safeHome) allowedPrefixes.push(`${safeHome}/`);
+    if (!allowedPrefixes.some((p) => resolvedOut.startsWith(p))) {
       throw new Error("Download path must be under /tmp/ or user home directory");
     }
   }
@@ -231,8 +234,11 @@ export async function downloadViaPlaywright(opts: {
     throw new Error("Download path must not contain null bytes");
   }
   // Allowlist: only permit downloads under /tmp/ or user home directory
-  const ALLOWED_PREFIXES = ["/tmp/", `${process.env.HOME ?? "/nonexistent"}/`];
-  if (!ALLOWED_PREFIXES.some((p) => resolvedOut.startsWith(p))) {
+  const home = process.env.HOME;
+  const safeHome = (home && home !== "/" && home.length > 1) ? home : null;
+  const allowedPrefixes = ["/tmp/"];
+  if (safeHome) allowedPrefixes.push(`${safeHome}/`);
+  if (!allowedPrefixes.some((p) => resolvedOut.startsWith(p))) {
     throw new Error("Download path must be under /tmp/ or user home directory");
   }
 

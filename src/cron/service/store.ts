@@ -3,41 +3,14 @@ import type { CronJob } from "../types.js";
 import type { CronServiceState } from "./state.js";
 import { parseAbsoluteTimeMs } from "../parse.js";
 import { migrateLegacyCronPayload } from "../payload-migration.js";
-import { loadCronStore, saveCronStore } from "../store.js";
+import { isValidCronJob, loadCronStore, saveCronStore } from "../store.js";
 import { recomputeNextRuns } from "./jobs.js";
 import { inferLegacyName, normalizeOptionalText } from "./normalize.js";
-
-function hasLegacyDeliveryHints(payload: Record<string, unknown>) {
-  if (typeof payload.deliver === "boolean") {
-    return true;
-  }
-  if (typeof payload.bestEffortDeliver === "boolean") {
-    return true;
-  }
-  if (typeof payload.to === "string" && payload.to.trim()) {
-    return true;
-  }
-  return false;
-}
-
-function buildDeliveryFromLegacyPayload(payload: Record<string, unknown>) {
-  const deliver = payload.deliver;
-  const mode = deliver === false ? "none" : "announce";
-  const channelRaw =
-    typeof payload.channel === "string" ? payload.channel.trim().toLowerCase() : "";
-  const toRaw = typeof payload.to === "string" ? payload.to.trim() : "";
-  const next: Record<string, unknown> = { mode };
-  if (channelRaw) {
-    next.channel = channelRaw;
-  }
-  if (toRaw) {
-    next.to = toRaw;
-  }
-  if (typeof payload.bestEffortDeliver === "boolean") {
-    next.bestEffort = payload.bestEffortDeliver;
-  }
-  return next;
-}
+import {
+  hasLegacyDeliveryHints,
+  buildDeliveryFromLegacyPayload,
+  stripLegacyDeliveryFields,
+} from "../legacy-compat.js";
 
 function buildDeliveryPatchFromLegacyPayload(payload: Record<string, unknown>) {
   const deliver = payload.deliver;
@@ -102,22 +75,6 @@ function mergeLegacyDeliveryInto(
   return { delivery: next, mutated };
 }
 
-function stripLegacyDeliveryFields(payload: Record<string, unknown>): Record<string, unknown> {
-  const copy = { ...payload };
-  if ("deliver" in copy) {
-    delete copy.deliver;
-  }
-  if ("channel" in copy) {
-    delete copy.channel;
-  }
-  if ("to" in copy) {
-    delete copy.to;
-  }
-  if ("bestEffortDeliver" in copy) {
-    delete copy.bestEffortDeliver;
-  }
-  return copy;
-}
 
 async function getFileMtimeMs(filePath: string): Promise<number | null> {
   try {
@@ -258,7 +215,8 @@ export async function ensureLoaded(
       }
     }
   }
-  state.store = { version: 1, jobs: jobs as unknown as CronJob[] };
+  const validJobs = (jobs as unknown[]).filter(isValidCronJob);
+  state.store = { version: 1, jobs: validJobs };
   state.storeLoadedAtMs = state.deps.nowMs();
   state.storeFileMtimeMs = fileMtimeMs;
 

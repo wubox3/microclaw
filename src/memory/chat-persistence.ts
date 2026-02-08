@@ -4,6 +4,7 @@ import type { EmbeddingProvider } from "./embeddings.js";
 import type { ChatMessageRecord } from "./types.js";
 import { hashContent, chunkText } from "./internal.js";
 import { providerKey } from "./embeddings.js";
+import { withTransaction } from "./sqlite.js";
 import { createLogger } from "../logging.js";
 
 const log = createLogger("chat-persistence");
@@ -35,20 +36,22 @@ export function createChatPersistence(params: {
 
   return {
     saveExchange: async ({ channelId, userMessage, assistantMessage, timestamp }) => {
+      if (!channelId || typeof channelId !== "string" || channelId.includes("/") || channelId.includes("\\")) {
+        throw new Error(`Invalid channelId: ${channelId}`);
+      }
+
       const doSave = async () => {
         if (closed) return;
         const exchangeContent = `User: ${userMessage}\n\nAssistant: ${assistantMessage}`;
         const hash = hashContent(exchangeContent);
         const chatPath = `chat/${channelId}/${timestamp}-${randomUUID().slice(0, 8)}`;
 
-        // Wrap all writes in a transaction for atomicity
-        db.exec("BEGIN");
-        let fileId: number;
-        try {
+        // Wrap all writes in a savepoint for atomicity (allows nesting)
+        const fileId = withTransaction(db, () => {
           const fileResult = db.prepare(
             "INSERT INTO memory_files (path, source, hash) VALUES (?, 'chat', ?)",
           ).run(chatPath, hash);
-          fileId = (fileResult as unknown as { lastInsertRowid: number }).lastInsertRowid;
+          const fId = (fileResult as unknown as { lastInsertRowid: number }).lastInsertRowid;
 
           // Insert chunks (auto-triggers FTS5 sync)
           const chunks = chunkText(exchangeContent);
@@ -62,7 +65,7 @@ export function createChatPersistence(params: {
             const chunkHash = hashContent(chunk);
             db.prepare(
               "INSERT INTO memory_chunks (file_id, content, start_line, end_line, hash) VALUES (?, ?, ?, ?, ?)",
-            ).run(fileId, chunk, startLine, startLine + chunkLineCount - 1, chunkHash);
+            ).run(fId, chunk, startLine, startLine + chunkLineCount - 1, chunkHash);
             if (pos >= 0) {
               searchFrom = pos + chunk.length;
             }
@@ -71,17 +74,15 @@ export function createChatPersistence(params: {
           // Insert into chat_messages for chronological history
           db.prepare(
             "INSERT INTO chat_messages (channel_id, role, content, timestamp, memory_file_id) VALUES (?, 'user', ?, ?, ?)",
-          ).run(channelId, userMessage, timestamp, fileId);
+          ).run(channelId, userMessage, timestamp, fId);
 
+          // Use +0.5 offset to maintain ordering without colliding with rapid messages (timestamps are in seconds)
           db.prepare(
             "INSERT INTO chat_messages (channel_id, role, content, timestamp, memory_file_id) VALUES (?, 'assistant', ?, ?, ?)",
-          ).run(channelId, assistantMessage, timestamp + 1, fileId);
+          ).run(channelId, assistantMessage, timestamp + 0.5, fId);
 
-          db.exec("COMMIT");
-        } catch (err) {
-          try { db.exec("ROLLBACK"); } catch { /* ignore rollback failure */ }
-          throw err;
-        }
+          return fId;
+        });
 
         // Await embedding generation (outside transaction) to prevent races with sync operations
         if (embeddingProvider) {
@@ -108,6 +109,8 @@ export function createChatPersistence(params: {
     },
 
     loadHistory: async ({ channelId = "web", limit = 50, before }) => {
+      const safeLimit = Math.max(1, Math.min(limit ?? 50, 1000));
+
       // Always query DESC to get the most recent N messages (optionally before a cursor),
       // then reverse to chronological ASC order for the caller.
       const query = before
@@ -115,8 +118,8 @@ export function createChatPersistence(params: {
         : "SELECT id, channel_id, role, content, timestamp, memory_file_id, created_at FROM chat_messages WHERE channel_id = ? ORDER BY timestamp DESC LIMIT ?";
 
       const params = before
-        ? [channelId, before, limit]
-        : [channelId, limit];
+        ? [channelId, before, safeLimit]
+        : [channelId, safeLimit];
 
       const rows = db.prepare(query).all(...params) as Array<{
         id: number;
@@ -161,8 +164,7 @@ async function generateEmbeddings(
   const texts = chunks.map((c) => c.content);
   const embeddings = await provider.embed(texts);
 
-  db.exec("BEGIN");
-  try {
+  withTransaction(db, () => {
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i]!;
       const result = embeddings[i];
@@ -173,9 +175,5 @@ async function generateEmbeddings(
         ).run(chunk.id, pKey, blob, result.dimensions);
       }
     }
-    db.exec("COMMIT");
-  } catch (err) {
-    try { db.exec("ROLLBACK"); } catch { /* ignore rollback failure */ }
-    throw err;
-  }
+  });
 }

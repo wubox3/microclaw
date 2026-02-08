@@ -209,13 +209,12 @@ export async function runContainerAgent(
     const timeoutHandle = setTimeout(() => {
       timedOut = true;
       log.error(`Container timeout: ${containerName}`);
-      execFile("docker", ["stop", containerName], { timeout: 15000 }, (err) => {
+      execFile("docker", ["stop", "-t", "10", containerName], { timeout: 15000 }, (err) => {
         if (err) {
           log.warn(`Graceful stop failed for ${containerName}, force killing`);
-          container.kill("SIGKILL");
           execFile("docker", ["kill", containerName], { timeout: 10000 }, (killErr) => {
             if (killErr) {
-              log.error(`Docker kill also failed for ${containerName}: ${killErr.message}`);
+              log.error(`Force kill failed for ${containerName}: ${killErr.message}`);
             }
           });
         }
@@ -308,7 +307,17 @@ export async function runContainerAgent(
           jsonLine = lastLine;
         }
 
-        const output: ContainerOutput = JSON.parse(jsonLine);
+        const parsed = JSON.parse(jsonLine);
+        if (typeof parsed !== "object" || parsed === null) {
+          throw new Error("Container output is not an object");
+        }
+        const output: ContainerOutput = {
+          status: typeof parsed.status === "string" && (parsed.status === "success" || parsed.status === "error") 
+            ? parsed.status : "error",
+          result: typeof parsed.result === "string" ? parsed.result : null,
+          error: typeof parsed.error === "string" ? parsed.error : undefined,
+          newSessionId: typeof parsed.newSessionId === "string" ? parsed.newSessionId : undefined,
+        };
 
         log.info(
           `Container completed: ${output.status} (${duration}ms)`,

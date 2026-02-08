@@ -42,7 +42,7 @@ export type ResolvedBrowserProfile = {
   driver: "microclaw" | "extension";
 };
 
-function isLoopbackHost(host: string) {
+export function isLoopbackHost(host: string) {
   const h = host.trim().toLowerCase();
   return (
     h === "localhost" ||

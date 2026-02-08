@@ -234,7 +234,7 @@ describe("textToSpeech", () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain("Authentication failed");
+      expect(result.error).toContain("authentication failed");
       expect(result.error).not.toContain("sk-or-secret");
     } finally {
       if (originalKey) {

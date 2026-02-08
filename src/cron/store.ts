@@ -2,7 +2,7 @@ import JSON5 from "json5";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { CronStoreFile } from "./types.js";
+import type { CronJob, CronStoreFile } from "./types.js";
 import { resolveDataDir } from "../config/config.js";
 
 export function defaultCronDir(config?: import("../config/types.js").MicroClawConfig) {
@@ -24,6 +24,15 @@ export function resolveCronStorePath(storePath?: string, config?: import("../con
   return defaultCronStorePath(config);
 }
 
+export function isValidCronJob(raw: unknown): raw is CronJob {
+  if (raw === null || typeof raw !== "object") return false;
+  const r = raw as Record<string, unknown>;
+  return typeof r.id === "string"
+    && typeof r.name === "string"
+    && r.schedule !== null && typeof r.schedule === "object"
+    && r.payload !== null && typeof r.payload === "object";
+}
+
 export async function loadCronStore(storePath: string): Promise<CronStoreFile> {
   let raw: string;
   try {
@@ -39,7 +48,7 @@ export async function loadCronStore(storePath: string): Promise<CronStoreFile> {
     const jobs = Array.isArray(parsed?.jobs) ? (parsed?.jobs as never[]) : [];
     return {
       version: 1,
-      jobs: jobs.filter(Boolean) as never as CronStoreFile["jobs"],
+      jobs: jobs.filter(isValidCronJob),
     };
   } catch (parseErr) {
     // Log corruption warning (structured logging not available at this layer)
@@ -65,8 +74,11 @@ export async function saveCronStore(storePath: string, store: CronStoreFile) {
     const existing = await fs.promises.readFile(storePath, "utf-8");
     JSON.parse(existing);
     await fs.promises.copyFile(storePath, `${storePath}.bak`);
-  } catch {
-    // best-effort — file may not exist yet or be invalid
+  } catch (backupErr) {
+    const msg = backupErr instanceof Error ? backupErr.message : String(backupErr);
+    if (msg && !msg.includes("ENOENT")) {
+      process.stderr.write("[cron:store] Failed to create cron store backup: " + msg + "\n");
+    }
   }
   try {
     await fs.promises.rename(tmp, storePath);

@@ -4,11 +4,18 @@ import path from "node:path";
 import type { VoiceWakeConfig } from "./types.js";
 
 const DEFAULT_TRIGGERS = ["microclaw", "claude", "computer"];
+const MAX_TRIGGERS = 50;
 
 function sanitizeTriggers(triggers: string[] | undefined | null): string[] {
+  const seen = new Set<string>();
   const cleaned = (triggers ?? [])
     .map((w) => (typeof w === "string" ? w.trim().toLowerCase() : ""))
-    .filter((w) => w.length > 0);
+    .filter((w) => {
+      if (w.length === 0 || seen.has(w)) return false;
+      seen.add(w);
+      return true;
+    })
+    .slice(0, MAX_TRIGGERS);
   return cleaned.length > 0 ? cleaned : [...DEFAULT_TRIGGERS];
 }
 
@@ -34,19 +41,25 @@ async function writeJSONAtomic(filePath: string, value: unknown): Promise<void> 
   }
 }
 
-let lock: Promise<void> = Promise.resolve();
+const locks = new Map<string, Promise<void>>();
 
-async function withLock<T>(fn: () => Promise<T>): Promise<T> {
-  const prev = lock;
-  let release: (() => void) | undefined;
-  lock = new Promise<void>((resolve) => {
-    release = resolve;
+async function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const prev = locks.get(key) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((r) => {
+    release = r;
   });
-  await prev;
+  locks.set(key, current);
+
+  await prev.catch(() => {});
+
   try {
     return await fn();
   } finally {
-    release?.();
+    release();
+    if (locks.get(key) === current) {
+      locks.delete(key);
+    }
   }
 }
 
@@ -79,7 +92,7 @@ export async function setVoiceWakeTriggers(
 ): Promise<VoiceWakeConfig> {
   const sanitized = sanitizeTriggers(triggers);
   const filePath = resolvePath(dataDir);
-  return await withLock(async () => {
+  return await withLock(dataDir, async () => {
     const next: VoiceWakeConfig = {
       triggers: sanitized,
       updatedAtMs: Date.now(),

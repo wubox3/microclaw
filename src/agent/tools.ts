@@ -45,6 +45,9 @@ export function createMemorySearchTool(memoryManager: MemorySearchManager): Agen
   };
 }
 
+// Cache the dynamically imported module to avoid repeated import overhead
+let _channelModule: typeof import("../channels/registry.js") | undefined;
+
 export function createChannelListTool(): AgentTool {
   return {
     name: "list_channels",
@@ -55,8 +58,9 @@ export function createChannelListTool(): AgentTool {
     },
     execute: async () => {
       try {
-        // Import dynamically to avoid circular deps
-        const { listChatChannels } = await import("../channels/registry.js");
+        // Import dynamically to avoid circular deps (cached after first load)
+        _channelModule ??= await import("../channels/registry.js");
+        const { listChatChannels } = _channelModule;
         const channels = listChatChannels();
         const formatted = channels.map((ch) =>
           `- ${ch.label}: ${ch.blurb ?? "Available"}`

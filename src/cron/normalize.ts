@@ -1,4 +1,9 @@
 import type { CronJobCreate, CronJobPatch } from "./types.js";
+import {
+  hasLegacyDeliveryHints,
+  buildDeliveryFromLegacyPayload,
+  stripLegacyDeliveryFields,
+} from "./legacy-compat.js";
 import { parseAbsoluteTimeMs } from "./parse.js";
 import { migrateLegacyCronPayload } from "./payload-migration.js";
 
@@ -96,46 +101,6 @@ function coerceDelivery(delivery: UnknownRecord) {
   return next;
 }
 
-function hasLegacyDeliveryHints(payload: UnknownRecord) {
-  if (typeof payload.deliver === "boolean") {
-    return true;
-  }
-  if (typeof payload.bestEffortDeliver === "boolean") {
-    return true;
-  }
-  if (typeof payload.to === "string" && payload.to.trim()) {
-    return true;
-  }
-  return false;
-}
-
-function buildDeliveryFromLegacyPayload(payload: UnknownRecord): UnknownRecord {
-  const deliver = payload.deliver;
-  const mode = deliver === false ? "none" : "announce";
-  const channelRaw =
-    typeof payload.channel === "string" ? payload.channel.trim().toLowerCase() : "";
-  const toRaw = typeof payload.to === "string" ? payload.to.trim() : "";
-  const next: UnknownRecord = { mode };
-  if (channelRaw) {
-    next.channel = channelRaw;
-  }
-  if (toRaw) {
-    next.to = toRaw;
-  }
-  if (typeof payload.bestEffortDeliver === "boolean") {
-    next.bestEffort = payload.bestEffortDeliver;
-  }
-  return next;
-}
-
-function stripLegacyDeliveryFields(payload: UnknownRecord): UnknownRecord {
-  const copy = { ...payload };
-  delete copy.deliver;
-  delete copy.channel;
-  delete copy.to;
-  delete copy.bestEffortDeliver;
-  return copy;
-}
 
 function unwrapJob(raw: UnknownRecord) {
   if (isRecord(raw.data)) {
@@ -191,7 +156,9 @@ export function normalizeCronJobInput(
   }
 
   if (isRecord(base.payload)) {
-    next.payload = coercePayload(base.payload);
+    const coerced = coercePayload(base.payload);
+    const { allowUnsafeExternalContent: _unsafe, ...safePayload } = coerced;
+    next.payload = safePayload;
   }
 
   if (isRecord(base.delivery)) {

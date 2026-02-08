@@ -8,7 +8,8 @@ export function requireEnv(key: string): string {
 
 export function optionalEnv(key: string, fallback?: string): string | undefined {
   const val = process.env[key];
-  return val && val.trim() ? val.trim() : fallback;
+  const trimmed = val?.trim();
+  return trimmed ? trimmed : fallback;
 }
 
 export function isDev(): boolean {

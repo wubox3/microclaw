@@ -54,7 +54,10 @@ function isDockerAvailable(): boolean {
   }
 }
 
+const cleanupFns: (() => Promise<void> | void)[] = [];
+
 async function main(): Promise<void> {
+
   // 1. Load environment
   loadDotenv();
 
@@ -95,6 +98,7 @@ async function main(): Promise<void> {
   if (config.memory?.enabled !== false) {
     try {
       memoryManager = createMemoryManager({ config, dataDir, auth });
+      cleanupFns.push(() => memoryManager?.close());
       log.info("Memory system initialized");
     } catch (err) {
       log.warn(`Memory system failed to initialize: ${formatError(err)}`);
@@ -139,12 +143,16 @@ async function main(): Promise<void> {
       });
       if (browserState) {
         additionalTools.push(createBrowserTool());
+        cleanupFns.push(() => stopBrowserServer());
         log.info(`Browser control on http://127.0.0.1:${browserState.port}/`);
       }
     } catch (err) {
       log.warn(`Browser server failed to start: ${formatError(err)}`);
     }
   }
+
+  const frozenConfig = structuredClone(config);
+  Object.freeze(frozenConfig);
 
   for (const reg of skillRegistry.tools) {
     if ("factory" in reg.tool && (reg.tool as SkillToolFactory).factory) {
@@ -164,7 +172,7 @@ async function main(): Promise<void> {
         sessionKey: "",
         channelId: runtimeCtx?.channelId ?? "web",
         chatId: "",
-        config: structuredClone(config),
+        config: frozenConfig,
       }),
     });
   }
@@ -267,6 +275,7 @@ async function main(): Promise<void> {
 
   try {
     await cronService.start();
+    cleanupFns.push(() => cronService.stop());
     log.info(`Cron scheduler ${cronEnabled ? "started" : "disabled"}`);
   } catch (err) {
     log.error(`Cron scheduler failed to start: ${formatError(err)}`);
@@ -282,6 +291,8 @@ async function main(): Promise<void> {
   // Track recently sent outbound texts to avoid re-processing agent replies as new messages
   const recentOutboundTexts = new Map<string, Set<string>>();
   const OUTBOUND_ECHO_TTL_MS = 30_000;
+  // Queue for gateway messages received while a chat is still processing
+  const pendingGatewayMessages = new Map<string, Array<GatewayInboundMessage>>();
 
   for (const reg of skillRegistry.channels) {
     const plugin = reg.plugin as ChannelPlugin;
@@ -298,7 +309,7 @@ async function main(): Promise<void> {
 
     const accountId = config.channels?.[channelId as keyof typeof config.channels]?.accountId ?? "default";
 
-    const onMessage = async (msg: GatewayInboundMessage): Promise<void> => {
+    const handleGatewayMessage = async (msg: GatewayInboundMessage): Promise<void> => {
       const chatKey = `${channelId}:${msg.chatId}`;
       const isFromSelf = msg.from === "me";
 
@@ -333,9 +344,14 @@ async function main(): Promise<void> {
         }
       }
 
-      // Per-chat concurrency guard
+      // Per-chat concurrency guard with message queueing
       if (processingGatewayChats.has(chatKey)) {
-        log.warn(`Dropping message for ${chatKey}: still processing previous`);
+        const queue = pendingGatewayMessages.get(chatKey) ?? [];
+        if (queue.length < 5) { // cap queue to prevent unbounded growth
+          pendingGatewayMessages.set(chatKey, [...queue, msg]);
+        } else {
+          log.warn(`Dropping message for ${chatKey}: queue full`);
+        }
         return;
       }
       processingGatewayChats.add(chatKey);
@@ -366,6 +382,14 @@ async function main(): Promise<void> {
         // Send reply via outbound adapter
         if (response.text && plugin.outbound?.sendText) {
           // Track outbound text so we can filter the echo when it comes back via poll
+          const MAX_ECHO_ENTRIES = 500;
+          if (recentOutboundTexts.size > MAX_ECHO_ENTRIES) {
+            // Clear oldest entries
+            const keys = [...recentOutboundTexts.keys()];
+            for (let i = 0; i < keys.length - MAX_ECHO_ENTRIES; i++) {
+              recentOutboundTexts.delete(keys[i]);
+            }
+          }
           const echoSet = recentOutboundTexts.get(msg.chatId) ?? new Set<string>();
           echoSet.add(response.text);
           recentOutboundTexts.set(msg.chatId, echoSet);
@@ -409,8 +433,22 @@ async function main(): Promise<void> {
         log.error(`Gateway message handling failed for ${chatKey}: ${formatError(err)}`);
       } finally {
         processingGatewayChats.delete(chatKey);
+        const queued = pendingGatewayMessages.get(chatKey);
+        if (queued && queued.length > 0) {
+          const [next, ...rest] = queued;
+          if (rest.length === 0) {
+            pendingGatewayMessages.delete(chatKey);
+          } else {
+            pendingGatewayMessages.set(chatKey, rest);
+          }
+          setImmediate(() => { handleGatewayMessage(next).catch((err) => {
+            log.error(`Queued gateway message failed for ${chatKey}: ${formatError(err)}`);
+          }); });
+        }
       }
     };
+
+    const onMessage = (msg: GatewayInboundMessage): Promise<void> => handleGatewayMessage(msg);
 
     try {
       await plugin.gateway.startAccount({
@@ -428,6 +466,7 @@ async function main(): Promise<void> {
 
   // 10. Start IPC watcher if container mode active
   if (containerEnabled) {
+    cleanupFns.push(() => { stopIpcWatcher(); removeFilteredEnvFile(); });
     startIpcWatcher({
       onMessage: (channelId, _chatId, text) => {
         // Deliver IPC messages to WebSocket clients
@@ -479,11 +518,21 @@ async function main(): Promise<void> {
     shuttingDown = true;
     log.info("Shutting down...");
 
-    // Force exit after 5 seconds if graceful close hangs
+    // Force exit after 15 seconds if graceful close hangs (allows SQLite WAL checkpoint)
     setTimeout(() => {
       log.warn("Forced shutdown after timeout");
       process.exit(1);
-    }, 5000).unref();
+    }, 15000).unref();
+
+    // Close memory manager first to ensure SQLite WAL checkpoint completes
+    if (memoryManager) {
+      try {
+        await memoryManager.close();
+        log.info("Memory database closed");
+      } catch (err) {
+        log.error(`Failed to close memory database: ${formatError(err)}`);
+      }
+    }
 
     // Stop channel gateways (await all in parallel)
     await Promise.allSettled(
@@ -512,14 +561,6 @@ async function main(): Promise<void> {
     if (containerEnabled) {
       stopIpcWatcher();
       removeFilteredEnvFile();
-    }
-    if (memoryManager) {
-      try {
-        await memoryManager.close();
-        log.info("Memory database closed");
-      } catch (err) {
-        log.error(`Failed to close memory database: ${formatError(err)}`);
-      }
     }
     // Close WebSocket server and terminate all client connections
     wss.clients.forEach((client) => {
@@ -607,7 +648,11 @@ async function main(): Promise<void> {
 
     // Prevent concurrent message processing per client
     if (processingClients.has(clientId)) {
-      safeSend(client.ws, { type: "error", message: "Please wait for the current response" });
+      safeSend(client.ws, { 
+        type: "error", 
+        message: "Still processing your previous message. Please wait.",
+        retryable: true 
+      });
       return;
     }
     processingClients.add(clientId);
@@ -762,7 +807,10 @@ process.on("uncaughtException", (err) => {
   process.exit(1);
 });
 
-main().catch((err) => {
-  log.error(`Failed to start: ${formatError(err)}`);
+main().catch(async (err) => {
+  log.error(`Fatal error: ${formatError(err)}`);
+  for (const cleanup of cleanupFns.reverse()) {
+    try { await cleanup(); } catch { /* best-effort */ }
+  }
   process.exit(1);
 });

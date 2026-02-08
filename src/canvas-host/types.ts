@@ -47,16 +47,16 @@ export type CanvasStateRef = {
 };
 
 export function createCanvasState(): CanvasStateRef {
-  let state: CanvasState = {
+  let state: CanvasState = Object.freeze({
     visible: false,
     surfaces: new Map(),
     lastHtml: null,
-  };
+  });
 
   return {
     get: () => state,
     update: (fn) => {
-      state = fn(state);
+      state = Object.freeze(fn(state));
       return state;
     },
   };

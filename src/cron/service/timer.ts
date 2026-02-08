@@ -73,6 +73,7 @@ export async function runDueJobs(state: CronServiceState) {
   });
   for (const job of due) {
     await executeJob(state, job, now, { forced: false });
+    await persist(state);
   }
 }
 
@@ -88,8 +89,11 @@ export async function executeJob(
   emit(state, { jobId: job.id, action: "started", runAtMs: startedAt });
 
   let deleted = false;
+  let finished = false;
 
   const finish = async (status: "ok" | "error" | "skipped", err?: string, summary?: string) => {
+    if (finished) return;
+    finished = true;
     const endedAt = state.deps.nowMs();
     job.state.runningAtMs = undefined;
     job.state.lastRunAtMs = startedAt;

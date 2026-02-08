@@ -122,30 +122,26 @@ async function canOpenWebSocket(wsUrl: string, timeoutMs = 800): Promise<boolean
       handshakeTimeout: timeoutMs,
       ...(Object.keys(headers).length ? { headers } : {}),
     });
-    const timer = setTimeout(
-      () => {
-        try {
-          ws.terminate();
-        } catch {
-          // ignore
-        }
-        resolve(false);
-      },
-      Math.max(50, timeoutMs + 25),
-    );
-    ws.once("open", () => {
+    let done = false;
+    const finish = (result: boolean) => {
+      if (done) {
+        return;
+      }
+      done = true;
       clearTimeout(timer);
       try {
-        ws.close();
+        ws.terminate();
       } catch {
         // ignore
       }
-      resolve(true);
-    });
-    ws.once("error", () => {
-      clearTimeout(timer);
-      resolve(false);
-    });
+      resolve(result);
+    };
+    const timer = setTimeout(
+      () => finish(false),
+      Math.max(50, timeoutMs + 25),
+    );
+    ws.once("open", () => finish(true));
+    ws.once("error", () => finish(false));
   });
 }
 

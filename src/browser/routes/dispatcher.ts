@@ -72,17 +72,20 @@ export function createBrowserRouteDispatcher(ctx: BrowserRouteContext) {
       const query = req.query ?? {};
       const body = req.body;
 
+      // Strip query string before matching routes
+      const pathOnly = path.split("?")[0];
+
       const match = registry.routes.find((route) => {
         if (route.method !== method) {
           return false;
         }
-        return route.regex.test(path);
+        return route.regex.test(pathOnly);
       });
       if (!match) {
         return { status: 404, body: { error: "Not Found" } };
       }
 
-      const exec = match.regex.exec(path);
+      const exec = match.regex.exec(pathOnly);
       const params: Record<string, string> = {};
       if (exec) {
         for (const [idx, name] of match.paramNames.entries()) {

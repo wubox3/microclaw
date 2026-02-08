@@ -1,17 +1,7 @@
 import type { BrowserActionOk, BrowserActionTargetOk } from "./client-actions-types.js";
-import { fetchBrowserJson } from "./client-fetch.js";
+import { buildProfileQuery, withBaseUrl, fetchBrowserJson } from "./client-utils.js";
 
-function buildProfileQuery(profile?: string): string {
-  return profile ? `?profile=${encodeURIComponent(profile)}` : "";
-}
-
-function withBaseUrl(baseUrl: string | undefined, path: string): string {
-  const trimmed = baseUrl?.trim();
-  if (!trimmed) {
-    return path;
-  }
-  return `${trimmed.replace(/\/$/, "")}${path}`;
-}
+// buildProfileQuery and withBaseUrl imported from client-utils.ts
 
 export async function browserCookies(
   baseUrl: string | undefined,

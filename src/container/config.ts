@@ -4,10 +4,10 @@ import os from "os";
 const PROJECT_ROOT = process.cwd();
 const HOME_DIR = process.env.HOME || os.homedir();
 
-function parseIntSafe(value: string | undefined, fallback: number): number {
+function parseIntSafe(value: string | undefined, fallback: number, min = 1): number {
   if (!value) return fallback;
   const parsed = parseInt(value, 10);
-  return Number.isNaN(parsed) ? fallback : parsed;
+  return Number.isNaN(parsed) || parsed < min ? fallback : parsed;
 }
 
 export const CONTAINER_IMAGE =

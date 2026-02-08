@@ -10,10 +10,10 @@ const DEFAULT_MODEL = "voyage-3";
 const DEFAULT_DIMENSIONS = 1024;
 
 export function createAnthropicEmbeddingProvider(apiKey: string): EmbeddingProvider {
-  let actualDimensions = DEFAULT_DIMENSIONS;
+  let actualDimensions: number | null = null;
   return {
     model: DEFAULT_MODEL,
-    get dimensions() { return actualDimensions; },
+    get dimensions() { return actualDimensions ?? DEFAULT_DIMENSIONS; },
     embed: async (texts: string[]): Promise<EmbeddingResult[]> => {
       // Voyage models are accessed via Anthropic's API
       // Using the messages API to generate embeddings via tool use
@@ -50,7 +50,9 @@ export function createAnthropicEmbeddingProvider(apiKey: string): EmbeddingProvi
         model: data.model,
         dimensions: item.embedding.length,
       }));
-      actualDimensions = results[0]?.embedding.length ?? actualDimensions;
+      if (actualDimensions === null && results[0]?.embedding.length) {
+        actualDimensions = results[0].embedding.length;
+      }
       return results;
     },
   };

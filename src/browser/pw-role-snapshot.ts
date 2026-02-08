@@ -134,15 +134,19 @@ function createRoleNameTracker(): RoleNameTracker {
   };
 }
 
-function removeNthFromNonDuplicates(refs: RoleRefMap, tracker: RoleNameTracker) {
+function removeNthFromNonDuplicates(refs: RoleRefMap, tracker: RoleNameTracker): RoleRefMap {
   const duplicates = tracker.getDuplicateKeys();
+  const result: RoleRefMap = {};
   for (const [ref, data] of Object.entries(refs)) {
     const key = tracker.getKey(data.role, data.name);
     if (!duplicates.has(key)) {
       const { nth: _removed, ...rest } = data;
-      refs[ref] = rest;
+      result[ref] = rest;
+    } else {
+      result[ref] = data;
     }
   }
+  return result;
 }
 
 function compactTree(tree: string) {
@@ -314,11 +318,11 @@ export function buildRoleSnapshotFromAriaSnapshot(
       result.push(enhanced);
     }
 
-    removeNthFromNonDuplicates(refs, tracker);
+    const cleanedRefs = removeNthFromNonDuplicates(refs, tracker);
 
     return {
       snapshot: result.join("\n") || "(no interactive elements)",
-      refs,
+      refs: cleanedRefs,
     };
   }
 
@@ -330,12 +334,12 @@ export function buildRoleSnapshotFromAriaSnapshot(
     }
   }
 
-  removeNthFromNonDuplicates(refs, tracker);
+  const cleanedRefs = removeNthFromNonDuplicates(refs, tracker);
 
   const tree = result.join("\n") || "(empty)";
   return {
     snapshot: options.compact ? compactTree(tree) : tree,
-    refs,
+    refs: cleanedRefs,
   };
 }
 

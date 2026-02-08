@@ -183,15 +183,17 @@ export function createAnthropicClient(options: AnthropicClientOptions): LlmClien
           }
         }
       } catch (error) {
-        // Ensure stream consumers receive message_stop even on error
-        yield { type: "message_stop" };
+        // Abort the stream first to release resources
         try {
           stream.abort();
         } catch {
           // abort may not be available or may fail - ignore
         }
+        // Yield message_stop as the final event so consumers can clean up.
+        // Do not throw after yielding since consumers treat message_stop as final.
+        yield { type: "message_stop" };
         const detail = error instanceof Error ? error.message : String(error);
-        throw new Error(`Anthropic stream failed: ${detail}`);
+        log.warn("Anthropic stream error: " + detail);
       }
     },
   };

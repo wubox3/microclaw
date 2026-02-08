@@ -1,20 +1,13 @@
-type DeliveryPayload = {
-  text?: string;
-};
+import { truncateText } from "../text-utils.js";
 
-function truncateText(input: string, maxLen: number): string {
-  if (input.length <= maxLen) {
-    return input;
-  }
-  return `${input.slice(0, Math.max(0, maxLen - 1)).trimEnd()}\u2026`;
-}
+const MAX_SUMMARY_CHARS = 2000;
 
 export function pickSummaryFromOutput(text: string | undefined) {
   const clean = (text ?? "").trim();
   if (!clean) {
     return undefined;
   }
-  const limit = 2000;
+  const limit = MAX_SUMMARY_CHARS;
   return clean.length > limit ? truncateText(clean, limit) : clean;
 }
 

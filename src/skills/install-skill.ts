@@ -4,7 +4,7 @@ import path, { resolve, basename } from "node:path";
 import { readSkillManifest, validateManifest } from "./manifest.js";
 
 export const VALID_DIR_NAME = /^(?!\.)(?!\.\.$)[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
-export const VALID_GIT_URL = /^(https?:\/\/[^\s]+|git@[^\s:]+:[^\s]+|git:\/\/[^\s]+)$/;
+export const VALID_GIT_URL = /^(https?:\/\/[^\s"'`]+$|git@[^\s:"'`]+:[^\s"'`]+$|git:\/\/[^\s"'`]+$)$/;
 
 export function parseArgs(argv: readonly string[]): { url: string; name: string | null } {
   const args = argv.slice(2);
@@ -30,6 +30,10 @@ export function parseArgs(argv: readonly string[]): { url: string; name: string 
     throw new Error("Error: invalid git URL — must be https://, git://, or git@ format");
   }
 
+  if (name !== null && name.startsWith("--")) {
+    throw new Error("Error: --name value must not start with --");
+  }
+
   if (name !== null && name.length === 0) {
     throw new Error("Error: --name must not be empty");
   }
@@ -48,7 +52,7 @@ export function deriveNameFromUrl(url: string): string {
 
 export function isWithinDir(parent: string, child: string): boolean {
   const rel = path.relative(path.resolve(parent), path.resolve(child));
-  return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
+  return !rel.startsWith("..") && !path.isAbsolute(rel);
 }
 
 export function cloneRepo(url: string, targetDir: string): void {
@@ -68,7 +72,7 @@ export function rollback(skillsRoot: string, targetDir: string): void {
   }
 }
 
-function run(): void {
+async function run(): Promise<void> {
   const { url, name } = parseArgs(process.argv);
   const dirName = name ?? deriveNameFromUrl(url);
 
@@ -86,7 +90,7 @@ function run(): void {
   }
 
   if (existsSync(targetDir)) {
-    console.error(`Error: skill directory already exists: ${targetDir}`);
+    console.error(`Error: skill directory already exists: ${targetDir.replace(process.cwd() + "/", "")}`);
     process.exit(1);
   }
 
@@ -98,7 +102,7 @@ function run(): void {
     process.exit(1);
   }
 
-  const manifest = readSkillManifest(targetDir);
+  const manifest = await readSkillManifest(targetDir);
   if (!manifest) {
     console.error("Error: no valid microclaw.skill.json found in repository");
     rollback(skillsRoot, targetDir);
@@ -134,7 +138,7 @@ function run(): void {
 }
 
 // Only run when executed directly, not when imported by tests
-const isDirectExecution = process.argv[1]?.endsWith("install-skill.ts") ?? false;
+const isDirectExecution = (process.argv[1]?.endsWith("install-skill.ts") || process.argv[1]?.endsWith("install-skill.js")) ?? false;
 if (isDirectExecution) {
   run();
 }

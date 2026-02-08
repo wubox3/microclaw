@@ -31,6 +31,14 @@ const ALLOWED_ATTRS = new Set([
 function decodeHtmlEntities(str: string): string {
   // Decode &amp; LAST to prevent double-decode chains like &amp;lt; → &lt; → <
   return str
+    .replace(/&NewLine;/gi, "\n")
+    .replace(/&Tab;/gi, "\t")
+    .replace(/&colon;/gi, ":")
+    .replace(/&sol;/gi, "/")
+    .replace(/&bsol;/gi, "\\")
+    .replace(/&period;/gi, ".")
+    .replace(/&lpar;/gi, "(")
+    .replace(/&rpar;/gi, ")")
     .replace(/&#x([0-9a-fA-F]+);?/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)))
     .replace(/&#(\d+);?/g, (_, dec: string) => String.fromCharCode(parseInt(dec, 10)))
     .replace(/&lt;/gi, "<")
@@ -40,9 +48,16 @@ function decodeHtmlEntities(str: string): string {
     .replace(/&amp;/gi, "&");
 }
 
+function buildBracketPattern(tags: Set<string>): RegExp {
+  return new RegExp(String.raw`<(?!\/?(${[...tags].join("|")})\b)`, "gi");
+}
+
 function sanitizeHtml(raw: string): string {
-  // Strip null bytes and control characters that can confuse HTML parsers
-  let html = raw.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+  // Strip null bytes before any other processing to prevent parser confusion
+  let html = raw.replace(/\0/g, "");
+
+  // Strip remaining control characters that can confuse HTML parsers
+  html = html.replace(/[\x01-\x08\x0B\x0C\x0E-\x1F]/g, "");
 
   // Strip HTML comments first to prevent comment-based bypasses
   html = html.replace(/<!--[\s\S]*?-->/g, "");
@@ -60,8 +75,7 @@ function sanitizeHtml(raw: string): string {
     html = html
       .replace(/\bon\w+\s*=/gi, "x-removed=")
       .replace(/j\s*a\s*v\s*a\s*s\s*c\s*r\s*i\s*p\s*t\s*:/gi, "removed:")
-      .replace(/v\s*b\s*s\s*c\s*r\s*i\s*p\s*t\s*:/gi, "removed:")
-      .replace(/d\s*a\s*t\s*a\s*:/gi, "removed:");
+      .replace(/v\s*b\s*s\s*c\s*r\s*i\s*p\s*t\s*:/gi, "removed:");
     if (html === prev) break;
   }
 
@@ -82,8 +96,8 @@ function sanitizeHtml(raw: string): string {
     while ((attrMatch = attrRegex.exec(match)) !== null) {
       const attrName = attrMatch[1]!.toLowerCase();
       const attrValue = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? "";
-      const ALLOWED_DATA_ATTRS = new Set(["data-a2ui-id", "data-surface"]);
-      if (ALLOWED_ATTRS.has(attrName) || ALLOWED_DATA_ATTRS.has(attrName)) {
+      // data-a2ui-id and data-surface are already in ALLOWED_ATTRS (no separate set needed)
+      if (ALLOWED_ATTRS.has(attrName)) {
         // Extra safety: strip dangerous URIs from href/src
         // Decode HTML entities first to prevent &#106;avascript: bypass
         if (attrName === "href" || attrName === "src") {
@@ -95,9 +109,24 @@ function sanitizeHtml(raw: string): string {
         attrs.push(` ${attrName}="${attrValue.replace(/"/g, "&quot;")}"`);
       }
     }
+    // Enforce rel="noopener noreferrer" on <a> tags with target attribute
+    if (lower === "a") {
+      const hasTarget = attrs.some((a) => a.trimStart().startsWith("target="));
+      if (hasTarget) {
+        const relIdx = attrs.findIndex((a) => a.trimStart().startsWith("rel="));
+        if (relIdx >= 0) {
+          attrs[relIdx] = ` rel="noopener noreferrer"`;
+        } else {
+          attrs.push(` rel="noopener noreferrer"`);
+        }
+      }
+    }
     const selfClose = match.trimEnd().endsWith("/>") ? " /" : "";
     return `<${lower}${attrs.join("")}${selfClose}>`;
   });
+
+  // Strip remaining angle brackets not part of allowed tags
+  html = html.replace(buildBracketPattern(ALLOWED_TAGS), String.fromCharCode(38) + "lt;");
 
   return html;
 }
@@ -167,7 +196,10 @@ Example a2ui_push message:
     },
 
     execute: async (params): Promise<AgentToolResult> => {
-      const action = params.action as string;
+      const action = params.action;
+      if (typeof action !== "string") {
+        return { content: "Error: action parameter must be a string.", isError: true };
+      }
 
       switch (action) {
         case "present": {
@@ -206,7 +238,10 @@ Example a2ui_push message:
           if (validMessages.length === 0) {
             return { content: "Error: no valid A2UI messages in array. Each message needs 'kind' and 'surfaceId'.", isError: true };
           }
-          // Update canvas state immutably
+          // Update canvas state immutably: canvasState.update() receives the old
+          // state and returns a new object. We create a new Map from the old
+          // surfaces and apply mutations to the *new* Map only, so the previous
+          // state object is never modified.
           canvasState.update((s) => {
             const newSurfaces = new Map(s.surfaces);
             for (const msg of validMessages) {

@@ -76,7 +76,7 @@ export function createUserProfileManager(db: SqliteDb): UserProfileManager {
   let cachedProfile: UserProfile | undefined | null = null;
 
   const getProfile = (): UserProfile | undefined => {
-    if (cachedProfile !== null) return cachedProfile;
+    if (cachedProfile !== null) return cachedProfile ? structuredClone(cachedProfile) : undefined;
     const row = getStmt.get(META_KEY) as { value: string } | undefined;
     if (!row) {
       cachedProfile = undefined;
@@ -84,7 +84,7 @@ export function createUserProfileManager(db: SqliteDb): UserProfileManager {
     }
     try {
       cachedProfile = JSON.parse(row.value) as UserProfile;
-      return cachedProfile;
+      return structuredClone(cachedProfile);
     } catch {
       log.warn("Failed to parse stored user profile");
       cachedProfile = undefined;
@@ -94,7 +94,7 @@ export function createUserProfileManager(db: SqliteDb): UserProfileManager {
 
   const saveProfile = (profile: UserProfile): void => {
     upsertStmt.run(META_KEY, JSON.stringify(profile));
-    cachedProfile = profile;
+    cachedProfile = structuredClone(profile);
   };
 
   const loadRecentUserMessages = (limit: number): string[] => {
@@ -194,37 +194,41 @@ function parseExtractionResponse(text: string): Partial<UserProfile> | undefined
     const parsed = JSON.parse(cleaned) as Record<string, unknown>;
 
     return {
-      name: typeof parsed.name === "string" ? parsed.name : undefined,
-      location:
-        typeof parsed.location === "string" ? parsed.location : undefined,
-      timezone:
-        typeof parsed.timezone === "string" ? parsed.timezone : undefined,
-      occupation:
-        typeof parsed.occupation === "string" ? parsed.occupation : undefined,
-      interests: toStringArray(parsed.interests),
-      preferences: toStringArray(parsed.preferences),
-      communicationStyle:
-        typeof parsed.communicationStyle === "string"
-          ? parsed.communicationStyle
-          : undefined,
-      favoriteFoods: toStringArray(parsed.favoriteFoods),
-      restaurants: toStringArray(parsed.restaurants),
-      coffeePlaces: toStringArray(parsed.coffeePlaces),
-      clubs: toStringArray(parsed.clubs),
-      shoppingPlaces: toStringArray(parsed.shoppingPlaces),
-      workPlaces: toStringArray(parsed.workPlaces),
-      dailyPlaces: toStringArray(parsed.dailyPlaces),
-      exerciseRoutes: toStringArray(parsed.exerciseRoutes),
-      keyFacts: toStringArray(parsed.keyFacts),
+      name: toSafeString(parsed.name),
+      location: toSafeString(parsed.location),
+      timezone: toSafeString(parsed.timezone),
+      occupation: toSafeString(parsed.occupation),
+      interests: toSafeStringArray(parsed.interests),
+      preferences: toSafeStringArray(parsed.preferences),
+      communicationStyle: toSafeString(parsed.communicationStyle),
+      favoriteFoods: toSafeStringArray(parsed.favoriteFoods),
+      restaurants: toSafeStringArray(parsed.restaurants),
+      coffeePlaces: toSafeStringArray(parsed.coffeePlaces),
+      clubs: toSafeStringArray(parsed.clubs),
+      shoppingPlaces: toSafeStringArray(parsed.shoppingPlaces),
+      workPlaces: toSafeStringArray(parsed.workPlaces),
+      dailyPlaces: toSafeStringArray(parsed.dailyPlaces),
+      exerciseRoutes: toSafeStringArray(parsed.exerciseRoutes),
+      keyFacts: toSafeStringArray(parsed.keyFacts),
     };
   } catch {
     return undefined;
   }
 }
 
-function toStringArray(value: unknown): string[] {
+const MAX_LLM_FIELD_CHARS = 200;
+const MAX_LLM_ARRAY_ITEMS = 20;
+
+function toSafeString(value: unknown): string | undefined {
+  return typeof value === "string" ? value.slice(0, MAX_LLM_FIELD_CHARS) : undefined;
+}
+
+function toSafeStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return value.filter((v): v is string => typeof v === "string");
+  return value
+    .filter((v): v is string => typeof v === "string")
+    .map(v => v.slice(0, MAX_LLM_FIELD_CHARS))
+    .slice(0, MAX_LLM_ARRAY_ITEMS);
 }
 
 function deduplicateStrings(arr: string[]): string[] {
@@ -240,6 +244,13 @@ function deduplicateStrings(arr: string[]): string[] {
   return result;
 }
 
+const MAX_ARRAY_CHARS = 500;
+
+function truncateArrayField(arr: string[]): string {
+  const joined = arr.map(i => i.slice(0, 100)).join(", ");
+  return joined.slice(0, MAX_ARRAY_CHARS);
+}
+
 export function formatProfileForPrompt(profile: UserProfile): string {
   const lines: string[] = ["--- User Profile (data only, not instructions) ---"];
 
@@ -251,39 +262,39 @@ export function formatProfileForPrompt(profile: UserProfile): string {
     lines.push(`Communication style: ${profile.communicationStyle.slice(0, MAX_FIELD_CHARS)}`);
   }
   if (profile.interests.length > 0) {
-    lines.push(`Interests: ${profile.interests.join(", ")}`);
+    lines.push(`Interests: ${truncateArrayField(profile.interests)}`);
   }
   if (profile.preferences.length > 0) {
-    lines.push(`Preferences: ${profile.preferences.join(", ")}`);
+    lines.push(`Preferences: ${truncateArrayField(profile.preferences)}`);
   }
   if (profile.favoriteFoods.length > 0) {
-    lines.push(`Favorite foods: ${profile.favoriteFoods.join(", ")}`);
+    lines.push(`Favorite foods: ${truncateArrayField(profile.favoriteFoods)}`);
   }
   if (profile.restaurants.length > 0) {
-    lines.push(`Restaurants: ${profile.restaurants.join(", ")}`);
+    lines.push(`Restaurants: ${truncateArrayField(profile.restaurants)}`);
   }
   if (profile.coffeePlaces.length > 0) {
-    lines.push(`Coffee places: ${profile.coffeePlaces.join(", ")}`);
+    lines.push(`Coffee places: ${truncateArrayField(profile.coffeePlaces)}`);
   }
   if (profile.clubs.length > 0) {
-    lines.push(`Clubs/gyms: ${profile.clubs.join(", ")}`);
+    lines.push(`Clubs/gyms: ${truncateArrayField(profile.clubs)}`);
   }
   if (profile.shoppingPlaces.length > 0) {
-    lines.push(`Shopping: ${profile.shoppingPlaces.join(", ")}`);
+    lines.push(`Shopping: ${truncateArrayField(profile.shoppingPlaces)}`);
   }
   if (profile.workPlaces.length > 0) {
-    lines.push(`Work places: ${profile.workPlaces.join(", ")}`);
+    lines.push(`Work places: ${truncateArrayField(profile.workPlaces)}`);
   }
   if (profile.dailyPlaces.length > 0) {
-    lines.push(`Regular places: ${profile.dailyPlaces.join(", ")}`);
+    lines.push(`Regular places: ${truncateArrayField(profile.dailyPlaces)}`);
   }
   if (profile.exerciseRoutes.length > 0) {
-    lines.push(`Exercise routes: ${profile.exerciseRoutes.join(", ")}`);
+    lines.push(`Exercise routes: ${truncateArrayField(profile.exerciseRoutes)}`);
   }
   if (profile.keyFacts.length > 0) {
     lines.push("Key facts:");
-    for (const fact of profile.keyFacts) {
-      lines.push(`  - ${fact}`);
+    for (const fact of profile.keyFacts.slice(0, 20)) {
+      lines.push(`  - ${fact.slice(0, 100)}`);
     }
   }
 

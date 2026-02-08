@@ -49,12 +49,22 @@ export function createMemoryManager(params: {
   );
   let closed = false;
 
+  // Operation counter to prevent close() from destroying db while ops are in-flight
+  let activeOps = 0;
+  let activeOpsResolve: (() => void) | null = null;
+
+  function trackAsyncOp<T>(fn: () => Promise<T>): Promise<T> {
+    if (closed) { throw new Error("Memory manager is closed"); }
+    activeOps++;
+    return fn().finally(() => {
+      activeOps--;
+      if (activeOps === 0 && activeOpsResolve) activeOpsResolve();
+    });
+  }
+
   return {
     search: async (searchParams: MemorySearchParams): Promise<MemorySearchResult[]> => {
-      if (closed) {
-        throw new Error("Memory manager is closed");
-      }
-
+      return trackAsyncOp(async () => {
       if (!searchParams.query || searchParams.query.trim() === "") {
         return [];
       }
@@ -92,6 +102,7 @@ export function createMemoryManager(params: {
         keywordWeight: embeddingProvider ? keywordWeight : 1,
         limit,
       });
+      });
     },
 
     getRecordCounts: async (): Promise<MemoryRecordCounts> => {
@@ -110,9 +121,7 @@ export function createMemoryManager(params: {
     }),
 
     syncFiles: async (dir: string) => {
-      if (closed) {
-        throw new Error("Memory manager is closed");
-      }
+      return trackAsyncOp(async () => {
       // Validate path to prevent directory traversal (handles case-insensitive filesystems)
       let resolved: string;
       let dataRoot: string;
@@ -128,16 +137,15 @@ export function createMemoryManager(params: {
         throw new Error("syncFiles directory must be within the configured data directory");
       }
       return syncMemoryFiles(db, resolved);
+      });
     },
 
     saveExchange: async (params) => {
-      if (closed) { throw new Error("Memory manager is closed"); }
-      return chatPersistence.saveExchange(params);
+      return trackAsyncOp(async () => chatPersistence.saveExchange(params));
     },
 
     loadChatHistory: async (params) => {
-      if (closed) { throw new Error("Memory manager is closed"); }
-      return chatPersistence.loadHistory(params);
+      return trackAsyncOp(async () => chatPersistence.loadHistory(params));
     },
 
     getUserProfile: (): UserProfile | undefined => {
@@ -146,13 +154,15 @@ export function createMemoryManager(params: {
     },
 
     updateUserProfile: async (llmClient) => {
-      if (closed) { throw new Error("Memory manager is closed"); }
-      return profileManager.extractAndUpdateProfile(llmClient);
+      return trackAsyncOp(async () => profileManager.extractAndUpdateProfile(llmClient));
     },
 
     close: async () => {
       if (closed) return;
       closed = true;
+      if (activeOps > 0) {
+        await new Promise<void>(resolve => { activeOpsResolve = resolve; });
+      }
       await chatPersistence.close();
       closeDatabase(db);
     },

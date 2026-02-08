@@ -2,27 +2,25 @@ import type { CronServiceState } from "./state.js";
 
 const storeLocks = new Map<string, Promise<void>>();
 
-const resolveChain = (promise: Promise<unknown>) =>
-  promise.then(
-    () => undefined,
-    () => undefined,
-  );
-
 export async function locked<T>(state: CronServiceState, fn: () => Promise<T>): Promise<T> {
   const storePath = state.deps.storePath;
-  const storeOp = storeLocks.get(storePath) ?? Promise.resolve();
-  const next = Promise.all([resolveChain(state.op), resolveChain(storeOp)]).then(fn);
 
-  // Keep the chain alive even when the operation fails.
-  const keepAlive = resolveChain(next);
-  state.op = keepAlive;
-  storeLocks.set(storePath, keepAlive);
+  let releaseLock!: () => void;
+  const myLock = new Promise<void>(fn2 => { releaseLock = fn2; });
+
+  const prevOp = state.op;
+  const prevStore = storeLocks.get(storePath) ?? Promise.resolve();
+
+  state.op = myLock.then(() => undefined);
+  storeLocks.set(storePath, myLock.then(() => undefined));
+
+  await Promise.all([prevOp.catch(() => undefined), prevStore.catch(() => undefined)]);
 
   try {
-    return (await next) as T;
+    return await fn();
   } finally {
-    // Clean up store lock once the chain settles to prevent memory leak
-    if (storeLocks.get(storePath) === keepAlive) {
+    releaseLock();
+    if (storeLocks.get(storePath) === state.op) {
       storeLocks.delete(storePath);
     }
   }

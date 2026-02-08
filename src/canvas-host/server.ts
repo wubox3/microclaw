@@ -40,11 +40,17 @@ export function createCanvasRoutes(dataDir: string): Hono {
   // Serve files from ~/.microclaw/canvas/ with path traversal protection
   app.get("/files/*", async (c) => {
     const rawPath = c.req.path.replace(/^\/files\//, "");
-    if (!rawPath || rawPath.includes("..") || rawPath.startsWith("/")) {
+    let decodedPath: string;
+    try {
+      decodedPath = decodeURIComponent(rawPath);
+    } catch {
+      return c.json({ error: "Invalid path encoding" }, 400);
+    }
+    if (!decodedPath || decodedPath.includes("..") || decodedPath.startsWith("/")) {
       return c.json({ error: "Invalid path" }, 400);
     }
 
-    const fullPath = resolve(canvasDir, rawPath);
+    const fullPath = resolve(canvasDir, decodedPath);
     const normalizedFull = normalize(fullPath);
 
     // Ensure resolved path is within canvas directory

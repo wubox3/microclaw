@@ -64,7 +64,7 @@ export function vectorSearch(
       searchLog.warn(`Embedding dimension mismatch: query=${queryEmbedding.length}, stored=${stored.length} for chunk ${row.chunk_id}, skipping`);
       return null;
     }
-    const score = cosineSimilarity(queryEmbedding, Array.from(stored));
+    const score = cosineSimilarity(queryEmbedding, stored);
     return {
       chunkId: row.chunk_id,
       fileId: row.file_id,

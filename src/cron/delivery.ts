@@ -18,7 +18,10 @@ function normalizeChannel(value: unknown): CronMessageChannel | undefined {
   if (!trimmed) {
     return undefined;
   }
-  if (!KNOWN_CHANNELS.has(trimmed)) return "last";
+  if (!KNOWN_CHANNELS.has(trimmed)) {
+    process.stderr.write("[cron:delivery] Unknown cron channel, defaulting to last\n");
+    return "last";
+  }
   return trimmed as CronMessageChannel;
 }
 

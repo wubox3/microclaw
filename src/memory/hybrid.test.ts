@@ -183,8 +183,8 @@ describe("buildFtsQuery", () => {
     expect(buildFtsQuery("foo.bar(baz)")).toBe('"foo" AND "bar" AND "baz"');
   });
 
-  it("falls back to joined single-char tokens", () => {
-    // Single-char tokens are joined into a single token for FTS
-    expect(buildFtsQuery("a b c")).toBe('"abc"');
+  it("returns empty for all-single-char queries", () => {
+    // Single-char tokens are too noisy for FTS matching
+    expect(buildFtsQuery("a b c")).toBe("");
   });
 });

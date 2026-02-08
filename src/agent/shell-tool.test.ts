@@ -218,9 +218,9 @@ describe("execute — timeout", () => {
 describe("execute — output truncation", () => {
   it("truncates output exceeding 50k characters", async () => {
     const tool = makeTool();
-    // Generate ~60k characters of output (each line is "a" repeated 100 chars + newline)
+    // Generate ~60k characters of output using head
     const result = await tool.execute({
-      command: 'python3 -c "print(\'a\' * 60000)"',
+      command: "yes a | head -c 60000",
     });
 
     expect(result.isError).toBeUndefined();

@@ -23,16 +23,19 @@ export interface IpcWatcherDeps {
 
 let watcherRunning = false;
 let watcherTimeout: ReturnType<typeof setTimeout> | null = null;
+let watcherAbort: AbortController | null = null;
 
 export function startIpcWatcher(deps: IpcWatcherDeps): void {
   if (watcherRunning) return;
   watcherRunning = true;
+  watcherAbort = new AbortController();
 
   const ipcBaseDir = path.join(DATA_DIR, "ipc");
   fs.mkdirSync(ipcBaseDir, { recursive: true });
 
   const processIpcFiles = async () => {
     if (!watcherRunning) return;
+    if (watcherAbort?.signal.aborted) return;
 
     try {
       let channelFolders: string[] = [];
@@ -53,6 +56,8 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
       }
 
       for (const channelId of channelFolders) {
+        if (watcherAbort?.signal.aborted) return;
+
         const messagesDir = path.join(ipcBaseDir, channelId, "messages");
         const tasksDir = path.join(ipcBaseDir, channelId, "tasks");
 
@@ -68,6 +73,8 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
           }
 
           for (const file of messageFiles) {
+            if (watcherAbort?.signal.aborted) return;
+
             const filePath = path.join(messagesDir, file);
             try {
               // Atomically prevent symlink following with O_NOFOLLOW
@@ -109,7 +116,9 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
                 const MAX_ERROR_FILES = 100;
                 const errorFiles = fs.readdirSync(errorsDir)
                   .filter((f) => f.endsWith(".json"))
-                  .sort();
+                  .map(f => ({ name: f, mtime: fs.statSync(path.join(errorsDir, f)).mtimeMs }))
+                  .sort((a, b) => a.mtime - b.mtime)
+                  .map(f => f.name);
                 if (errorFiles.length >= MAX_ERROR_FILES) {
                   for (const old of errorFiles.slice(0, errorFiles.length - MAX_ERROR_FILES + 1)) {
                     try { fs.unlinkSync(path.join(errorsDir, old)); } catch { /* best-effort */ }
@@ -144,6 +153,8 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
           }
 
           for (const file of taskFiles) {
+            if (watcherAbort?.signal.aborted) return;
+
             const filePath = path.join(tasksDir, file);
             try {
               // Atomically prevent symlink following with O_NOFOLLOW
@@ -171,10 +182,14 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
                 const limit = typeof data.limit === "number" && data.limit > 0 && data.limit <= 50
                   ? data.limit
                   : 5;
+                if (watcherAbort?.signal.aborted) return;
+
                 const results = await deps.memoryManager.search({
                   query: data.query,
                   limit,
                 });
+
+                if (watcherAbort?.signal.aborted) return;
 
                 const resultFile = filePath.replace(/\.json$/, ".result.json");
                 const tempPath = `${resultFile}.tmp`;
@@ -208,7 +223,7 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
       );
     }
 
-    if (watcherRunning) {
+    if (watcherRunning && !watcherAbort?.signal.aborted) {
       watcherTimeout = setTimeout(scheduleNext, IPC_POLL_INTERVAL);
     }
   };
@@ -217,7 +232,7 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
     processIpcFiles().catch((err) => {
       log.error(`IPC watcher error: ${err instanceof Error ? err.message : String(err)}`);
       // Always reschedule so the watcher never dies silently
-      if (watcherRunning) {
+      if (watcherRunning && !watcherAbort?.signal.aborted) {
         watcherTimeout = setTimeout(scheduleNext, IPC_POLL_INTERVAL * 2);
       }
     });
@@ -229,6 +244,8 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
 
 export function stopIpcWatcher(): void {
   watcherRunning = false;
+  watcherAbort?.abort();
+  watcherAbort = null;
   if (watcherTimeout !== null) {
     clearTimeout(watcherTimeout);
     watcherTimeout = null;

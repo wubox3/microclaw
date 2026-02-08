@@ -30,6 +30,9 @@ function safeWriteJson(filePath: string, data: Record<string, unknown>) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 }
 
+// NOTE: setDeep intentionally mutates `obj` in place. This is acceptable here because the
+// objects passed in are loaded from disk (via safeReadJson) for immediate write-back
+// (via safeWriteJson). They are temporary and not shared across callers.
 function setDeep(obj: Record<string, unknown>, keys: string[], value: unknown) {
   if (keys.length === 0) {
     return;

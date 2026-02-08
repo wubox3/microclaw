@@ -96,13 +96,13 @@ export function buildFtsQuery(query: string): string {
     .split(/\s+/)
     .filter((t) => t.length > 1);
   if (tokens.length === 0) {
-    // All tokens are single characters; join them as a single token
+    // All tokens are single characters; return empty to avoid noisy FTS matches
     const singleChars = query
       .replace(/[^\w\s]/g, " ")
       .split(/\s+/)
       .filter((t) => t.length === 1);
     if (singleChars.length > 0) {
-      return `"${singleChars.join("")}"`;
+      return "";
     }
     // Sanitize: strip all non-alphanumeric to avoid FTS5 syntax errors
     const sanitized = query.replace(/[^\w\s]/g, "").trim();

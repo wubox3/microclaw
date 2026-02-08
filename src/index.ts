@@ -30,8 +30,23 @@ import type { MemorySearchManager } from "./memory/types.js";
 import type { AgentTool } from "./agent/types.js";
 import type { SkillToolFactory } from "./skills/types.js";
 import type { ChannelPlugin, GatewayInboundMessage } from "./channels/plugins/types.js";
+import { createVibecodingManager } from "./agent/vibecoding-tool.js";
 
 const log = createLogger("main");
+
+/** Escape text for safe HTML display in canvas. */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/** Format vibecoding output as canvas HTML. */
+function vibecodingCanvasHtml(prompt: string, output: string): string {
+  return `<div style="font-family:monospace;padding:16px;background:#1e1e2e;color:#cdd6f4;height:100%;overflow:auto;box-sizing:border-box"><h3 style="color:#89b4fa;margin:0 0 8px">Vibecoding</h3><p style="color:#a6adc8;margin:0 0 12px;font-size:13px">${escapeHtml(prompt)}</p><pre style="white-space:pre-wrap;word-break:break-word;margin:0;font-size:13px;line-height:1.5">${escapeHtml(output)}</pre></div>`;
+}
 
 /** Safely send JSON to a WebSocket, handling race between readyState check and send. */
 function safeSend(ws: WebSocket, data: unknown): void {
@@ -69,12 +84,32 @@ async function main(): Promise<void> {
   const port = resolvePort(config);
   const host = resolveHost(config);
 
+  // Initialize vibecoding session manager
+  const vibecodingManager = createVibecodingManager({
+    defaultCwd: paths.projectRoot,
+    allowedTools: [
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(node:*)",
+      "Bash(pnpm:*)",
+      "Bash(yarn:*)",
+      "Bash(tsc:*)",
+      "Bash(git:*)",
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+    ],
+  });
+  cleanupFns.push(() => { vibecodingManager.cleanupAll(); });
+
   const provider = config.agent?.provider ?? "anthropic";
 
   // 3. Resolve auth credentials (only required for Anthropic provider)
   let auth: import("./infra/auth.js").AuthCredentials = { isOAuth: false };
   if (provider === "anthropic") {
-    auth = resolveAuthCredentials();
+    auth = await resolveAuthCredentials();
     log.info(`Auth mode: ${auth.isOAuth ? "Claude Code OAuth" : "API key"}`);
   } else {
     log.info(`LLM provider: ${provider}`);
@@ -351,6 +386,77 @@ async function main(): Promise<void> {
       processingGatewayChats.add(chatKey);
 
       try {
+        // Intercept vibecoding commands before agent processing
+        if (msg.text.startsWith("vibecoding ")) {
+          // Show canvas and set loading state
+          canvasState.update((s) => ({ ...s, visible: true }));
+          webMonitor.broadcast(JSON.stringify({ type: "canvas_present" }));
+          webMonitor.broadcast(JSON.stringify({
+            type: "canvas_update",
+            html: vibecodingCanvasHtml(msg.text, "Running..."),
+          }));
+
+          const output = await vibecodingManager.handleCommand({
+            chatKey,
+            prompt: msg.text,
+          });
+
+          // Update canvas with final output
+          const canvasHtml = vibecodingCanvasHtml(msg.text, output);
+          canvasState.update((s) => ({ ...s, lastHtml: canvasHtml }));
+          webMonitor.broadcast(JSON.stringify({ type: "canvas_update", html: canvasHtml }));
+
+          // Send reply via outbound adapter
+          if (plugin.outbound?.sendText) {
+            const MAX_ECHO_ENTRIES = 500;
+            if (recentOutboundTexts.size > MAX_ECHO_ENTRIES) {
+              const keys = [...recentOutboundTexts.keys()];
+              for (let i = 0; i < keys.length - MAX_ECHO_ENTRIES; i++) {
+                recentOutboundTexts.delete(keys[i]);
+              }
+            }
+            const echoSet = recentOutboundTexts.get(msg.chatId) ?? new Set<string>();
+            echoSet.add(output);
+            recentOutboundTexts.set(msg.chatId, echoSet);
+            setTimeout(() => {
+              echoSet.delete(output);
+              if (echoSet.size === 0) recentOutboundTexts.delete(msg.chatId);
+            }, OUTBOUND_ECHO_TTL_MS);
+
+            await plugin.outbound.sendText({
+              config,
+              accountId,
+              to: msg.chatId,
+              text: output,
+              chatType: msg.chatType,
+            });
+          }
+
+          // Broadcast to web UI
+          webMonitor.broadcast(JSON.stringify({
+            type: "channel_message",
+            channelId,
+            from: "assistant",
+            text: output,
+            timestamp: Date.now(),
+            senderName: "Vibecoding",
+            isFromSelf: true,
+          }));
+
+          // Persist vibecoding exchange
+          if (memoryManager) {
+            memoryManager.saveExchange({
+              channelId,
+              userMessage: msg.text,
+              assistantMessage: output,
+              timestamp: msg.timestamp,
+            }).catch((err) => {
+              log.warn(`Failed to persist vibecoding exchange for ${channelId}: ${formatError(err)}`);
+            });
+          }
+          return;
+        }
+
         // Load recent chat history
         const historyMessages: Array<{ role: "user" | "assistant"; content: string; timestamp: number }> = [];
         if (memoryManager) {
@@ -496,6 +602,7 @@ async function main(): Promise<void> {
     dataDir,
     cronService,
     cronStorePath,
+    vibecodingManager,
   });
 
   // 12. Start server
@@ -661,6 +768,64 @@ async function main(): Promise<void> {
       // Validate channelId to prevent injection
       if (!/^[a-zA-Z0-9_-]+$/.test(resolvedChannelId)) {
         safeSend(client.ws, { type: "error", message: "Invalid channelId" });
+        return;
+      }
+
+      // Intercept vibecoding commands before agent processing
+      if (message.text.startsWith("vibecoding ")) {
+        const vibeChatKey = `web:${clientId}`;
+
+        // Show canvas and set loading state
+        canvasState.update((s) => ({ ...s, visible: true }));
+        safeSend(client.ws, { type: "canvas_present" });
+        safeSend(client.ws, {
+          type: "canvas_update",
+          html: vibecodingCanvasHtml(message.text, "Running..."),
+        });
+
+        let streamedOutput = "";
+        const output = await vibecodingManager.handleCommand({
+          chatKey: vibeChatKey,
+          prompt: message.text,
+          sendChunk: (chunk) => {
+            streamedOutput += chunk;
+            safeSend(client.ws, {
+              type: "vibecoding_chunk",
+              text: chunk,
+              timestamp: Date.now(),
+              channelId: resolvedChannelId,
+            });
+            // Update canvas with accumulated output
+            safeSend(client.ws, {
+              type: "canvas_update",
+              html: vibecodingCanvasHtml(message.text, streamedOutput),
+            });
+          },
+        });
+
+        // Final canvas update with complete output
+        const canvasHtml = vibecodingCanvasHtml(message.text, output);
+        canvasState.update((s) => ({ ...s, lastHtml: canvasHtml }));
+        safeSend(client.ws, { type: "canvas_update", html: canvasHtml });
+
+        safeSend(client.ws, {
+          type: "message",
+          text: output,
+          timestamp: Date.now(),
+          channelId: resolvedChannelId,
+        });
+
+        // Persist vibecoding exchange
+        if (memoryManager) {
+          memoryManager.saveExchange({
+            channelId: resolvedChannelId,
+            userMessage: message.text,
+            assistantMessage: output,
+            timestamp: message.timestamp,
+          }).catch((err) => {
+            log.warn(`Failed to persist vibecoding exchange for ${resolvedChannelId}: ${formatError(err)}`);
+          });
+        }
         return;
       }
 

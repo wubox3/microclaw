@@ -4,13 +4,14 @@ export type SqliteDb = DatabaseSync;
 
 export function withTransaction<T>(db: SqliteDb, fn: () => T): T {
   const savepointName = `sp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  db.exec(`SAVEPOINT ${savepointName}`);
+  const quoted = `"${savepointName}"`;
+  db.exec(`SAVEPOINT ${quoted}`);
   try {
     const result = fn();
-    db.exec(`RELEASE ${savepointName}`);
+    db.exec(`RELEASE ${quoted}`);
     return result;
   } catch (err) {
-    try { db.exec(`ROLLBACK TO ${savepointName}`); } catch { /* ignore rollback failure */ }
+    try { db.exec(`ROLLBACK TO ${quoted}`); } catch { /* ignore rollback failure */ }
     throw err;
   }
 }

@@ -72,8 +72,14 @@ function createCdpSender(ws: WebSocket) {
   const timers = new Map<number, ReturnType<typeof setTimeout>>();
 
   const send: CdpSendFn = (method: string, params?: Record<string, unknown>) => {
-    const id = nextId;
+    let id = nextId;
     nextId = nextId >= MAX_SAFE_CDP_ID ? 1 : nextId + 1;
+    // Skip IDs still awaiting a response to prevent overwriting pending entries on wrap
+    const MAX_SKIP = 1000;
+    for (let i = 0; i < MAX_SKIP && pending.has(id); i++) {
+      id = nextId;
+      nextId = nextId >= MAX_SAFE_CDP_ID ? 1 : nextId + 1;
+    }
     const msg = { id, method, params };
     ws.send(JSON.stringify(msg));
     return new Promise<unknown>((resolve, reject) => {

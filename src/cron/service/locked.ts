@@ -11,8 +11,9 @@ export async function locked<T>(state: CronServiceState, fn: () => Promise<T>): 
   const prevOp = state.op;
   const prevStore = storeLocks.get(storePath) ?? Promise.resolve();
 
-  state.op = myLock.then(() => undefined);
-  storeLocks.set(storePath, myLock.then(() => undefined));
+  const derived = myLock.then(() => undefined);
+  state.op = derived;
+  storeLocks.set(storePath, derived);
 
   await Promise.all([prevOp.catch(() => undefined), prevStore.catch(() => undefined)]);
 
@@ -20,7 +21,7 @@ export async function locked<T>(state: CronServiceState, fn: () => Promise<T>): 
     return await fn();
   } finally {
     releaseLock();
-    if (storeLocks.get(storePath) === state.op) {
+    if (storeLocks.get(storePath) === derived) {
       storeLocks.delete(storePath);
     }
   }

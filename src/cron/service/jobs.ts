@@ -64,7 +64,7 @@ export function computeJobNextRunAtMs(job: CronJob, nowMs: number): number | und
             ? parseAbsoluteTimeMs(schedule.at)
             : null;
     if (atMs === null) return undefined;
-    return atMs > Date.now() ? atMs : undefined;
+    return atMs > nowMs ? atMs : undefined;
   }
   return computeNextRunAtMs(job.schedule, nowMs);
 }
@@ -217,7 +217,7 @@ export function applyJobPatch(state: CronServiceState, id: string, job: CronJob,
   // Replace the job in the store array immutably.
   const index = state.store!.jobs.findIndex(j => j.id === id);
   if (index === -1) throw new Error("unknown cron job id");
-  state.store!.jobs[index] = { ...draft, updatedAtMs: Date.now() };
+  state.store!.jobs[index] = { ...draft, updatedAtMs: state.deps.nowMs() };
   return state.store!.jobs[index];
 }
 

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
-import { lstat, readFile } from "node:fs/promises";
+import { lstat, open } from "node:fs/promises";
 import { resolve, normalize, extname } from "node:path";
+import { constants } from "node:fs";
 import { generateA2uiPage } from "./a2ui-page.js";
 
 const MIME_TYPES: Readonly<Record<string, string>> = {
@@ -67,10 +68,18 @@ export function createCanvasRoutes(dataDir: string): Hono {
       if (!stats.isFile()) {
         return c.json({ error: "Not a regular file" }, 400);
       }
-      const data = await readFile(normalizedFull);
+      // Open with O_NOFOLLOW to prevent TOCTOU race between lstat and read
+      const O_NOFOLLOW = constants.O_NOFOLLOW ?? 0;
+      const fh = await open(normalizedFull, constants.O_RDONLY | O_NOFOLLOW);
+      let data: Buffer;
+      try {
+        data = await fh.readFile();
+      } finally {
+        await fh.close();
+      }
       const ext = extname(normalizedFull).toLowerCase();
       const contentType = MIME_TYPES[ext] ?? "application/octet-stream";
-      return new Response(data, {
+      return new Response(data as unknown as BodyInit, {
         status: 200,
         headers: {
           "Content-Type": contentType,

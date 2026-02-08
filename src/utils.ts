@@ -27,15 +27,19 @@ export function chunk<T>(array: readonly T[], size: number): T[][] {
 }
 
 export function normalizeE164(phone: string): string {
+  // Preserve the leading '+' to distinguish international numbers from NANP
+  const hadPlus = phone.trimStart().startsWith("+");
   let digits = phone.replace(/\D/g, "");
-  // Strip international dialing prefixes (00 or 011)
-  if (digits.startsWith("011")) {
-    digits = digits.slice(3);
-  } else if (digits.startsWith("00")) {
-    digits = digits.slice(2);
+  // Strip international dialing prefixes (00 or 011) only when no '+' was present
+  if (!hadPlus) {
+    if (digits.startsWith("011")) {
+      digits = digits.slice(3);
+    } else if (digits.startsWith("00")) {
+      digits = digits.slice(2);
+    }
   }
-  // 10-digit numbers are standard US/CA format; prepend country code 1
-  if (digits.length === 10) {
+  // 10-digit numbers without a '+' prefix are assumed US/CA; prepend country code 1
+  if (digits.length === 10 && !hadPlus) {
     digits = "1" + digits;
   }
   if (digits.length < 7 || digits.length > 15) {

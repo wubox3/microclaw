@@ -23,7 +23,7 @@ function redactSensitiveConfig(config: MicroClawConfig): MicroClawConfig {
     try {
       clone = JSON.parse(JSON.stringify(config));
     } catch {
-      return config;
+      throw new Error("Failed to clone config for redaction — refusing to expose raw credentials");
     }
   }
   // Strip API keys and tokens to prevent skill plugins from exfiltrating credentials

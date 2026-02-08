@@ -88,6 +88,12 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
               }
               let rawData: string;
               try {
+                // Reject oversized files to prevent OOM from malicious containers
+                const MAX_IPC_FILE_SIZE = 1024 * 1024; // 1 MB
+                const stat = fs.fstatSync(fd);
+                if (stat.size > MAX_IPC_FILE_SIZE) {
+                  throw new Error(`IPC message file exceeds ${MAX_IPC_FILE_SIZE} bytes (${stat.size})`);
+                }
                 rawData = fs.readFileSync(fd, "utf-8");
               } finally {
                 fs.closeSync(fd);
@@ -168,6 +174,12 @@ export function startIpcWatcher(deps: IpcWatcherDeps): void {
               }
               let taskRawData: string;
               try {
+                // Reject oversized files to prevent OOM from malicious containers
+                const MAX_IPC_TASK_SIZE = 256 * 1024; // 256 KB
+                const taskStat = fs.fstatSync(taskFd);
+                if (taskStat.size > MAX_IPC_TASK_SIZE) {
+                  throw new Error(`IPC task file exceeds ${MAX_IPC_TASK_SIZE} bytes (${taskStat.size})`);
+                }
                 taskRawData = fs.readFileSync(taskFd, "utf-8");
               } finally {
                 fs.closeSync(taskFd);
@@ -269,8 +281,8 @@ export function writeFilteredEnvFile(): void {
   for (const varName of allowedVars) {
     const value = process.env[varName];
     if (value) {
-      // Strip newlines to prevent env variable injection
-      const sanitized = value.replace(/[\r\n]/g, "");
+      // Strip newlines and null bytes to prevent env variable injection
+      const sanitized = value.replace(/[\r\n\0]/g, "");
       if (sanitized.length > 0) {
         // Quote with single quotes and escape embedded single quotes
         const quoted = sanitized.replace(/'/g, "'\\''");

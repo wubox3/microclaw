@@ -28,8 +28,7 @@ const ALLOWED_ATTRS = new Set([
   "open", "data-a2ui-id", "data-surface", "role", "aria-label", "aria-hidden",
 ]);
 
-function decodeHtmlEntities(str: string): string {
-  // Decode &amp; LAST to prevent double-decode chains like &amp;lt; → &lt; → <
+function decodeHtmlEntitiesOnce(str: string): string {
   return str
     .replace(/&NewLine;/gi, "\n")
     .replace(/&Tab;/gi, "\t")
@@ -46,6 +45,26 @@ function decodeHtmlEntities(str: string): string {
     .replace(/&quot;/gi, '"')
     .replace(/&apos;/gi, "'")
     .replace(/&amp;/gi, "&");
+}
+
+function decodeHtmlEntities(str: string): string {
+  // Multi-pass decode to prevent double-encode bypass (e.g. &amp;#106;avascript:)
+  let prev = str;
+  for (let i = 0; i < 3; i++) {
+    const decoded = decodeHtmlEntitiesOnce(prev);
+    if (decoded === prev) break;
+    prev = decoded;
+  }
+  return prev;
+}
+
+function encodeHtmlAttrValue(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 function buildBracketPattern(tags: Set<string>): RegExp {
@@ -106,7 +125,7 @@ function sanitizeHtml(raw: string): string {
             continue;
           }
         }
-        attrs.push(` ${attrName}="${attrValue.replace(/"/g, "&quot;")}"`);
+        attrs.push(` ${attrName}="${encodeHtmlAttrValue(attrValue)}"`);
       }
     }
     // Enforce rel="noopener noreferrer" on <a> tags with target attribute

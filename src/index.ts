@@ -26,7 +26,6 @@ import { defaultCronJobsPath } from "./cron/store.js";
 import { runCronIsolatedAgentTurn } from "./cron/isolated-agent.js";
 import { appendCronRunLog, resolveCronRunLogPath } from "./cron/run-log.js";
 import { createCronTool } from "./agent/cron-tool.js";
-import { createShellTool, cleanupAllSessions } from "./agent/shell-tool.js";
 import type { MemorySearchManager } from "./memory/types.js";
 import type { AgentTool } from "./agent/types.js";
 import type { SkillToolFactory } from "./skills/types.js";
@@ -129,12 +128,6 @@ async function main(): Promise<void> {
   // Add canvas tool
   additionalTools.push(createCanvasTool({ webMonitor, canvasState }));
   log.info("Canvas tool registered");
-
-  // Add shell command execution tool (skip in container mode where sandbox provides its own shell)
-  if (!containerEnabled) {
-    additionalTools.push(createShellTool({ cwd: paths.projectRoot, shellPath: paths.shellPath }));
-    log.info("Shell tool registered");
-  }
 
   // Start browser control server
   if (config.browser?.enabled !== false) {
@@ -546,9 +539,6 @@ async function main(): Promise<void> {
         }
       }),
     );
-
-    // Clean up persistent shell sessions
-    cleanupAllSessions();
 
     // Stop cron scheduler
     try {

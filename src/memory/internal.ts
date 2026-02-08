@@ -37,7 +37,7 @@ export function chunkText(text: string, chunkSize = CHUNK_SIZE, overlap = CHUNK_
     }
   }
 
-  if (currentChunk.length > 0 && (chunks.length === 0 || currentSize > overlap)) {
+  if (currentChunk.length > 0) {
     chunks.push(currentChunk.join("\n"));
   }
 

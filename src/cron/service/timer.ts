@@ -84,8 +84,7 @@ export async function executeJob(
   opts: { forced: boolean },
 ) {
   const startedAt = state.deps.nowMs();
-  job.state.runningAtMs = startedAt;
-  job.state.lastError = undefined;
+  job.state = { ...job.state, runningAtMs: startedAt, lastError: undefined };
   emit(state, { jobId: job.id, action: "started", runAtMs: startedAt });
 
   let deleted = false;
@@ -95,26 +94,33 @@ export async function executeJob(
     if (finished) return;
     finished = true;
     const endedAt = state.deps.nowMs();
-    job.state.runningAtMs = undefined;
-    job.state.lastRunAtMs = startedAt;
-    job.state.lastStatus = status;
-    job.state.lastDurationMs = Math.max(0, endedAt - startedAt);
-    job.state.lastError = err;
+    const lastDurationMs = Math.max(0, endedAt - startedAt);
 
     const shouldDelete =
       job.schedule.kind === "at" && status === "ok" && job.deleteAfterRun === true;
 
+    let nextRunAtMs: number | undefined;
     if (!shouldDelete) {
       if (job.schedule.kind === "at" && status === "ok") {
         // One-shot job completed successfully; disable it.
         job.enabled = false;
-        job.state.nextRunAtMs = undefined;
+        nextRunAtMs = undefined;
       } else if (job.enabled) {
-        job.state.nextRunAtMs = computeJobNextRunAtMs(job, endedAt);
+        nextRunAtMs = computeJobNextRunAtMs(job, endedAt);
       } else {
-        job.state.nextRunAtMs = undefined;
+        nextRunAtMs = undefined;
       }
     }
+
+    job.state = {
+      ...job.state,
+      runningAtMs: undefined,
+      lastRunAtMs: startedAt,
+      lastStatus: status,
+      lastDurationMs,
+      lastError: err,
+      nextRunAtMs,
+    };
 
     emit(state, {
       jobId: job.id,
@@ -123,7 +129,7 @@ export async function executeJob(
       error: err,
       summary,
       runAtMs: startedAt,
-      durationMs: job.state.lastDurationMs,
+      durationMs: lastDurationMs,
       nextRunAtMs: job.state.nextRunAtMs,
     });
 

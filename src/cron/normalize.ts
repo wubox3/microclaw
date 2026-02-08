@@ -144,8 +144,7 @@ export function normalizeCronJobInput(
       const trimmed = enabled.trim().toLowerCase();
       if (trimmed === "true") {
         next.enabled = true;
-      }
-      if (trimmed === "false") {
+      } else if (trimmed === "false") {
         next.enabled = false;
       }
     }
@@ -180,8 +179,7 @@ export function normalizeCronJobInput(
       const kind = typeof next.payload.kind === "string" ? next.payload.kind : "";
       if (kind === "systemEvent") {
         next.sessionTarget = "main";
-      }
-      if (kind === "agentTurn") {
+      } else if (kind === "agentTurn") {
         next.sessionTarget = "isolated";
       }
     }

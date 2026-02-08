@@ -58,7 +58,11 @@ export function createMemoryManager(params: {
     activeOps++;
     return fn().finally(() => {
       activeOps--;
-      if (activeOps === 0 && activeOpsResolve) activeOpsResolve();
+      if (activeOps === 0 && activeOpsResolve) {
+        const resolve = activeOpsResolve;
+        activeOpsResolve = null;
+        resolve();
+      }
     });
   }
 

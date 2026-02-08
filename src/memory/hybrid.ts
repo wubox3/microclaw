@@ -35,11 +35,14 @@ export function mergeSearchResults(params: {
   const merged = new Map<number, MemorySearchResult>();
 
   // Normalize BM25 scores to 0-1 range
-  let maxBm25 = 1;
+  let maxBm25 = 0;
   for (const r of keywordResults) {
     if (r.bm25Score > maxBm25) {
       maxBm25 = r.bm25Score;
     }
+  }
+  if (maxBm25 === 0) {
+    maxBm25 = 1;
   }
 
   for (const vr of vectorResults) {

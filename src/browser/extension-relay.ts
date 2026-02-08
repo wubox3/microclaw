@@ -225,6 +225,12 @@ export async function ensureChromeExtensionRelayServer(opts: {
   const MAX_SAFE_EXTENSION_ID = 2 ** 31; // Use 2^31 for safety margin against integer overflow
   let nextExtensionId = 1;
 
+  const allocateExtensionId = (): number => {
+    const id = nextExtensionId;
+    nextExtensionId = nextExtensionId >= MAX_SAFE_EXTENSION_ID ? 1 : nextExtensionId + 1;
+    return id;
+  };
+
   const sendToExtension = async (payload: ExtensionForwardCommandMessage): Promise<unknown> => {
     const ws = extensionWs;
     if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -336,8 +342,7 @@ export async function ensureChromeExtensionRelayServer(opts: {
         throw new Error("target not found");
       }
       default: {
-        const id = nextExtensionId;
-        nextExtensionId = nextExtensionId >= MAX_SAFE_EXTENSION_ID ? 1 : nextExtensionId + 1;
+        const id = allocateExtensionId();
         return await sendToExtension({
           id,
           method: "forwardCDPCommand",
@@ -432,7 +437,7 @@ export async function ensureChromeExtensionRelayServer(opts: {
       void (async () => {
         try {
           await sendToExtension({
-            id: (() => { const id = nextExtensionId; nextExtensionId = nextExtensionId >= MAX_SAFE_EXTENSION_ID ? 1 : nextExtensionId + 1; return id; })(),
+            id: allocateExtensionId(),
             method: "forwardCDPCommand",
             params: { method: "Target.activateTarget", params: { targetId } },
           });
@@ -456,7 +461,7 @@ export async function ensureChromeExtensionRelayServer(opts: {
       void (async () => {
         try {
           await sendToExtension({
-            id: (() => { const id = nextExtensionId; nextExtensionId = nextExtensionId >= MAX_SAFE_EXTENSION_ID ? 1 : nextExtensionId + 1; return id; })(),
+            id: allocateExtensionId(),
             method: "forwardCDPCommand",
             params: { method: "Target.closeTarget", params: { targetId } },
           });

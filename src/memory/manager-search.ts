@@ -57,6 +57,10 @@ export function vectorSearch(
   const results = rows.map((row): VectorSearchResult | null => {
     // Copy into an aligned ArrayBuffer — Node.js Buffers can have arbitrary
     // byteOffset which would cause Float32Array to throw RangeError.
+    if (row.embedding.byteLength === 0 || row.embedding.byteLength % 4 !== 0) {
+      searchLog.warn(`Invalid embedding size (${row.embedding.byteLength} bytes, not aligned to float32) for chunk ${row.chunk_id}, skipping`);
+      return null;
+    }
     const aligned = new ArrayBuffer(row.embedding.byteLength);
     new Uint8Array(aligned).set(new Uint8Array(row.embedding.buffer, row.embedding.byteOffset, row.embedding.byteLength));
     const stored = new Float32Array(aligned);

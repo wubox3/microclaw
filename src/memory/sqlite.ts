@@ -1,9 +1,10 @@
 import { DatabaseSync } from "node:sqlite";
+import { randomUUID } from "node:crypto";
 
 export type SqliteDb = DatabaseSync;
 
 export function withTransaction<T>(db: SqliteDb, fn: () => T): T {
-  const savepointName = `sp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const savepointName = `sp_${randomUUID().replace(/-/g, "")}`;
   const quoted = `"${savepointName}"`;
   db.exec(`SAVEPOINT ${quoted}`);
   try {

@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import type { MicroClawConfig } from "../config/types.js";
 
 export type MemoryBackendConfig = {
@@ -12,7 +13,7 @@ export type MemoryBackendConfig = {
 export function resolveMemoryBackendConfig(config: MicroClawConfig, dataDir: string): MemoryBackendConfig {
   return {
     dataDir,
-    dbPath: `${dataDir}/memory.db`,
+    dbPath: join(dataDir, "memory.db"),
     embeddingModel: config.memory?.embeddingModel ?? "voyage-3",
     vectorWeight: config.memory?.vectorWeight ?? 0.7,
     keywordWeight: config.memory?.keywordWeight ?? 0.3,

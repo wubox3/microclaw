@@ -3,13 +3,13 @@ import { WebSocket, WebSocketServer } from "ws";
 import crypto from "node:crypto";
 import { execSync } from "child_process";
 // unlinkSync removed (unused import)
-import { resolve as resolvePath } from "node:path";
 import { loadDotenv } from "./infra/dotenv.js";
 import { isDev } from "./infra/env.js";
 import { resolveAuthCredentials } from "./infra/auth.js";
 import { formatError } from "./infra/errors.js";
 import { createLogger } from "./logging.js";
-import { loadConfig, resolveDataDir, resolvePort, resolveHost } from "./config/config.js";
+import { loadConfig, resolvePort, resolveHost } from "./config/config.js";
+import { resolvePaths } from "./config/paths.js";
 import { loadSkills } from "./skills/loader.js";
 import { createMemoryManager } from "./memory/manager.js";
 import { createAgent } from "./agent/agent.js";
@@ -22,11 +22,11 @@ import { createCanvasTool } from "./agent/canvas-tool.js";
 import { startBrowserServer, stopBrowserServer } from "./browser/server.js";
 import { createBrowserTool } from "./browser/browser-tool.js";
 import { CronService } from "./cron/service.js";
-import { resolveCronStorePath } from "./cron/store.js";
+import { defaultCronJobsPath } from "./cron/store.js";
 import { runCronIsolatedAgentTurn } from "./cron/isolated-agent.js";
 import { appendCronRunLog, resolveCronRunLogPath } from "./cron/run-log.js";
 import { createCronTool } from "./agent/cron-tool.js";
-import { createShellTool } from "./agent/shell-tool.js";
+import { createShellTool, cleanupAllSessions } from "./agent/shell-tool.js";
 import type { MemorySearchManager } from "./memory/types.js";
 import type { AgentTool } from "./agent/types.js";
 import type { SkillToolFactory } from "./skills/types.js";
@@ -63,9 +63,10 @@ async function main(): Promise<void> {
 
   log.info("Starting MicroClaw...");
 
-  // 2. Load config (before auth, so provider selection is known)
+  // 2. Load config and resolve all paths upfront
   const config = loadConfig();
-  const dataDir = resolveDataDir(config);
+  const paths = resolvePaths(config);
+  const { dataDir } = paths;
   const port = resolvePort(config);
   const host = resolveHost(config);
 
@@ -83,7 +84,7 @@ async function main(): Promise<void> {
   log.info(`Data directory: ${dataDir}`);
 
   // 4. Load skills
-  const skillRegistry = await loadSkills({ config });
+  const skillRegistry = await loadSkills({ config, skillsDir: paths.skillsDir });
   log.info(`Loaded ${skillRegistry.skills.length} skills`);
   for (const diag of skillRegistry.diagnostics) {
     if (diag.level === "error") {
@@ -131,7 +132,7 @@ async function main(): Promise<void> {
 
   // Add shell command execution tool (skip in container mode where sandbox provides its own shell)
   if (!containerEnabled) {
-    additionalTools.push(createShellTool({ cwd: process.cwd() }));
+    additionalTools.push(createShellTool({ cwd: paths.projectRoot, shellPath: paths.shellPath }));
     log.info("Shell tool registered");
   }
 
@@ -213,7 +214,7 @@ async function main(): Promise<void> {
 
   // 9a. Build and start cron scheduler
   const cronEnabled = config.cron?.enabled !== false;
-  const cronStorePath = resolveCronStorePath(config.cron?.store, config);
+  const cronStorePath = defaultCronJobsPath(paths.cronStorePath);
   const cronService = new CronService({
     log: {
       debug: (obj, msg) => log.debug(msg ?? JSON.stringify(obj)),
@@ -545,6 +546,9 @@ async function main(): Promise<void> {
         }
       }),
     );
+
+    // Clean up persistent shell sessions
+    cleanupAllSessions();
 
     // Stop cron scheduler
     try {

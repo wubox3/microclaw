@@ -1,27 +1,15 @@
 import JSON5 from "json5";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import type { CronJob, CronStoreFile } from "./types.js";
-import { resolveDataDir } from "../config/config.js";
 
-export function defaultCronDir(config?: import("../config/types.js").MicroClawConfig) {
-  return path.join(resolveDataDir(config ?? {}), "cron");
-}
-
-export function defaultCronStorePath(config?: import("../config/types.js").MicroClawConfig) {
-  return path.join(defaultCronDir(config), "jobs.json");
-}
-
-export function resolveCronStorePath(storePath?: string, config?: import("../config/types.js").MicroClawConfig) {
-  if (storePath?.trim()) {
-    const raw = storePath.trim();
-    if (raw === "~" || raw.startsWith("~/")) {
-      return path.resolve(raw.replace(/^~/, os.homedir()));
-    }
-    return path.resolve(raw);
-  }
-  return defaultCronStorePath(config);
+/**
+ * Return the jobs.json path inside a pre-resolved cron store directory.
+ * The caller is responsible for providing an absolute cronDir
+ * (typically from resolvePaths() at startup).
+ */
+export function defaultCronJobsPath(cronDir: string): string {
+  return path.join(cronDir, "jobs.json");
 }
 
 export function isValidCronJob(raw: unknown): raw is CronJob {

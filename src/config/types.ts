@@ -69,6 +69,7 @@ export type VoiceWakeConfigOptions = {
 export type VoiceConfig = {
   tts?: TtsConfig;
   wake?: VoiceWakeConfigOptions;
+  language?: string;
 };
 
 export type CronConfig = {

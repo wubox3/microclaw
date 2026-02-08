@@ -13,10 +13,13 @@
   var talkPhase = 'idle'; // idle | listening | thinking | speaking
   var voiceConfigured = false;
   var voiceProvider = '';
+  var voiceLang = 'en-US';
   var recognition = null;
   var currentAudio = null;
   var micPermissionGranted = false;
   var silenceTimer = null;
+  var thinkingTimer = null;
+  var listenGeneration = 0;
 
   // ─── Sound Effects (loaded from sound-fx.js) ───
   var SoundFX = window.MicroClawSoundFX || { init: function() {}, play: function() {} };
@@ -28,6 +31,9 @@
   var voiceStatus = null;
   var voiceOrb = null;
   var voiceProviderEl = null;
+  var voiceLangSelect = null;
+  var messageInput = null;
+  var sendBtn = null;
 
   // ─── Microphone Permission ───
   function requestMicPermission() {
@@ -51,7 +57,9 @@
     var rec = new SpeechRecognition();
     rec.continuous = true;
     rec.interimResults = true;
-    rec.lang = 'en-US';
+    if (voiceLang !== 'auto') {
+      rec.lang = voiceLang;
+    }
     rec.maxAlternatives = 3;
     return rec;
   }
@@ -92,6 +100,10 @@
       clearTimeout(silenceTimer);
       silenceTimer = null;
     }
+    if (thinkingTimer) {
+      clearTimeout(thinkingTimer);
+      thinkingTimer = null;
+    }
     if (recognition) {
       try { recognition.stop(); } catch (e) { /* ignore */ }
       recognition = null;
@@ -102,20 +114,25 @@
     }
     isListening = false;
     isSpeaking = false;
-    setVoiceStatus('');
+    setVoiceStatusIdle();
     updateUI();
   }
 
   function startListening() {
     if (!voiceOn) return;
 
+    // Bump generation so stale callbacks from old sessions are ignored
+    var gen = ++listenGeneration;
+
     recognition = createRecognition();
     if (!recognition) return;
 
     isListening = true;
     var finalTranscript = '';
+    var lastInterim = '';
 
     recognition.onresult = function(event) {
+      if (gen !== listenGeneration) return; // stale session
       var interimTranscript = '';
 
       for (var i = event.resultIndex; i < event.results.length; i++) {
@@ -127,6 +144,7 @@
         }
       }
 
+      lastInterim = interimTranscript;
       var displayText = (finalTranscript + ' ' + interimTranscript).trim();
       if (displayText) {
         setVoiceStatus('You: "' + displayText + '"');
@@ -135,19 +153,25 @@
       // Reset silence timer on new speech
       if (silenceTimer) clearTimeout(silenceTimer);
       silenceTimer = setTimeout(function() {
-        var command = finalTranscript.trim();
+        if (gen !== listenGeneration) return; // stale
+        // Use finalTranscript if available, fall back to interim
+        // (Chinese recognition often keeps results as interim until session ends)
+        var command = finalTranscript.trim() || lastInterim.trim();
         if (command.length > 0) {
           recognition.stop();
           handleVoiceCommand(command);
           finalTranscript = '';
+          lastInterim = '';
         }
       }, 1500);
     };
 
     recognition.onend = function() {
+      if (gen !== listenGeneration) return; // stale session, ignore
       isListening = false;
       if (voiceOn && talkPhase === 'listening' && !isSpeaking) {
         setTimeout(function() {
+          if (gen !== listenGeneration) return; // stale
           if (voiceOn && !isSpeaking) {
             startListening();
           }
@@ -156,6 +180,7 @@
     };
 
     recognition.onerror = function(event) {
+      if (gen !== listenGeneration) return; // stale session
       if (event.error === 'not-allowed') {
         setVoiceStatus('Microphone denied — allow mic at: chrome://settings/content/microphone');
         stopVoice();
@@ -182,7 +207,18 @@
 
     SoundFX.play('send');
     setTalkPhase('thinking');
-    setVoiceStatus('Processing: "' + text + '"');
+    setVoiceStatusHtml('Processing: &ldquo;' + escapeHtml(text) + '&rdquo; &mdash; <span class="voice-paused">voice input paused</span>');
+
+    // Timeout: if no LLM response within 30s, resume listening
+    if (thinkingTimer) clearTimeout(thinkingTimer);
+    thinkingTimer = setTimeout(function() {
+      thinkingTimer = null;
+      if (voiceOn && talkPhase === 'thinking') {
+        setVoiceStatus('No response — resuming listening...');
+        setTalkPhase('listening');
+        startListening();
+      }
+    }, 30000);
 
     if (window.MicroClaw && window.MicroClaw.sendMessage) {
       window.MicroClaw.sendMessage(text);
@@ -191,11 +227,24 @@
 
   // ─── TTS Playback ───
   function speakText(text) {
-    if (!text || text.trim().length === 0) return;
+    // Clear thinking timeout — response arrived
+    if (thinkingTimer) {
+      clearTimeout(thinkingTimer);
+      thinkingTimer = null;
+    }
+
+    if (!text || text.trim().length === 0) {
+      // Empty response — resume listening instead of getting stuck
+      if (voiceOn) {
+        setTalkPhase('listening');
+        startListening();
+      }
+      return;
+    }
 
     setTalkPhase('speaking');
     isSpeaking = true;
-    setVoiceStatus('Speaking...');
+    setVoiceStatusHtml('Speaking... &mdash; <span class="voice-paused">voice input paused</span>');
     updateUI();
 
     if (recognition) {
@@ -364,6 +413,12 @@
         if (data.success && data.data) {
           voiceConfigured = data.data.ttsConfigured === true;
           voiceProvider = data.data.provider || '';
+          if (data.data.language) {
+            voiceLang = data.data.language;
+            if (voiceLangSelect) {
+              voiceLangSelect.value = voiceLang;
+            }
+          }
           updateProviderLabel();
         }
       })
@@ -402,8 +457,31 @@
 
   function setVoiceStatus(text) {
     if (voiceStatus) {
+      voiceStatus.classList.remove('voice-idle');
       voiceStatus.textContent = text;
       voiceStatus.classList.toggle('hidden', !text);
+    }
+  }
+
+  function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function setVoiceStatusHtml(html) {
+    if (voiceStatus) {
+      voiceStatus.classList.remove('voice-idle');
+      voiceStatus.innerHTML = html;
+      voiceStatus.classList.toggle('hidden', !html);
+    }
+  }
+
+  function setVoiceStatusIdle() {
+    if (voiceStatus) {
+      voiceStatus.textContent = 'Voice off \u2014 speech input ignored';
+      voiceStatus.classList.remove('hidden');
+      voiceStatus.classList.add('voice-idle');
     }
   }
 
@@ -421,6 +499,14 @@
     if (voiceOrb) {
       voiceOrb.classList.toggle('hidden', !voiceOn && !isListening);
     }
+    if (messageInput) {
+      messageInput.disabled = voiceOn;
+      messageInput.classList.toggle('voice-disabled', voiceOn);
+    }
+    if (sendBtn) {
+      sendBtn.disabled = voiceOn;
+      sendBtn.classList.toggle('voice-disabled', voiceOn);
+    }
   }
 
   // ─── Public API ───
@@ -432,6 +518,24 @@
       voiceStatus = document.getElementById('voice-status');
       voiceOrb = document.getElementById('voice-orb');
       voiceProviderEl = document.getElementById('voice-provider');
+      voiceLangSelect = document.getElementById('voice-lang');
+      messageInput = document.getElementById('message-input');
+      sendBtn = document.getElementById('send-btn');
+
+      if (voiceLangSelect) {
+        voiceLangSelect.addEventListener('change', function() {
+          voiceLang = voiceLangSelect.value;
+          // Restart recognition immediately with the new language
+          if (voiceOn && talkPhase === 'listening') {
+            if (recognition) {
+              try { recognition.stop(); } catch (e) { /* ignore */ }
+              recognition = null;
+            }
+            isListening = false;
+            startListening();
+          }
+        });
+      }
 
       SoundFX.init();
       loadVoiceConfig();
@@ -464,6 +568,7 @@
         });
       }
 
+      setVoiceStatusIdle();
       updateUI();
     },
 

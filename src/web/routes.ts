@@ -299,6 +299,7 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
       : process.env.OPENAI_API_KEY;
     const hasApiKey = Boolean(ttsConfig.apiKey || envKey);
     const ttsConfigured = ttsConfig.enabled && hasApiKey;
+    const language = deps.config.voice?.language || "en-US";
     return c.json({
       success: true,
       data: {
@@ -306,6 +307,7 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
         ttsConfigured,
         provider: ttsConfig.provider,
         voice: ttsConfig.voice,
+        language,
       },
     });
   });

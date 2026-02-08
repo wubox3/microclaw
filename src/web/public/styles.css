@@ -295,6 +295,12 @@ main#chat-area {
   cursor: not-allowed;
 }
 
+.voice-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 /* Code blocks in messages */
 .message-bubble pre {
   background: rgba(0,0,0,0.06);
@@ -551,11 +557,28 @@ main#chat-area {
   padding: 4px 16px 8px;
 }
 
+.voice-lang-select {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.voice-lang-select:focus {
+  outline: none;
+  border-color: var(--primary-light);
+}
+
 .voice-toggle-btn {
   display: flex;
   align-items: center;
   gap: 10px;
-  width: 100%;
+  flex: 1;
   padding: 8px 14px;
   border: 1px solid var(--border);
   border-radius: 20px;
@@ -733,6 +756,16 @@ main#chat-area {
 
 .voice-status.hidden {
   display: none;
+}
+
+.voice-status.voice-idle {
+  opacity: 0.5;
+  font-style: italic;
+}
+
+.voice-paused {
+  color: #E53935;
+  font-weight: 600;
 }
 
 /* Canvas Panel */

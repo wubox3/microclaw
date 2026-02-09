@@ -1,6 +1,6 @@
 export type ChannelId = ChatChannelId | string;
 
-export type ChatChannelId = "telegram" | "whatsapp" | "discord" | "googlechat" | "slack" | "signal" | "imessage";
+export type ChatChannelId = "telegram" | "whatsapp" | "discord" | "googlechat" | "slack" | "signal" | "imessage" | "twitter";
 
 export type NormalizedChatType = "direct" | "group" | "channel" | "thread";
 

@@ -14,7 +14,7 @@ import {
 
 describe("CHAT_CHANNEL_ORDER", () => {
   it("has 7 channels", () => {
-    expect(CHAT_CHANNEL_ORDER).toHaveLength(7);
+    expect(CHAT_CHANNEL_ORDER).toHaveLength(8);
   });
 
   it("contains all expected channels", () => {
@@ -25,6 +25,7 @@ describe("CHAT_CHANNEL_ORDER", () => {
     expect(CHAT_CHANNEL_ORDER).toContain("slack");
     expect(CHAT_CHANNEL_ORDER).toContain("signal");
     expect(CHAT_CHANNEL_ORDER).toContain("imessage");
+    expect(CHAT_CHANNEL_ORDER).toContain("twitter");
   });
 });
 
@@ -41,7 +42,7 @@ describe("DEFAULT_CHAT_CHANNEL", () => {
 describe("listChatChannels", () => {
   it("returns 7 channel meta objects", () => {
     const channels = listChatChannels();
-    expect(channels).toHaveLength(7);
+    expect(channels).toHaveLength(8);
   });
 
   it("each channel has id and label", () => {

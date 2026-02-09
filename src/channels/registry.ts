@@ -8,6 +8,7 @@ export const CHAT_CHANNEL_ORDER: readonly ChatChannelId[] = [
   "slack",
   "signal",
   "imessage",
+  "twitter",
 ] as const;
 
 export const CHANNEL_IDS = [...CHAT_CHANNEL_ORDER] as const;
@@ -59,12 +60,21 @@ const CHAT_CHANNEL_META: Record<ChatChannelId, ChannelMeta> = {
     blurb: "iMessage integration (macOS only).",
     aliases: ["imsg"],
   },
+  twitter: {
+    id: "twitter",
+    label: "X/Twitter",
+    selectionLabel: "X/Twitter (bird CLI)",
+    blurb: "X/Twitter via bird CLI for mentions and replies.",
+    aliases: ["bird", "x"],
+  },
 };
 
 export const CHAT_CHANNEL_ALIASES: Record<string, ChatChannelId> = {
   imsg: "imessage",
   "google-chat": "googlechat",
   gchat: "googlechat",
+  bird: "twitter",
+  x: "twitter",
 };
 
 export function listChatChannels(): ChannelMeta[] {

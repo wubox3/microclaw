@@ -32,3 +32,11 @@ channels:
     enabled: true
     accountId: ""
     allowFrom: []
+
+  imessage:
+    enabled: true
+    allowFrom: []
+
+  twitter:
+    enabled: true
+    allowFrom: []

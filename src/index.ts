@@ -27,6 +27,8 @@ import { startTelegramGateway } from "./channels/telegram/gateway.js";
 import { startSignalGateway } from "./channels/signal/gateway.js";
 import { startSlackGateway } from "./channels/slack/gateway.js";
 import { startDiscordGateway } from "./channels/discord/gateway.js";
+import { startImessageGateway } from "./channels/imessage/gateway.js";
+import { startTwitterGateway } from "./channels/twitter/gateway.js";
 import { CronService } from "./cron/service.js";
 import { defaultCronJobsPath } from "./cron/store.js";
 import { AsapRunner } from "./jobs/runner.js";
@@ -341,6 +343,18 @@ async function main(): Promise<void> {
   const discordHandle = startDiscordGateway({ config, agent, webMonitor, memoryManager });
   if (discordHandle) {
     cleanupFns.push(() => { discordHandle.stop(); });
+  }
+
+  // 9h. Start iMessage gateway (imsg CLI-based)
+  const imessageHandle = startImessageGateway({ config, agent, webMonitor, memoryManager });
+  if (imessageHandle) {
+    cleanupFns.push(() => { imessageHandle.stop(); });
+  }
+
+  // 9i. Start Twitter gateway (bird CLI-based)
+  const twitterHandle = startTwitterGateway({ config, agent, webMonitor, memoryManager });
+  if (twitterHandle) {
+    cleanupFns.push(() => { twitterHandle.stop(); });
   }
 
   // 9b. Start skills file watcher

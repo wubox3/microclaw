@@ -54,6 +54,33 @@ export const CHAT_SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_chat_channel_ts ON chat_messages(channel_id, timestamp);
 `;
 
+export const GCC_SCHEMA = `
+  CREATE TABLE IF NOT EXISTS gcc_branches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    memory_type TEXT NOT NULL,
+    branch_name TEXT NOT NULL,
+    head_commit_hash TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(memory_type, branch_name)
+  );
+
+  CREATE TABLE IF NOT EXISTS gcc_commits (
+    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    hash TEXT NOT NULL UNIQUE,
+    memory_type TEXT NOT NULL,
+    branch_name TEXT NOT NULL,
+    parent_hash TEXT,
+    delta TEXT NOT NULL,
+    snapshot TEXT NOT NULL,
+    message TEXT NOT NULL,
+    confidence TEXT NOT NULL DEFAULT 'MEDIUM_CONFIDENCE',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_gcc_commits_type_branch_seq
+    ON gcc_commits(memory_type, branch_name, seq DESC);
+`;
+
 export const FTS_SYNC_TRIGGERS = `
   CREATE TRIGGER IF NOT EXISTS memory_chunks_ai AFTER INSERT ON memory_chunks BEGIN
     INSERT INTO memory_chunks_fts(rowid, content) VALUES (new.id, new.content);

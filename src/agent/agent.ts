@@ -1,6 +1,6 @@
 import type { MicroClawConfig } from "../config/types.js";
 import type { AuthCredentials } from "../infra/auth.js";
-import type { MemorySearchManager, UserProfile } from "../memory/types.js";
+import type { MemorySearchManager, UserProfile, ProgrammingSkills, PlanningPreferences, ProgrammingPlanning, EventPlanning } from "../memory/types.js";
 import type { AgentMessage, AgentResponse, AgentTool } from "./types.js";
 import type { LlmClient, LlmMessage } from "./llm-client.js";
 import { createLlmClient } from "./create-client.js";
@@ -93,14 +93,38 @@ export function createAgent(context: AgentContext): Agent {
       // Direct mode: Anthropic API (fallback)
       // Snapshot tools at call time to avoid mutation during iteration
       const toolsSnapshot = [...currentTools];
-      // Read user profile (non-blocking, undefined if unavailable)
+      // Read user profile and programming skills (non-blocking, undefined if unavailable)
       let userProfile: UserProfile | undefined;
+      let programmingSkills: ProgrammingSkills | undefined;
+      let planningPreferences: PlanningPreferences | undefined;
+      let programmingPlanning: ProgrammingPlanning | undefined;
+      let eventPlanning: EventPlanning | undefined;
       try {
         userProfile = context.memoryManager?.getUserProfile();
       } catch {
         // graceful degradation - continue without profile
       }
-      return runDirectChat({ messages, channelId, client, tools: toolsSnapshot, context, userProfile });
+      try {
+        programmingSkills = context.memoryManager?.getProgrammingSkills();
+      } catch {
+        // graceful degradation - continue without skills
+      }
+      try {
+        planningPreferences = context.memoryManager?.getPlanningPreferences();
+      } catch {
+        // graceful degradation - continue without planning preferences
+      }
+      try {
+        programmingPlanning = context.memoryManager?.getProgrammingPlanning();
+      } catch {
+        // graceful degradation - continue without programming planning
+      }
+      try {
+        eventPlanning = context.memoryManager?.getEventPlanning();
+      } catch {
+        // graceful degradation - continue without event planning
+      }
+      return runDirectChat({ messages, channelId, client, tools: toolsSnapshot, context, userProfile, programmingSkills, planningPreferences, programmingPlanning, eventPlanning });
     },
   };
 }
@@ -170,8 +194,12 @@ async function runDirectChat(params: {
   tools: AgentTool[];
   context: AgentContext;
   userProfile?: UserProfile;
+  programmingSkills?: ProgrammingSkills;
+  planningPreferences?: PlanningPreferences;
+  programmingPlanning?: ProgrammingPlanning;
+  eventPlanning?: EventPlanning;
 }): Promise<AgentResponse> {
-  const { messages, channelId, client, tools, context, userProfile } = params;
+  const { messages, channelId, client, tools, context, userProfile, programmingSkills, planningPreferences, programmingPlanning, eventPlanning } = params;
 
   // Search memory for context if available
   let memoryResults: import("../memory/types.js").MemorySearchResult[] | undefined;
@@ -196,6 +224,10 @@ async function runDirectChat(params: {
     channelId,
     canvasEnabled: context.canvasEnabled,
     userProfile,
+    programmingSkills,
+    planningPreferences,
+    programmingPlanning,
+    eventPlanning,
   });
 
   const systemMessages = messages.filter((m) => m.role === "system");

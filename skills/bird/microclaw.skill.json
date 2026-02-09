@@ -1,0 +1,7 @@
+{
+  "id": "bird",
+  "name": "Bird (X/Twitter CLI)",
+  "description": "X/Twitter CLI for reading, searching, posting, and engagement via cookies",
+  "version": "0.1.0",
+  "entry": "index.ts"
+}

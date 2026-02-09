@@ -87,6 +87,57 @@ export type UserProfile = {
   lastUpdated: string;
 };
 
+export type PlanningPreferences = {
+  structurePreferences: string[];
+  detailLevelPreferences: string[];
+  valuedPlanElements: string[];
+  architectureApproaches: string[];
+  scopePreferences: string[];
+  presentationFormat: string[];
+  approvedPlanPatterns: string[];
+  planningInsights: string[];
+  lastUpdated: string;
+};
+
+export type ProgrammingPlanning = {
+  confirmedPlans: string[];
+  modifiedPatterns: string[];
+  discardedReasons: string[];
+  planStructure: string[];
+  scopePreferences: string[];
+  detailLevel: string[];
+  reviewPatterns: string[];
+  implementationFlow: string[];
+  planningInsights: string[];
+  lastUpdated: string;
+};
+
+export type EventPlanning = {
+  preferredTimes: string[];
+  preferredDays: string[];
+  recurringSchedules: string[];
+  venuePreferences: string[];
+  calendarHabits: string[];
+  planningStyle: string[];
+  eventTypes: string[];
+  schedulingInsights: string[];
+  lastUpdated: string;
+};
+
+export type ProgrammingSkills = {
+  languages: string[];
+  frameworks: string[];
+  architecturePatterns: string[];
+  codingStylePreferences: string[];
+  testingApproach: string[];
+  toolsAndLibraries: string[];
+  approvedPatterns: string[];
+  buildAndDeployment: string[];
+  editorAndEnvironment: string[];
+  keyInsights: string[];
+  lastUpdated: string;
+};
+
 export type MemorySearchManager = {
   search: (params: MemorySearchParams) => Promise<MemorySearchResult[]>;
   getStatus: () => Promise<MemoryProviderStatus>;
@@ -104,6 +155,20 @@ export type MemorySearchManager = {
     before?: number;
   }) => Promise<ChatMessageRecord[]>;
   getUserProfile: () => UserProfile | undefined;
+  saveUserProfile: (profile: UserProfile) => void;
   updateUserProfile: (llmClient: import("../agent/llm-client.js").LlmClient) => Promise<void>;
+  getProgrammingSkills: () => ProgrammingSkills | undefined;
+  saveProgrammingSkills: (skills: ProgrammingSkills) => void;
+  updateProgrammingSkills: (llmClient: import("../agent/llm-client.js").LlmClient) => Promise<void>;
+  getPlanningPreferences: () => PlanningPreferences | undefined;
+  savePlanningPreferences: (prefs: PlanningPreferences) => void;
+  updatePlanningPreferences: (llmClient: import("../agent/llm-client.js").LlmClient) => Promise<void>;
+  getProgrammingPlanning: () => ProgrammingPlanning | undefined;
+  saveProgrammingPlanning: (planning: ProgrammingPlanning) => void;
+  updateProgrammingPlanning: (llmClient: import("../agent/llm-client.js").LlmClient) => Promise<void>;
+  getEventPlanning: () => EventPlanning | undefined;
+  saveEventPlanning: (planning: EventPlanning) => void;
+  updateEventPlanning: (llmClient: import("../agent/llm-client.js").LlmClient) => Promise<void>;
+  gccStore?: import("./gcc-store.js").GccStore;
   close: () => void | Promise<void>;
 };

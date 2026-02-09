@@ -1,6 +1,9 @@
 import type { MicroClawConfig } from "../config/types.js";
-import type { MemorySearchResult, UserProfile } from "../memory/types.js";
+import type { MemorySearchResult, UserProfile, ProgrammingSkills, PlanningPreferences, ProgrammingPlanning, EventPlanning } from "../memory/types.js";
 import { formatProfileForPrompt } from "../memory/user-profile.js";
+import { formatProgrammingSkillsForPrompt } from "../memory/gcc-programming-skills.js";
+import { formatProgrammingPlanningForPrompt } from "../memory/gcc-programming-planning.js";
+import { formatEventPlanningForPrompt } from "../memory/gcc-event-planning.js";
 
 const BASE_SYSTEM_PROMPT = `You are MicroClaw, a helpful AI assistant that can communicate across multiple messaging channels.
 
@@ -29,6 +32,10 @@ export function buildSystemPrompt(params: {
   channelId?: string;
   canvasEnabled?: boolean;
   userProfile?: UserProfile;
+  programmingSkills?: ProgrammingSkills;
+  planningPreferences?: PlanningPreferences;
+  programmingPlanning?: ProgrammingPlanning;
+  eventPlanning?: EventPlanning;
 }): string {
   const parts: string[] = [];
 
@@ -40,6 +47,21 @@ export function buildSystemPrompt(params: {
     parts.push("\n" + formatProfileForPrompt(params.userProfile));
   }
 
+  // Programming skills (injected after user profile)
+  if (params.programmingSkills) {
+    parts.push("\n" + formatProgrammingSkillsForPrompt(params.programmingSkills));
+  }
+
+  // Programming planning preferences (injected after programming skills)
+  if (params.programmingPlanning) {
+    parts.push("\n" + formatProgrammingPlanningForPrompt(params.programmingPlanning));
+  }
+
+  // Event planning preferences
+  if (params.eventPlanning) {
+    parts.push("\n" + formatEventPlanningForPrompt(params.eventPlanning));
+  }
+
   // Canvas instructions
   if (params.canvasEnabled) {
     parts.push(CANVAS_INSTRUCTIONS);
@@ -48,6 +70,9 @@ export function buildSystemPrompt(params: {
   // Channel context
   if (params.channelId) {
     parts.push(`\nCurrent channel: ${params.channelId}`);
+    if (params.channelId === "x") {
+      parts.push("You are in the X (Twitter) channel. Use the bird tool to read tweets, search, view timelines, post, and engage on X/Twitter on behalf of the user. Proactively use the bird tool for any X/Twitter-related requests.");
+    }
   }
 
   // Memory context

@@ -27,6 +27,7 @@
   // Channels
   var channels = [
     { id: 'web', label: 'Web Chat', active: true },
+    { id: 'x', label: 'X (Twitter)' },
     { id: 'telegram', label: 'Telegram' },
     { id: 'whatsapp', label: 'WhatsApp' },
     { id: 'discord', label: 'Discord' },
@@ -252,16 +253,33 @@
     };
   }
 
+  // Vibecoding mode
+  var vibecodingMode = false;
+  var vibecodingBtn = document.getElementById('vibecoding-toggle-btn');
+  if (vibecodingBtn) {
+    vibecodingBtn.addEventListener('click', function() {
+      vibecodingMode = !vibecodingMode;
+      vibecodingBtn.classList.toggle('active', vibecodingMode);
+      messageInput.placeholder = vibecodingMode ? 'Vibecoding prompt...' : 'Type a message...';
+    });
+  }
+
   function sendMessage(text) {
     if (!text.trim() || !isConnected) return;
 
+    // Auto-prepend vibecoding prefix when mode is active
+    var finalText = text;
+    if (vibecodingMode && !text.startsWith('vibecoding ')) {
+      finalText = 'vibecoding ' + text;
+    }
+
     var now = Date.now();
     addMessage('user', text, now);
-    pushHistory({ role: 'user', content: text, timestamp: now });
+    pushHistory({ role: 'user', content: finalText, timestamp: now });
 
     ws.send(JSON.stringify({
       type: 'message',
-      text: text,
+      text: finalText,
       id: now.toString() + '-' + (++messageCounter),
       timestamp: now,
       channelId: activeChannelId,
@@ -322,5 +340,10 @@
   // Initialize cron module
   if (window.MicroClawCron && window.MicroClawCron.init) {
     window.MicroClawCron.init();
+  }
+
+  // Initialize memory editor module
+  if (window.MicroClawMemory && window.MicroClawMemory.init) {
+    window.MicroClawMemory.init();
   }
 })();

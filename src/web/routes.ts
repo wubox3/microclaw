@@ -6,6 +6,7 @@ import type { MemorySearchManager } from "../memory/types.js";
 import type { Agent } from "../agent/agent.js";
 import type { WebMonitor } from "../channels/web/monitor.js";
 import type { CronService } from "../cron/service.js";
+import type { VibecodingManager } from "../agent/vibecoding-tool.js";
 import { normalizeCronJobCreate, normalizeCronJobPatch } from "../cron/normalize.js";
 import { readCronRunLogEntries, resolveCronRunLogPath } from "../cron/run-log.js";
 import { listChatChannels } from "../channels/registry.js";
@@ -15,6 +16,18 @@ import { createCanvasRoutes } from "../canvas-host/server.js";
 import { createLogger } from "../logging.js";
 
 const log = createLogger("web-routes");
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function vibecodingCanvasHtml(prompt: string, output: string): string {
+  return `<div style="font-family:monospace;padding:16px;background:#1e1e2e;color:#cdd6f4;height:100%;overflow:auto;box-sizing:border-box"><h3 style="color:#89b4fa;margin:0 0 8px">Vibecoding</h3><p style="color:#a6adc8;margin:0 0 12px;font-size:13px">${escapeHtml(prompt)}</p><pre style="white-space:pre-wrap;word-break:break-word;margin:0;font-size:13px;line-height:1.5">${escapeHtml(output)}</pre></div>`;
+}
 
 const safeErrorMessage = (err: unknown, fallback: string): string => {
   if (err instanceof Error) {
@@ -32,6 +45,7 @@ export type WebAppDeps = {
   dataDir: string;
   cronService?: CronService;
   cronStorePath?: string;
+  vibecodingManager?: VibecodingManager;
 };
 
 export function createWebRoutes(deps: WebAppDeps): Hono {
@@ -96,6 +110,210 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     }
   });
 
+  // Memory profile/skills/planning CRUD
+  app.get("/api/memory/profile", (c) => {
+    if (!deps.memoryManager) {
+      return c.json({ success: false, error: "Memory not configured" }, 503);
+    }
+    const profile = deps.memoryManager.getUserProfile();
+    return c.json({ success: true, data: profile ?? null });
+  });
+
+  app.put("/api/memory/profile", async (c) => {
+    if (!deps.memoryManager) {
+      return c.json({ success: false, error: "Memory not configured" }, 503);
+    }
+    let body: Record<string, unknown>;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: "Invalid JSON body" }, 400);
+    }
+    if (typeof body !== "object" || body === null) {
+      return c.json({ success: false, error: "Body must be an object" }, 400);
+    }
+    try {
+      const profile = body as import("../memory/types.js").UserProfile;
+      profile.lastUpdated = new Date().toISOString();
+      deps.memoryManager.saveUserProfile(profile);
+      return c.json({ success: true, data: deps.memoryManager.getUserProfile() });
+    } catch (err) {
+      log.error(`Failed to save user profile: ${err instanceof Error ? err.message : String(err)}`);
+      return c.json({ success: false, error: "Failed to save user profile" }, 500);
+    }
+  });
+
+  app.get("/api/memory/skills", (c) => {
+    if (!deps.memoryManager) {
+      return c.json({ success: false, error: "Memory not configured" }, 503);
+    }
+    const skills = deps.memoryManager.getProgrammingSkills();
+    return c.json({ success: true, data: skills ?? null });
+  });
+
+  app.put("/api/memory/skills", async (c) => {
+    if (!deps.memoryManager) {
+      return c.json({ success: false, error: "Memory not configured" }, 503);
+    }
+    let body: Record<string, unknown>;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: "Invalid JSON body" }, 400);
+    }
+    if (typeof body !== "object" || body === null) {
+      return c.json({ success: false, error: "Body must be an object" }, 400);
+    }
+    try {
+      const skills = body as import("../memory/types.js").ProgrammingSkills;
+      skills.lastUpdated = new Date().toISOString();
+      deps.memoryManager.saveProgrammingSkills(skills);
+      return c.json({ success: true, data: deps.memoryManager.getProgrammingSkills() });
+    } catch (err) {
+      log.error(`Failed to save programming skills: ${err instanceof Error ? err.message : String(err)}`);
+      return c.json({ success: false, error: "Failed to save programming skills" }, 500);
+    }
+  });
+
+  app.get("/api/memory/programming-planning", (c) => {
+    if (!deps.memoryManager) {
+      return c.json({ success: false, error: "Memory not configured" }, 503);
+    }
+    const planning = deps.memoryManager.getProgrammingPlanning();
+    return c.json({ success: true, data: planning ?? null });
+  });
+
+  app.put("/api/memory/programming-planning", async (c) => {
+    if (!deps.memoryManager) {
+      return c.json({ success: false, error: "Memory not configured" }, 503);
+    }
+    let body: Record<string, unknown>;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: "Invalid JSON body" }, 400);
+    }
+    if (typeof body !== "object" || body === null) {
+      return c.json({ success: false, error: "Body must be an object" }, 400);
+    }
+    try {
+      const planning = body as import("../memory/types.js").ProgrammingPlanning;
+      planning.lastUpdated = new Date().toISOString();
+      deps.memoryManager.saveProgrammingPlanning(planning);
+      return c.json({ success: true, data: deps.memoryManager.getProgrammingPlanning() });
+    } catch (err) {
+      log.error(`Failed to save programming planning: ${err instanceof Error ? err.message : String(err)}`);
+      return c.json({ success: false, error: "Failed to save programming planning" }, 500);
+    }
+  });
+
+  app.get("/api/memory/event-planning", (c) => {
+    if (!deps.memoryManager) {
+      return c.json({ success: false, error: "Memory not configured" }, 503);
+    }
+    const planning = deps.memoryManager.getEventPlanning();
+    return c.json({ success: true, data: planning ?? null });
+  });
+
+  app.put("/api/memory/event-planning", async (c) => {
+    if (!deps.memoryManager) {
+      return c.json({ success: false, error: "Memory not configured" }, 503);
+    }
+    let body: Record<string, unknown>;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: "Invalid JSON body" }, 400);
+    }
+    if (typeof body !== "object" || body === null) {
+      return c.json({ success: false, error: "Body must be an object" }, 400);
+    }
+    try {
+      const planning = body as import("../memory/types.js").EventPlanning;
+      planning.lastUpdated = new Date().toISOString();
+      deps.memoryManager.saveEventPlanning(planning);
+      return c.json({ success: true, data: deps.memoryManager.getEventPlanning() });
+    } catch (err) {
+      log.error(`Failed to save event planning: ${err instanceof Error ? err.message : String(err)}`);
+      return c.json({ success: false, error: "Failed to save event planning" }, 500);
+    }
+  });
+
+  // GCC version control endpoints
+  const GCC_VALID_TYPES = new Set(["programming_skills", "programming_planning", "event_planning"]);
+
+  app.get("/api/memory/gcc/:type/log", (c) => {
+    if (!deps.memoryManager?.gccStore) {
+      return c.json({ success: false, error: "GCC not available" }, 503);
+    }
+    const memoryType = c.req.param("type");
+    if (!GCC_VALID_TYPES.has(memoryType)) {
+      return c.json({ success: false, error: "Invalid memory type" }, 400);
+    }
+    const branch = c.req.query("branch") ?? "main";
+    const limitParam = c.req.query("limit");
+    const limit = limitParam ? Math.max(1, Math.min(Number(limitParam) || 50, 500)) : 50;
+    try {
+      const entries = deps.memoryManager.gccStore.log(
+        memoryType as import("../memory/gcc-types.js").GccMemoryType,
+        branch,
+        limit,
+      );
+      return c.json({ success: true, data: entries });
+    } catch (err) {
+      log.error(`GCC log failed: ${err instanceof Error ? err.message : String(err)}`);
+      return c.json({ success: false, error: "Failed to get GCC log" }, 500);
+    }
+  });
+
+  app.get("/api/memory/gcc/:type/branches", (c) => {
+    if (!deps.memoryManager?.gccStore) {
+      return c.json({ success: false, error: "GCC not available" }, 503);
+    }
+    const memoryType = c.req.param("type");
+    if (!GCC_VALID_TYPES.has(memoryType)) {
+      return c.json({ success: false, error: "Invalid memory type" }, 400);
+    }
+    try {
+      const branches = deps.memoryManager.gccStore.listBranches(
+        memoryType as import("../memory/gcc-types.js").GccMemoryType,
+      );
+      return c.json({ success: true, data: branches });
+    } catch (err) {
+      log.error(`GCC branches failed: ${err instanceof Error ? err.message : String(err)}`);
+      return c.json({ success: false, error: "Failed to list branches" }, 500);
+    }
+  });
+
+  app.post("/api/memory/gcc/:type/rollback", async (c) => {
+    if (!deps.memoryManager?.gccStore) {
+      return c.json({ success: false, error: "GCC not available" }, 503);
+    }
+    const memoryType = c.req.param("type");
+    if (!GCC_VALID_TYPES.has(memoryType)) {
+      return c.json({ success: false, error: "Invalid memory type" }, 400);
+    }
+    let body: Record<string, unknown>;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: "Invalid JSON body" }, 400);
+    }
+    if (typeof body.hash !== "string" || body.hash.trim().length === 0) {
+      return c.json({ success: false, error: "hash must be a non-empty string" }, 400);
+    }
+    try {
+      const commit = deps.memoryManager.gccStore.rollback(
+        memoryType as import("../memory/gcc-types.js").GccMemoryType,
+        body.hash,
+      );
+      return c.json({ success: true, data: commit });
+    } catch (err) {
+      log.error(`GCC rollback failed: ${err instanceof Error ? err.message : String(err)}`);
+      return c.json({ success: false, error: safeErrorMessage(err, "Failed to rollback") }, 400);
+    }
+  });
+
   app.post("/api/memory/search", async (c) => {
     if (!deps.memoryManager) {
       return c.json({ success: false, error: "Memory not configured" }, 503);
@@ -147,6 +365,34 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     }
     const timestamp = Date.now();
     const userText = messages[messages.length - 1]?.content ?? "";
+
+    // Intercept vibecoding commands
+    if (deps.vibecodingManager && userText.startsWith("vibecoding ")) {
+      try {
+        // Show canvas with loading state
+        deps.webMonitor.broadcast(JSON.stringify({ type: "canvas_present" }));
+        deps.webMonitor.broadcast(JSON.stringify({
+          type: "canvas_update",
+          html: vibecodingCanvasHtml(userText, "Running..."),
+        }));
+
+        const output = await deps.vibecodingManager.handleCommand({
+          chatKey: "web:rest",
+          prompt: userText,
+        });
+
+        // Update canvas with final output
+        deps.webMonitor.broadcast(JSON.stringify({
+          type: "canvas_update",
+          html: vibecodingCanvasHtml(userText, output),
+        }));
+
+        return c.json({ success: true, data: { text: output } });
+      } catch (err) {
+        log.error(`Vibecoding request failed: ${err instanceof Error ? err.message : String(err)}`);
+        return c.json({ success: false, error: "Vibecoding request failed" }, 500);
+      }
+    }
 
     // REST clients send the full conversation in the request body,
     // so we do NOT also load DB history (that would duplicate messages).
@@ -525,6 +771,7 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
   const voiceJsPath = resolve(publicDir, "voice.js");
   const canvasJsPath = resolve(publicDir, "canvas.js");
   const cronJsPath = resolve(publicDir, "cron.js");
+  const memoryJsPath = resolve(publicDir, "memory.js");
   const htmlPath = resolve(publicDir, "index.html");
 
   const cssContent = safeReadFile(cssPath);
@@ -533,6 +780,7 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
   const voiceJsContent = safeReadFile(voiceJsPath);
   const canvasJsContent = safeReadFile(canvasJsPath);
   const cronJsContent = safeReadFile(cronJsPath);
+  const memoryJsContent = safeReadFile(memoryJsPath);
   const htmlContent = safeReadFile(htmlPath);
 
   const STATIC_CACHE = "public, max-age=300";
@@ -559,6 +807,10 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
 
   app.get("/cron.js", (c) => {
     return c.text(getStaticContent(cronJsPath, cronJsContent), 200, { "Content-Type": "application/javascript", "Cache-Control": STATIC_CACHE });
+  });
+
+  app.get("/memory.js", (c) => {
+    return c.text(getStaticContent(memoryJsPath, memoryJsContent), 200, { "Content-Type": "application/javascript", "Cache-Control": STATIC_CACHE });
   });
 
   app.get("/", (c) => {

@@ -38,13 +38,15 @@
       <div id="memory-panel" class="sidebar-section">
         <div class="nav-section-label">Memory</div>
         <div id="memory-status" class="memory-status">Initializing...</div>
+        <button id="memory-edit-btn" class="memory-edit-btn">Edit Memory</button>
       </div>
     </aside>
     <main id="chat-area">
       <header id="chat-header">
         <span id="chat-title">Web Chat</span>
         <span id="connection-status" class="status-dot disconnected"></span>
-        <button id="canvas-toggle-btn" class="canvas-toggle-btn" title="Toggle canvas panel">Canvas</button>
+        <button id="vibecoding-toggle-btn" class="vibecoding-toggle-btn hidden" title="Toggle vibecoding mode">Vibecoding</button>
+        <button id="canvas-toggle-btn" class="canvas-toggle-btn hidden" title="Toggle canvas panel">Canvas</button>
         <div id="voice-orb" class="voice-orb hidden">
           <span class="orb-ring"></span>
           <span class="orb-core"></span>
@@ -71,6 +73,28 @@
       <iframe id="canvas-iframe" src="/canvas/a2ui" sandbox="allow-scripts allow-same-origin"></iframe>
     </aside>
   </div>
+  <!-- Memory Editor Dialog -->
+  <div id="memory-dialog" class="dialog-overlay hidden">
+    <div class="dialog-box mem-dialog-box">
+      <div class="dialog-header">
+        <h3>Memory Editor</h3>
+        <button id="memory-dialog-close" class="dialog-close">&times;</button>
+      </div>
+      <div class="mem-tab-bar" id="memory-tab-bar">
+        <button class="mem-tab-btn active" data-tab="profile">Profile</button>
+        <button class="mem-tab-btn" data-tab="skills">Coding</button>
+        <button class="mem-tab-btn" data-tab="programming-planning">CodingPlan</button>
+        <button class="mem-tab-btn" data-tab="event-planning">Events</button>
+        <button class="mem-tab-btn" data-tab="history">History</button>
+      </div>
+      <div id="memory-dialog-body" class="dialog-body mem-dialog-body"></div>
+      <div class="dialog-footer mem-dialog-footer">
+        <span id="memory-last-updated" class="mem-last-updated"></span>
+        <button id="memory-dialog-save" class="dialog-btn">Save</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Cron Job Dialog -->
   <div id="cron-dialog" class="dialog-overlay hidden">
     <div class="dialog-box">
@@ -128,6 +152,7 @@
   </div>
 
   <script src="/cron.js"></script>
+  <script src="/memory.js"></script>
   <script src="/sound-fx.js"></script>
   <script src="/voice.js"></script>
   <script src="/canvas.js"></script>

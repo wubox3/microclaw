@@ -840,8 +840,38 @@ main#chat-area {
   opacity: 0.4;
 }
 
-.canvas-toggle-btn {
+.vibecoding-toggle-btn.hidden,
+.canvas-toggle-btn.hidden {
+  display: none;
+}
+
+.vibecoding-toggle-btn {
   margin-left: auto;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vibecoding-toggle-btn:hover {
+  border-color: #a6e3a1;
+  color: #a6e3a1;
+}
+
+.vibecoding-toggle-btn.active {
+  background: #a6e3a1;
+  color: #1e1e2e;
+  border-color: #a6e3a1;
+}
+
+.canvas-toggle-btn {
+  margin-left: 0;
   padding: 6px 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -999,6 +1029,321 @@ main#chat-area {
 
 .dialog-btn:hover {
   background: var(--primary-hover);
+}
+
+/* Memory Editor */
+.memory-edit-btn {
+  display: block;
+  width: calc(100% - 32px);
+  margin: 8px 16px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.memory-edit-btn:hover {
+  border-color: var(--primary-light);
+  color: var(--primary);
+  background: rgba(232, 123, 53, 0.04);
+}
+
+.mem-dialog-box {
+  width: 600px;
+  max-width: 92vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.mem-tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 0 20px;
+  background: var(--bg);
+}
+
+.mem-tab-btn {
+  padding: 10px 16px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mem-tab-btn:hover {
+  color: var(--text-primary);
+}
+
+.mem-tab-btn.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.mem-dialog-body {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 60vh;
+  padding: 16px 20px;
+}
+
+.mem-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mem-last-updated {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.mem-empty {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 40px 20px;
+}
+
+.mem-field-group {
+  margin-bottom: 14px;
+}
+
+.mem-field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.mem-field-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.mem-field-input:focus {
+  border-color: var(--primary);
+}
+
+.mem-array-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.mem-add-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  transition: all 0.15s;
+}
+
+.mem-add-btn:hover {
+  border-color: var(--primary-light);
+  color: var(--primary);
+}
+
+.mem-array-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mem-array-item {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.mem-array-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.mem-array-input:focus {
+  border-color: var(--primary);
+}
+
+.mem-remove-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.mem-remove-btn:hover {
+  border-color: #FF3B30;
+  color: #FF3B30;
+  background: #FFF0EF;
+}
+
+/* GCC History Tab */
+.mem-history-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.mem-history-select {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 13px;
+  outline: none;
+}
+
+.mem-history-log {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mem-history-entry {
+  padding: 10px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.mem-history-entry-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.mem-history-hash {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.mem-history-confidence {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.mem-confidence-high {
+  background: #E8F5E9;
+  color: #2E7D32;
+}
+
+.mem-confidence-medium {
+  background: #FFF3E0;
+  color: #E65100;
+}
+
+.mem-confidence-low {
+  background: #FFEBEE;
+  color: #C62828;
+}
+
+.mem-history-date {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.mem-history-message {
+  font-size: 13px;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.mem-history-delta {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.mem-delta-added {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: #2E7D32;
+}
+
+.mem-delta-removed {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: #C62828;
+}
+
+.mem-rollback-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mem-rollback-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: #FFF5EE;
 }
 
 /* Mobile Responsive */

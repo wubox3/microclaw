@@ -29,6 +29,7 @@ import { startSlackGateway } from "./channels/slack/gateway.js";
 import { startDiscordGateway } from "./channels/discord/gateway.js";
 import { startImessageGateway } from "./channels/imessage/gateway.js";
 import { startTwitterGateway } from "./channels/twitter/gateway.js";
+import { startGoogleChatGateway } from "./channels/googlechat/gateway.js";
 import { CronService } from "./cron/service.js";
 import { defaultCronJobsPath } from "./cron/store.js";
 import { AsapRunner } from "./jobs/runner.js";
@@ -355,6 +356,12 @@ async function main(): Promise<void> {
   const twitterHandle = startTwitterGateway({ config, agent, webMonitor, memoryManager });
   if (twitterHandle) {
     cleanupFns.push(() => { twitterHandle.stop(); });
+  }
+
+  // 9j. Start Google Chat gateway (webhook-based)
+  const googleChatHandle = startGoogleChatGateway({ config, agent, webMonitor, memoryManager });
+  if (googleChatHandle) {
+    cleanupFns.push(() => { googleChatHandle.stop(); });
   }
 
   // 9b. Start skills file watcher

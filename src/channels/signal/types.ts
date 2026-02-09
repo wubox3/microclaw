@@ -14,7 +14,7 @@ export type SignalGatewayHandle = {
   readonly stop: () => void;
 };
 
-export type SignalJsonMessage = {
+export type SignalEnvelope = {
   readonly envelope?: {
     readonly source?: string;
     readonly sourceNumber?: string;

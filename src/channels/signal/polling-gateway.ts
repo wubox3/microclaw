@@ -1,12 +1,9 @@
-import { spawn, execSync } from "node:child_process";
-import { accessSync, constants } from "node:fs";
-import { resolve } from "node:path";
 import { createLogger } from "../../logging.js";
 import { formatError } from "../../infra/errors.js";
 import type {
   SignalGatewayParams,
   SignalGatewayHandle,
-  SignalJsonMessage,
+  SignalEnvelope,
 } from "./types.js";
 
 const log = createLogger("signal");
@@ -31,28 +28,10 @@ function resolvePhoneNumber(params: SignalGatewayParams): string | null {
   return null;
 }
 
-function isExecutable(path: string): boolean {
-  try {
-    accessSync(resolve(path), constants.X_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function resolveSignalCliBin(): string | null {
-  if (process.env.SIGNAL_CLI_PATH) {
-    const resolved = resolve(process.env.SIGNAL_CLI_PATH);
-    if (isExecutable(resolved)) return resolved;
-    log.warn(`SIGNAL_CLI_PATH is not executable: ${resolved}`);
-    return null;
-  }
-  try {
-    const found = execSync("which signal-cli", { encoding: "utf8", timeout: 5000 }).trim();
-    return found || null;
-  } catch {
-    return null;
-  }
+function resolveBaseUrl(): string {
+  const fromEnv = process.env.SIGNAL_CLI_URL?.trim();
+  if (fromEnv) return fromEnv.replace(/\/+$/, "");
+  return "http://localhost:8080";
 }
 
 function isAllowed(source: string, allowFrom: string[] | undefined): boolean {
@@ -64,41 +43,33 @@ function isAllowed(source: string, allowFrom: string[] | undefined): boolean {
   });
 }
 
-function runSignalCli(
-  binPath: string,
-  args: readonly string[],
-  timeoutMs: number = 15000,
-): Promise<string | null> {
-  return new Promise<string | null>((res) => {
-    const child = spawn(binPath, args, {
-      stdio: ["ignore", "pipe", "pipe"],
-      timeout: timeoutMs,
-    });
+async function signalApi<T>(
+  baseUrl: string,
+  method: "GET" | "POST",
+  path: string,
+  body?: Record<string, unknown>,
+): Promise<T | null> {
+  const url = `${baseUrl}${path}`;
+  try {
+    const options: RequestInit = {
+      method,
+      headers: { "Content-Type": "application/json" },
+    };
+    if (body) {
+      options.body = JSON.stringify(body);
+    }
 
-    let stdout = "";
-    let stderr = "";
-
-    child.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString();
-    });
-    child.stderr?.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString();
-    });
-
-    child.on("close", (code) => {
-      if (code === 0) {
-        res(stdout);
-      } else {
-        log.warn(`signal-cli ${args.slice(0, 3).join(" ")} failed (exit ${code}): ${stderr.slice(0, 200)}`);
-        res(null);
-      }
-    });
-
-    child.on("error", (err) => {
-      log.warn(`signal-cli spawn error: ${formatError(err)}`);
-      res(null);
-    });
-  });
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      log.warn(`Signal API ${method} ${path} returned ${response.status}`);
+      return null;
+    }
+    const data = (await response.json()) as T;
+    return data;
+  } catch (err) {
+    log.warn(`Signal API ${method} ${path} error: ${formatError(err)}`);
+    return null;
+  }
 }
 
 export function startSignalPollingGateway(
@@ -112,13 +83,7 @@ export function startSignalPollingGateway(
     return null;
   }
 
-  const binPath = resolveSignalCliBin();
-  if (!binPath) {
-    log.info("signal-cli binary not found, skipping");
-    return null;
-  }
-  log.info(`Using signal-cli at ${binPath}`);
-
+  const baseUrl = resolveBaseUrl();
   const allowFrom = config.channels?.signal?.allowFrom;
   const processingChats = new Set<string>();
   let stopped = false;
@@ -148,12 +113,11 @@ export function startSignalPollingGateway(
       ? text.slice(0, MAX_TEXT_LENGTH) + "..."
       : text;
 
-    const result = await runSignalCli(binPath!, [
-      "-a", phoneNumber!,
-      "send",
-      "-m", truncated,
-      recipient,
-    ], 30000);
+    const result = await signalApi(baseUrl, "POST", "/v2/send", {
+      message: truncated,
+      number: phoneNumber,
+      recipients: [recipient],
+    });
 
     return result !== null;
   }
@@ -237,22 +201,8 @@ export function startSignalPollingGateway(
     }
   }
 
-  function parseJsonMessages(output: string): SignalJsonMessage[] {
-    const messages: SignalJsonMessage[] = [];
-    for (const line of output.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith("{")) continue;
-      try {
-        messages.push(JSON.parse(trimmed) as SignalJsonMessage);
-      } catch {
-        // skip malformed lines
-      }
-    }
-    return messages;
-  }
-
-  function processMessage(msg: SignalJsonMessage): void {
-    const env = msg.envelope;
+  function processEnvelope(envelope: SignalEnvelope): void {
+    const env = envelope.envelope;
     if (!env) return;
 
     const dataMsg = env.dataMessage;
@@ -280,48 +230,51 @@ export function startSignalPollingGateway(
     if (stopped) return;
 
     try {
-      const output = await runSignalCli(binPath!, [
-        "-a", phoneNumber!,
-        "-o", "json",
-        "receive",
-        "-t", "1",
-      ], 30000);
+      const encoded = encodeURIComponent(phoneNumber!);
+      const envelopes = await signalApi<SignalEnvelope[]>(
+        baseUrl,
+        "GET",
+        `/v1/receive/${encoded}`,
+      );
 
-      if (!output) {
-        reconnectAttempts += 1;
-        if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
-          log.error(`Exceeded ${MAX_RECONNECT_ATTEMPTS} poll failures, stopping`);
-          stopped = true;
-          return;
-        }
-        const delay = Math.min(
-          BASE_RECONNECT_DELAY_MS * Math.pow(2, reconnectAttempts - 1),
-          MAX_RECONNECT_DELAY_MS,
-        );
-        log.info(`Retrying in ${delay}ms (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
-        await new Promise((resolve) => setTimeout(resolve, delay));
+      if (!envelopes || envelopes.length === 0) {
+        reconnectAttempts = 0;
         return;
       }
 
       reconnectAttempts = 0;
-      const messages = parseJsonMessages(output);
 
-      for (const msg of messages) {
-        processMessage(msg);
+      for (const envelope of envelopes) {
+        processEnvelope(envelope);
       }
     } catch (err) {
       log.warn(`Poll error: ${formatError(err)}`);
+      reconnectAttempts += 1;
+
+      if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
+        log.error(`Exceeded ${MAX_RECONNECT_ATTEMPTS} poll failures, stopping`);
+        stopped = true;
+        return;
+      }
+
+      const delay = Math.min(
+        BASE_RECONNECT_DELAY_MS * Math.pow(2, reconnectAttempts - 1),
+        MAX_RECONNECT_DELAY_MS,
+      );
+      log.info(`Retrying poll in ${delay}ms (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 
   async function startPolling(): Promise<void> {
-    // Verify signal-cli works with this account
-    const versionOutput = await runSignalCli(binPath!, ["--version"]);
-    if (!versionOutput) {
-      log.error("signal-cli version check failed, gateway not started");
-      return;
+    // Verify API is reachable
+    const about = await signalApi<{ versions?: string[] }>(baseUrl, "GET", "/v1/about");
+    if (!about) {
+      log.warn(`signal-cli REST API not reachable at ${baseUrl}, gateway will retry on poll`);
+    } else {
+      log.info(`signal-cli REST API connected at ${baseUrl}`);
     }
-    log.info(`signal-cli ${versionOutput.trim()}`);
+
     log.info(`Polling started for ${phoneNumber} (${POLL_INTERVAL_MS}ms interval)`);
 
     const tick = async () => {

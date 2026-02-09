@@ -23,6 +23,11 @@ channels:
     token: ""
     allowFrom: []
 
+  slack:
+    enabled: true
+    token: ""
+    allowFrom: []
+
   whatsapp:
     enabled: true
     accountId: ""

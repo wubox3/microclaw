@@ -25,6 +25,8 @@ import { createBrowserTool } from "./browser/browser-tool.js";
 import { startWhatsAppGateway } from "./channels/whatsapp/gateway.js";
 import { startTelegramGateway } from "./channels/telegram/gateway.js";
 import { startSignalGateway } from "./channels/signal/gateway.js";
+import { startSlackGateway } from "./channels/slack/gateway.js";
+import { startDiscordGateway } from "./channels/discord/gateway.js";
 import { CronService } from "./cron/service.js";
 import { defaultCronJobsPath } from "./cron/store.js";
 import { AsapRunner } from "./jobs/runner.js";
@@ -327,6 +329,18 @@ async function main(): Promise<void> {
   const signalHandle = startSignalGateway({ config, agent, webMonitor, memoryManager });
   if (signalHandle) {
     cleanupFns.push(() => { signalHandle.stop(); });
+  }
+
+  // 9f. Start Slack gateway (polling-based)
+  const slackHandle = startSlackGateway({ config, agent, webMonitor, memoryManager });
+  if (slackHandle) {
+    cleanupFns.push(() => { slackHandle.stop(); });
+  }
+
+  // 9g. Start Discord gateway (polling-based)
+  const discordHandle = startDiscordGateway({ config, agent, webMonitor, memoryManager });
+  if (discordHandle) {
+    cleanupFns.push(() => { discordHandle.stop(); });
   }
 
   // 9b. Start skills file watcher

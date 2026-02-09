@@ -239,8 +239,72 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     }
   });
 
+  app.get("/api/memory/workflow", (c) => {
+    if (!deps.memoryManager) {
+      return c.json({ success: false, error: "Memory not configured" }, 503);
+    }
+    const workflow = deps.memoryManager.getWorkflow();
+    return c.json({ success: true, data: workflow ?? null });
+  });
+
+  app.put("/api/memory/workflow", async (c) => {
+    if (!deps.memoryManager) {
+      return c.json({ success: false, error: "Memory not configured" }, 503);
+    }
+    let body: Record<string, unknown>;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: "Invalid JSON body" }, 400);
+    }
+    if (typeof body !== "object" || body === null) {
+      return c.json({ success: false, error: "Body must be an object" }, 400);
+    }
+    try {
+      const workflow = body as import("../memory/types.js").Workflow;
+      workflow.lastUpdated = new Date().toISOString();
+      deps.memoryManager.saveWorkflow(workflow);
+      return c.json({ success: true, data: deps.memoryManager.getWorkflow() });
+    } catch (err) {
+      log.error(`Failed to save workflow: ${err instanceof Error ? err.message : String(err)}`);
+      return c.json({ success: false, error: "Failed to save workflow" }, 500);
+    }
+  });
+
+  app.get("/api/memory/tasks", (c) => {
+    if (!deps.memoryManager) {
+      return c.json({ success: false, error: "Memory not configured" }, 503);
+    }
+    const tasks = deps.memoryManager.getTasks();
+    return c.json({ success: true, data: tasks ?? null });
+  });
+
+  app.put("/api/memory/tasks", async (c) => {
+    if (!deps.memoryManager) {
+      return c.json({ success: false, error: "Memory not configured" }, 503);
+    }
+    let body: Record<string, unknown>;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: "Invalid JSON body" }, 400);
+    }
+    if (typeof body !== "object" || body === null) {
+      return c.json({ success: false, error: "Body must be an object" }, 400);
+    }
+    try {
+      const tasks = body as import("../memory/types.js").Tasks;
+      tasks.lastUpdated = new Date().toISOString();
+      deps.memoryManager.saveTasks(tasks);
+      return c.json({ success: true, data: deps.memoryManager.getTasks() });
+    } catch (err) {
+      log.error(`Failed to save tasks: ${err instanceof Error ? err.message : String(err)}`);
+      return c.json({ success: false, error: "Failed to save tasks" }, 500);
+    }
+  });
+
   // GCC version control endpoints
-  const GCC_VALID_TYPES = new Set(["programming_skills", "programming_planning", "event_planning"]);
+  const GCC_VALID_TYPES = new Set(["programming_skills", "programming_planning", "event_planning", "workflow", "tasks"]);
 
   app.get("/api/memory/gcc/:type/log", (c) => {
     if (!deps.memoryManager?.gccStore) {

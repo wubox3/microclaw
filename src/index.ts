@@ -242,6 +242,14 @@ async function main(): Promise<void> {
         .catch((err) => {
           log.warn(`Event planning extraction failed: ${formatError(err)}`);
         })
+        .then(() => memoryManager!.updateWorkflow(profileLlmClient))
+        .catch((err) => {
+          log.warn(`Workflow extraction failed: ${formatError(err)}`);
+        })
+        .then(() => memoryManager!.updateTasks(profileLlmClient))
+        .catch((err) => {
+          log.warn(`Tasks extraction failed: ${formatError(err)}`);
+        })
         .finally(() => { extractionInProgress = false; });
     };
     // Run once on startup (non-blocking)
@@ -249,7 +257,7 @@ async function main(): Promise<void> {
     // Schedule daily
     profileInterval = setInterval(runProfileExtraction, PROFILE_INTERVAL_MS);
     profileInterval.unref();
-    log.info("User profile + programming skills + programming planning + event planning extraction scheduled (24h interval)");
+    log.info("User profile + programming skills + programming planning + event planning + workflow + tasks extraction scheduled (24h interval)");
   }
 
   // 9a. Build and start cron scheduler

@@ -1,9 +1,11 @@
 import type { MicroClawConfig } from "../config/types.js";
-import type { MemorySearchResult, UserProfile, ProgrammingSkills, PlanningPreferences, ProgrammingPlanning, EventPlanning } from "../memory/types.js";
+import type { MemorySearchResult, UserProfile, ProgrammingSkills, PlanningPreferences, ProgrammingPlanning, EventPlanning, Workflow, Tasks } from "../memory/types.js";
 import { formatProfileForPrompt } from "../memory/user-profile.js";
 import { formatProgrammingSkillsForPrompt } from "../memory/gcc-programming-skills.js";
 import { formatProgrammingPlanningForPrompt } from "../memory/gcc-programming-planning.js";
 import { formatEventPlanningForPrompt } from "../memory/gcc-event-planning.js";
+import { formatWorkflowForPrompt } from "../memory/gcc-workflow.js";
+import { formatTasksForPrompt } from "../memory/gcc-tasks.js";
 
 const BASE_SYSTEM_PROMPT = `You are MicroClaw, a helpful AI assistant that can communicate across multiple messaging channels.
 
@@ -36,6 +38,8 @@ export function buildSystemPrompt(params: {
   planningPreferences?: PlanningPreferences;
   programmingPlanning?: ProgrammingPlanning;
   eventPlanning?: EventPlanning;
+  workflow?: Workflow;
+  tasks?: Tasks;
 }): string {
   const parts: string[] = [];
 
@@ -60,6 +64,16 @@ export function buildSystemPrompt(params: {
   // Event planning preferences
   if (params.eventPlanning) {
     parts.push("\n" + formatEventPlanningForPrompt(params.eventPlanning));
+  }
+
+  // Workflow preferences
+  if (params.workflow) {
+    parts.push("\n" + formatWorkflowForPrompt(params.workflow));
+  }
+
+  // Active tasks & context
+  if (params.tasks) {
+    parts.push("\n" + formatTasksForPrompt(params.tasks));
   }
 
   // Canvas instructions

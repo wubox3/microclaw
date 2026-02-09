@@ -1,6 +1,6 @@
 import type { MicroClawConfig } from "../config/types.js";
 import type { AuthCredentials } from "../infra/auth.js";
-import type { MemorySearchManager, UserProfile, ProgrammingSkills, PlanningPreferences, ProgrammingPlanning, EventPlanning } from "../memory/types.js";
+import type { MemorySearchManager, UserProfile, ProgrammingSkills, PlanningPreferences, ProgrammingPlanning, EventPlanning, Workflow, Tasks } from "../memory/types.js";
 import type { AgentMessage, AgentResponse, AgentTool } from "./types.js";
 import type { LlmClient, LlmMessage } from "./llm-client.js";
 import { createLlmClient } from "./create-client.js";
@@ -99,6 +99,8 @@ export function createAgent(context: AgentContext): Agent {
       let planningPreferences: PlanningPreferences | undefined;
       let programmingPlanning: ProgrammingPlanning | undefined;
       let eventPlanning: EventPlanning | undefined;
+      let workflow: Workflow | undefined;
+      let tasks: Tasks | undefined;
       try {
         userProfile = context.memoryManager?.getUserProfile();
       } catch {
@@ -124,7 +126,17 @@ export function createAgent(context: AgentContext): Agent {
       } catch {
         // graceful degradation - continue without event planning
       }
-      return runDirectChat({ messages, channelId, client, tools: toolsSnapshot, context, userProfile, programmingSkills, planningPreferences, programmingPlanning, eventPlanning });
+      try {
+        workflow = context.memoryManager?.getWorkflow();
+      } catch {
+        // graceful degradation - continue without workflow
+      }
+      try {
+        tasks = context.memoryManager?.getTasks();
+      } catch {
+        // graceful degradation - continue without tasks
+      }
+      return runDirectChat({ messages, channelId, client, tools: toolsSnapshot, context, userProfile, programmingSkills, planningPreferences, programmingPlanning, eventPlanning, workflow, tasks });
     },
   };
 }
@@ -198,8 +210,10 @@ async function runDirectChat(params: {
   planningPreferences?: PlanningPreferences;
   programmingPlanning?: ProgrammingPlanning;
   eventPlanning?: EventPlanning;
+  workflow?: Workflow;
+  tasks?: Tasks;
 }): Promise<AgentResponse> {
-  const { messages, channelId, client, tools, context, userProfile, programmingSkills, planningPreferences, programmingPlanning, eventPlanning } = params;
+  const { messages, channelId, client, tools, context, userProfile, programmingSkills, planningPreferences, programmingPlanning, eventPlanning, workflow, tasks } = params;
 
   // Search memory for context if available
   let memoryResults: import("../memory/types.js").MemorySearchResult[] | undefined;
@@ -228,6 +242,8 @@ async function runDirectChat(params: {
     planningPreferences,
     programmingPlanning,
     eventPlanning,
+    workflow,
+    tasks,
   });
 
   const systemMessages = messages.filter((m) => m.role === "system");

@@ -2,7 +2,7 @@ import { mkdirSync, existsSync, realpathSync } from "node:fs";
 import { resolve as resolvePath } from "node:path";
 import type { MicroClawConfig } from "../config/types.js";
 import type { AuthCredentials } from "../infra/auth.js";
-import type { MemorySearchManager, MemorySearchParams, MemorySearchResult, MemoryProviderStatus, MemoryRecordCounts, UserProfile, ProgrammingSkills, PlanningPreferences, ProgrammingPlanning, EventPlanning } from "./types.js";
+import type { MemorySearchManager, MemorySearchParams, MemorySearchResult, MemoryProviderStatus, MemoryRecordCounts, UserProfile, ProgrammingSkills, PlanningPreferences, ProgrammingPlanning, EventPlanning, Workflow, Tasks } from "./types.js";
 import { createUserProfileManager } from "./user-profile.js";
 import { createProgrammingSkillsManager } from "./programming-skills.js";
 import { createPlanningPreferencesManager } from "./planning-preferences.js";
@@ -10,6 +10,8 @@ import { createGccStore, type GccStore } from "./gcc-store.js";
 import { createGccProgrammingSkillsManager } from "./gcc-programming-skills.js";
 import { createGccProgrammingPlanningManager } from "./gcc-programming-planning.js";
 import { createGccEventPlanningManager } from "./gcc-event-planning.js";
+import { createGccWorkflowManager } from "./gcc-workflow.js";
+import { createGccTasksManager } from "./gcc-tasks.js";
 import { createLogger } from "../logging.js";
 import { openDatabase, closeDatabase } from "./sqlite.js";
 import { MEMORY_SCHEMA, FTS_SYNC_TRIGGERS, CHAT_SCHEMA, GCC_SCHEMA } from "./memory-schema.js";
@@ -59,6 +61,8 @@ export function createMemoryManager(params: {
   const gccSkillsManager = createGccProgrammingSkillsManager(db, gccStore);
   const gccPlanningManager = createGccProgrammingPlanningManager(db, gccStore);
   const gccEventPlanningManager = createGccEventPlanningManager(db, gccStore);
+  const gccWorkflowManager = createGccWorkflowManager(db, gccStore);
+  const gccTasksManager = createGccTasksManager(db, gccStore);
 
   // Migrate legacy data to GCC on first run
   try {
@@ -269,6 +273,34 @@ export function createMemoryManager(params: {
 
     updateEventPlanning: async (llmClient) => {
       return trackAsyncOp(async () => gccEventPlanningManager.extractAndUpdateEventPlanning(llmClient));
+    },
+
+    getWorkflow: (): Workflow | undefined => {
+      if (closed) return undefined;
+      return gccWorkflowManager.getWorkflow();
+    },
+
+    saveWorkflow: (workflow: Workflow): void => {
+      if (closed) return;
+      gccWorkflowManager.saveWorkflow(workflow);
+    },
+
+    updateWorkflow: async (llmClient) => {
+      return trackAsyncOp(async () => gccWorkflowManager.extractAndUpdateWorkflow(llmClient));
+    },
+
+    getTasks: (): Tasks | undefined => {
+      if (closed) return undefined;
+      return gccTasksManager.getTasks();
+    },
+
+    saveTasks: (tasks: Tasks): void => {
+      if (closed) return;
+      gccTasksManager.saveTasks(tasks);
+    },
+
+    updateTasks: async (llmClient) => {
+      return trackAsyncOp(async () => gccTasksManager.extractAndUpdateTasks(llmClient));
     },
 
     gccStore,

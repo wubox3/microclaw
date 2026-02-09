@@ -4,9 +4,11 @@
 
   var TABS = [
     { id: 'profile', label: 'Profile', endpoint: '/api/memory/profile' },
+    { id: 'event-planning', label: 'Events', endpoint: '/api/memory/event-planning' },
+    { id: 'workflow', label: 'Workflow', endpoint: '/api/memory/workflow' },
+    { id: 'tasks', label: 'Tasks', endpoint: '/api/memory/tasks' },
     { id: 'skills', label: 'Skills', endpoint: '/api/memory/skills' },
     { id: 'programming-planning', label: 'Planning', endpoint: '/api/memory/programming-planning' },
-    { id: 'event-planning', label: 'Events', endpoint: '/api/memory/event-planning' },
     { id: 'history', label: 'History', endpoint: null },
   ];
 
@@ -44,6 +46,21 @@
         'eventTypes', 'schedulingInsights',
       ],
     },
+    workflow: {
+      strings: [],
+      arrays: [
+        'decompositionPatterns', 'taskSizingPreferences', 'prioritizationApproach',
+        'sequencingPatterns', 'dependencyHandling', 'estimationStyle',
+        'toolsAndProcesses', 'workflowInsights',
+      ],
+    },
+    tasks: {
+      strings: [],
+      arrays: [
+        'activeTasks', 'completedTasks', 'blockedTasks', 'upcomingTasks',
+        'currentGoals', 'projectContext', 'deadlines', 'taskInsights',
+      ],
+    },
   };
 
   // Friendly labels for field names
@@ -71,16 +88,26 @@
     recurringSchedules: 'Recurring Schedules', venuePreferences: 'Venue Preferences',
     calendarHabits: 'Calendar Habits', planningStyle: 'Planning Style',
     eventTypes: 'Event Types', schedulingInsights: 'Scheduling Insights',
+    decompositionPatterns: 'Decomposition Patterns', taskSizingPreferences: 'Task Sizing',
+    prioritizationApproach: 'Prioritization', sequencingPatterns: 'Sequencing',
+    dependencyHandling: 'Dependency Handling', estimationStyle: 'Estimation Style',
+    toolsAndProcesses: 'Tools & Processes', workflowInsights: 'Workflow Insights',
+    activeTasks: 'Active Tasks', completedTasks: 'Completed Tasks',
+    blockedTasks: 'Blocked Tasks', upcomingTasks: 'Upcoming Tasks',
+    currentGoals: 'Current Goals', projectContext: 'Project Context',
+    deadlines: 'Deadlines', taskInsights: 'Task Insights',
   };
 
   var GCC_TYPES = [
     { value: 'programming_skills', label: 'Skills' },
     { value: 'programming_planning', label: 'Planning' },
     { value: 'event_planning', label: 'Events' },
+    { value: 'workflow', label: 'Workflow' },
+    { value: 'tasks', label: 'Tasks' },
   ];
 
   var activeTab = 'profile';
-  var tabData = { profile: null, skills: null, 'programming-planning': null, 'event-planning': null };
+  var tabData = { profile: null, skills: null, 'programming-planning': null, 'event-planning': null, workflow: null, tasks: null };
   var dirty = false;
   var historyState = { type: 'programming_skills', entries: [] };
 

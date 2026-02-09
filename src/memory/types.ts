@@ -124,6 +124,30 @@ export type EventPlanning = {
   lastUpdated: string;
 };
 
+export type Workflow = {
+  decompositionPatterns: string[];
+  taskSizingPreferences: string[];
+  prioritizationApproach: string[];
+  sequencingPatterns: string[];
+  dependencyHandling: string[];
+  estimationStyle: string[];
+  toolsAndProcesses: string[];
+  workflowInsights: string[];
+  lastUpdated: string;
+};
+
+export type Tasks = {
+  activeTasks: string[];
+  completedTasks: string[];
+  blockedTasks: string[];
+  upcomingTasks: string[];
+  currentGoals: string[];
+  projectContext: string[];
+  deadlines: string[];
+  taskInsights: string[];
+  lastUpdated: string;
+};
+
 export type ProgrammingSkills = {
   languages: string[];
   frameworks: string[];
@@ -169,6 +193,12 @@ export type MemorySearchManager = {
   getEventPlanning: () => EventPlanning | undefined;
   saveEventPlanning: (planning: EventPlanning) => void;
   updateEventPlanning: (llmClient: import("../agent/llm-client.js").LlmClient) => Promise<void>;
+  getWorkflow: () => Workflow | undefined;
+  saveWorkflow: (workflow: Workflow) => void;
+  updateWorkflow: (llmClient: import("../agent/llm-client.js").LlmClient) => Promise<void>;
+  getTasks: () => Tasks | undefined;
+  saveTasks: (tasks: Tasks) => void;
+  updateTasks: (llmClient: import("../agent/llm-client.js").LlmClient) => Promise<void>;
   gccStore?: import("./gcc-store.js").GccStore;
   close: () => void | Promise<void>;
 };

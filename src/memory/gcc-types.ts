@@ -1,4 +1,4 @@
-export type GccMemoryType = "programming_skills" | "programming_planning" | "event_planning";
+export type GccMemoryType = "programming_skills" | "programming_planning" | "event_planning" | "workflow" | "tasks";
 
 export type GccConfidence = "HIGH_CONFIDENCE" | "MEDIUM_CONFIDENCE" | "LOW_CONFIDENCE";
 

@@ -1,7 +1,7 @@
 
 # EClaw
 
-**EClaw** is a lightweight, developer-friendly AI assistant framework designed to preserve the most important capabilities of large agent platforms while dramatically reducing code size and architectural complexity.
+**EClaw** is an embedded Claw Bot for Raspberry Pi 5 and older Mac Mini, derived from Openclaw. It retains core capabilities—multi-message channels, vector memory, browser automation, canvas interaction, voice, and hybrid memory—while simplifying the codebase and architecture to improve maintainability and development speed.
 
 > Delivering most of the capability of large agent platforms at a fraction of the complexity.
 

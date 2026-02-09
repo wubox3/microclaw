@@ -111,4 +111,9 @@ MicroClaw aims to strike a balance between capability and simplicity:
 
 ---
 
+## License
+
+MIT
+
+---
 

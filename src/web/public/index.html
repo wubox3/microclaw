@@ -3,20 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MicroClaw</title>
+  <title>EClaw</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <div id="app">
     <aside id="sidebar">
       <div class="sidebar-header">
-        <h1 class="logo">MicroClaw</h1>
+        <h1 class="logo">EClaw</h1>
       </div>
       <div id="cron-panel" class="sidebar-section">
-        <div class="nav-section-label">Jobs</div>
+        <div class="nav-section-label-row">
+          <div class="nav-section-label">Jobs</div>
+          <button id="calendar-open-btn" class="calendar-open-btn" title="Job Calendar">Cal</button>
+        </div>
         <div id="cron-status" class="cron-status">Loading...</div>
         <div id="cron-list" class="cron-list"></div>
         <button id="cron-add-btn" class="cron-add-btn">+ New Job</button>
+      </div>
+      <div id="asap-panel" class="sidebar-section">
+        <div class="nav-section-label-row">
+          <div class="nav-section-label">ASAP Queue</div>
+          <span id="asap-count" class="asap-count-badge" style="display:none"></span>
+        </div>
+        <div id="asap-list" class="asap-list"></div>
+        <button id="asap-add-btn" class="cron-add-btn">+ New ASAP Job</button>
       </div>
       <nav id="channel-list">
         <div class="nav-section-label">Channels</div>
@@ -153,7 +164,50 @@
     </div>
   </div>
 
+  <!-- Calendar Dialog -->
+  <div id="calendar-dialog" class="dialog-overlay hidden">
+    <div class="dialog-box cal-dialog-box">
+      <div class="dialog-header">
+        <h3>Job Calendar</h3>
+        <button id="calendar-dialog-close" class="dialog-close">&times;</button>
+      </div>
+      <div class="dialog-body cal-dialog-body">
+        <div class="cal-nav">
+          <button id="calendar-prev" class="cal-nav-btn">&lsaquo;</button>
+          <span id="calendar-month-label" class="cal-month-label"></span>
+          <button id="calendar-next" class="cal-nav-btn">&rsaquo;</button>
+        </div>
+        <div id="calendar-grid" class="cal-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ASAP Job Dialog -->
+  <div id="asap-dialog" class="dialog-overlay hidden">
+    <div class="dialog-box">
+      <div class="dialog-header">
+        <h3>New ASAP Job</h3>
+        <button id="asap-dialog-close" class="dialog-close">&times;</button>
+      </div>
+      <div class="dialog-body">
+        <div class="cron-form-group">
+          <label for="asap-field-name">Name</label>
+          <input id="asap-field-name" type="text" placeholder="Task name">
+        </div>
+        <div class="cron-form-group">
+          <label for="asap-field-desc">Description</label>
+          <textarea id="asap-field-desc" rows="4" placeholder="What should the agent do?"></textarea>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button id="asap-dialog-save" class="dialog-btn">Add Job</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/cron.js"></script>
+  <script src="/calendar.js"></script>
+  <script src="/asap.js"></script>
   <script src="/memory.js"></script>
   <script src="/sound-fx.js"></script>
   <script src="/voice.js"></script>

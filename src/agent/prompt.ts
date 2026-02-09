@@ -1,4 +1,4 @@
-import type { MicroClawConfig } from "../config/types.js";
+import type { EClawConfig } from "../config/types.js";
 import type { MemorySearchResult, UserProfile, ProgrammingSkills, PlanningPreferences, ProgrammingPlanning, EventPlanning, Workflow, Tasks } from "../memory/types.js";
 import { formatProfileForPrompt } from "../memory/user-profile.js";
 import { formatProgrammingSkillsForPrompt } from "../memory/gcc-programming-skills.js";
@@ -7,7 +7,7 @@ import { formatEventPlanningForPrompt } from "../memory/gcc-event-planning.js";
 import { formatWorkflowForPrompt } from "../memory/gcc-workflow.js";
 import { formatTasksForPrompt } from "../memory/gcc-tasks.js";
 
-const BASE_SYSTEM_PROMPT = `You are MicroClaw, a helpful AI assistant that can communicate across multiple messaging channels.
+const BASE_SYSTEM_PROMPT = `You are EClaw, a helpful AI assistant that can communicate across multiple messaging channels.
 
 You have access to a memory system that stores relevant context from past conversations and files.
 When memory results are provided, use them to give more informed and contextual responses.
@@ -29,7 +29,7 @@ When a user asks you to show something visual, create a UI, or display interacti
 When you receive a canvas action from the user (e.g. button click), respond appropriately and update the canvas if needed.`;
 
 export function buildSystemPrompt(params: {
-  config: MicroClawConfig;
+  config: EClawConfig;
   memoryResults?: MemorySearchResult[];
   channelId?: string;
   canvasEnabled?: boolean;
@@ -40,6 +40,7 @@ export function buildSystemPrompt(params: {
   eventPlanning?: EventPlanning;
   workflow?: Workflow;
   tasks?: Tasks;
+  skillsPrompt?: string;
 }): string {
   const parts: string[] = [];
 
@@ -74,6 +75,11 @@ export function buildSystemPrompt(params: {
   // Active tasks & context
   if (params.tasks) {
     parts.push("\n" + formatTasksForPrompt(params.tasks));
+  }
+
+  // Skills prompt
+  if (params.skillsPrompt) {
+    parts.push("\n" + params.skillsPrompt);
   }
 
   // Canvas instructions

@@ -166,7 +166,7 @@ describe("createGccTasksManager", () => {
         blockedTasks: ["deploy to prod (waiting for CI)"],
         upcomingTasks: ["add Slack integration"],
         currentGoals: ["ship multi-channel support"],
-        projectContext: ["microclaw: multi-channel AI assistant"],
+        projectContext: ["eclaw: multi-channel AI assistant"],
         deadlines: ["demo by Friday"],
         taskInsights: ["works on 2-3 tasks per session"],
       });
@@ -451,7 +451,7 @@ describe("formatTasksForPrompt", () => {
       blockedTasks: ["deploy to prod (waiting for CI)"],
       upcomingTasks: ["add Slack integration"],
       currentGoals: ["ship multi-channel support"],
-      projectContext: ["microclaw: multi-channel AI assistant"],
+      projectContext: ["eclaw: multi-channel AI assistant"],
       deadlines: ["demo by Friday"],
       taskInsights: ["works on 2-3 tasks per session"],
     });
@@ -467,7 +467,7 @@ describe("formatTasksForPrompt", () => {
     expect(result).toContain("  - deploy to prod (waiting for CI)");
     expect(result).toContain("Upcoming: add Slack integration");
     expect(result).toContain("Recently completed: added X channel");
-    expect(result).toContain("Projects: microclaw: multi-channel AI assistant");
+    expect(result).toContain("Projects: eclaw: multi-channel AI assistant");
     expect(result).toContain("Deadlines: demo by Friday");
     expect(result).toContain("Task insights:");
     expect(result).toContain("  - works on 2-3 tasks per session");

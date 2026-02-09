@@ -20,10 +20,10 @@ export type RunCronAgentTurnParams = {
 };
 
 /**
- * Simplified isolated agent execution for microclaw.
+ * Simplified isolated agent execution for eclaw.
  *
  * OpenClaw's version has deep coupling to its session/workspace/CLI/delivery system.
- * For microclaw, we simply:
+ * For eclaw, we simply:
  * 1. Run agent.chat() with the job's message
  * 2. Capture response text
  * 3. Optionally broadcast result to web UI via webMonitor

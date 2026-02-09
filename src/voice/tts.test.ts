@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { textToSpeech, resolveTtsConfig } from "./tts.js";
-import type { MicroClawConfig } from "../config/types.js";
+import type { EClawConfig } from "../config/types.js";
 
 // ---------------------------------------------------------------------------
 // Mock fetch
@@ -23,9 +23,9 @@ afterEach(() => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeConfig(overrides?: MicroClawConfig["voice"]): MicroClawConfig {
+function makeConfig(overrides?: EClawConfig["voice"]): EClawConfig {
   // Default to enabled for tests that exercise TTS behavior
-  const defaults: MicroClawConfig["voice"] = { tts: { enabled: true } };
+  const defaults: EClawConfig["voice"] = { tts: { enabled: true } };
   if (overrides?.tts) {
     return { voice: { ...defaults, tts: { ...defaults.tts, ...overrides.tts } } };
   }
@@ -163,8 +163,8 @@ describe("textToSpeech", () => {
       expect(body.model).toBe("openai/tts-1-hd");
       expect(body.response_format).toBe("mp3");
       // OpenRouter-specific headers
-      expect(opts.headers["HTTP-Referer"]).toBe("https://github.com/wubox3/microclaw");
-      expect(opts.headers["X-Title"]).toBe("MicroClaw");
+      expect(opts.headers["HTTP-Referer"]).toBe("https://github.com/wubox3/eclaw");
+      expect(opts.headers["X-Title"]).toBe("EClaw");
     } finally {
       if (originalKey) {
         process.env.OPENROUTER_API_KEY = originalKey;

@@ -71,12 +71,12 @@ Exchanges marked with [TASK] contain task-related content.
 
 Return ONLY valid JSON matching this schema (no markdown fencing, no explanation):
 {
-  "activeTasks": ["tasks currently being worked on - e.g. implement bird skill for microclaw, fix auth token refresh"],
+  "activeTasks": ["tasks currently being worked on - e.g. implement bird skill for eclaw, fix auth token refresh"],
   "completedTasks": ["recently completed tasks - e.g. added X channel to sidebar, migrated to GCC memory"],
   "blockedTasks": ["tasks that are blocked or waiting - e.g. deploy to prod (waiting for CI fix)"],
   "upcomingTasks": ["planned future tasks - e.g. add Slack integration, write E2E tests"],
   "currentGoals": ["higher-level goals - e.g. ship multi-channel support, improve memory system"],
-  "projectContext": ["project names and context - e.g. microclaw: multi-channel AI assistant, bird: X/Twitter CLI"],
+  "projectContext": ["project names and context - e.g. eclaw: multi-channel AI assistant, bird: X/Twitter CLI"],
   "deadlines": ["known deadlines - e.g. demo by Friday, v2.0 launch March 1"],
   "taskInsights": ["observations about task patterns - e.g. user works on 2-3 tasks per session"]
 }
@@ -85,7 +85,7 @@ Rules:
 - Only include information explicitly demonstrated or stated in the conversations
 - Do not guess or infer beyond what is clearly indicated
 - Return empty arrays for unknown fields
-- Be specific: "implement bird CLI wrapper for microclaw" not just "implement feature"
+- Be specific: "implement bird CLI wrapper for eclaw" not just "implement feature"
 - For completedTasks, only include tasks clearly marked as done in recent conversations
 - Keep each item concise (one sentence max)
 

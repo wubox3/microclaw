@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { resolveMemoryBackendConfig } from "./backend-config.js";
-import type { MicroClawConfig } from "../config/types.js";
+import type { EClawConfig } from "../config/types.js";
 
 describe("resolveMemoryBackendConfig", () => {
   it("returns defaults when no memory config provided", () => {
@@ -16,7 +16,7 @@ describe("resolveMemoryBackendConfig", () => {
   });
 
   it("applies custom overrides", () => {
-    const config: MicroClawConfig = {
+    const config: EClawConfig = {
       memory: {
         embeddingModel: "custom-model",
         vectorWeight: 0.5,
@@ -37,7 +37,7 @@ describe("resolveMemoryBackendConfig", () => {
   });
 
   it("applies partial overrides with defaults for remaining", () => {
-    const config: MicroClawConfig = {
+    const config: EClawConfig = {
       memory: { embeddingModel: "text-embedding-3-small" },
     };
     const result = resolveMemoryBackendConfig(config, "/data");
@@ -53,7 +53,7 @@ describe("resolveMemoryBackendConfig", () => {
   });
 
   it("handles memory config with zero values", () => {
-    const config: MicroClawConfig = {
+    const config: EClawConfig = {
       memory: { vectorWeight: 0, keywordWeight: 1, maxResults: 0 },
     };
     const result = resolveMemoryBackendConfig(config, "/data");

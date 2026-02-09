@@ -14,13 +14,13 @@ import {
   resolveBrowserExecutableForPlatform,
 } from "./chrome.executables.js";
 import {
-  decorateMicroClawProfile,
+  decorateEClawProfile,
   ensureProfileCleanExit,
   isProfileDecorated,
 } from "./chrome.profile-decoration.js";
 import {
-  DEFAULT_MICROCLAW_BROWSER_COLOR,
-  DEFAULT_MICROCLAW_BROWSER_PROFILE_NAME,
+  DEFAULT_ECLAW_BROWSER_COLOR,
+  DEFAULT_ECLAW_BROWSER_PROFILE_NAME,
 } from "./constants.js";
 
 const log = createSubsystemLogger("browser").child("chrome");
@@ -33,7 +33,7 @@ export {
   resolveBrowserExecutableForPlatform,
 } from "./chrome.executables.js";
 export {
-  decorateMicroClawProfile,
+  decorateEClawProfile,
   ensureProfileCleanExit,
   isProfileDecorated,
 } from "./chrome.profile-decoration.js";
@@ -59,7 +59,7 @@ function resolveBrowserExecutable(resolved: ResolvedBrowserConfig): BrowserExecu
   return resolveBrowserExecutableForPlatform(resolved, process.platform);
 }
 
-export function resolveMicroClawUserDataDir(profileName = DEFAULT_MICROCLAW_BROWSER_PROFILE_NAME) {
+export function resolveEClawUserDataDir(profileName = DEFAULT_ECLAW_BROWSER_PROFILE_NAME) {
   return path.join(CONFIG_DIR, "browser", profileName, "user-data");
 }
 
@@ -157,7 +157,7 @@ export async function isChromeCdpReady(
   return await canOpenWebSocket(wsUrl, handshakeTimeoutMs);
 }
 
-export async function launchMicroClawChrome(
+export async function launchEClawChrome(
   resolved: ResolvedBrowserConfig,
   profile: ResolvedBrowserProfile,
 ): Promise<RunningChrome> {
@@ -173,13 +173,13 @@ export async function launchMicroClawChrome(
     );
   }
 
-  const userDataDir = resolveMicroClawUserDataDir(profile.name);
+  const userDataDir = resolveEClawUserDataDir(profile.name);
   fs.mkdirSync(userDataDir, { recursive: true });
 
   const needsDecorate = !isProfileDecorated(
     userDataDir,
     profile.name,
-    (profile.color ?? DEFAULT_MICROCLAW_BROWSER_COLOR).toUpperCase(),
+    (profile.color ?? DEFAULT_ECLAW_BROWSER_COLOR).toUpperCase(),
   );
 
   // First launch to create preference files if missing, then decorate and relaunch.
@@ -264,20 +264,20 @@ export async function launchMicroClawChrome(
 
   if (needsDecorate) {
     try {
-      decorateMicroClawProfile(userDataDir, {
+      decorateEClawProfile(userDataDir, {
         name: profile.name,
         color: profile.color,
       });
-      log.info(`🦞 microclaw browser profile decorated (${profile.color})`);
+      log.info(`🦞 eclaw browser profile decorated (${profile.color})`);
     } catch (err) {
-      log.warn(`microclaw browser profile decoration failed: ${String(err)}`);
+      log.warn(`eclaw browser profile decoration failed: ${String(err)}`);
     }
   }
 
   try {
     ensureProfileCleanExit(userDataDir);
   } catch (err) {
-    log.warn(`microclaw browser clean-exit prefs failed: ${String(err)}`);
+    log.warn(`eclaw browser clean-exit prefs failed: ${String(err)}`);
   }
 
   const proc = spawnOnce();
@@ -303,7 +303,7 @@ export async function launchMicroClawChrome(
 
   const pid = proc.pid ?? -1;
   log.info(
-    `🦞 microclaw browser started (${exe.kind}) profile "${profile.name}" on 127.0.0.1:${profile.cdpPort} (pid ${pid})`,
+    `🦞 eclaw browser started (${exe.kind}) profile "${profile.name}" on 127.0.0.1:${profile.cdpPort} (pid ${pid})`,
   );
 
   return {
@@ -316,7 +316,7 @@ export async function launchMicroClawChrome(
   };
 }
 
-export async function stopMicroClawChrome(running: RunningChrome, timeoutMs = 2500) {
+export async function stopEClawChrome(running: RunningChrome, timeoutMs = 2500) {
   const proc = running.proc;
   if (proc.killed) {
     return;

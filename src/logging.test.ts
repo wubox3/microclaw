@@ -50,8 +50,8 @@ describe("createLogger", () => {
 // ---------------------------------------------------------------------------
 
 describe("logger", () => {
-  it("is a Logger instance with name microclaw", () => {
-    expect(logger.settings.name).toBe("microclaw");
+  it("is a Logger instance with name eclaw", () => {
+    expect(logger.settings.name).toBe("eclaw");
   });
 
   it("has default minLevel 3", () => {

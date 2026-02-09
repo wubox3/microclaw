@@ -100,14 +100,14 @@ export type PlanningPreferences = {
 };
 
 export type ProgrammingPlanning = {
-  confirmedPlans: string[];
-  modifiedPatterns: string[];
-  discardedReasons: string[];
-  planStructure: string[];
+  structurePreferences: string[];
+  detailLevelPreferences: string[];
+  valuedPlanElements: string[];
+  architectureApproaches: string[];
   scopePreferences: string[];
-  detailLevel: string[];
-  reviewPatterns: string[];
-  implementationFlow: string[];
+  presentationFormat: string[];
+  approvedPlanPatterns: string[];
+  discardedReasons: string[];
   planningInsights: string[];
   lastUpdated: string;
 };

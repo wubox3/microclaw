@@ -1,7 +1,7 @@
 
-# MicroClaw
+# EClaw
 
-**MicroClaw** is a lightweight, developer-friendly AI assistant framework designed to preserve the most important capabilities of large agent platforms while dramatically reducing code size and architectural complexity.
+**EClaw** is a lightweight, developer-friendly AI assistant framework designed to preserve the most important capabilities of large agent platforms while dramatically reducing code size and architectural complexity.
 
 > Delivering most of the capability of large agent platforms at a fraction of the complexity.
 
@@ -9,14 +9,14 @@
 
 ## Positioning
 
-MicroClaw sits between large, enterprise agent systems and ultra-minimal personal assistants:
+EClaw sits between large, enterprise agent systems and ultra-minimal personal assistants:
 
 ```
 Capability
    ↑
    │                                   OpenClaw
    │                             (Enterprise platform)
-   │        MicroClaw
+   │        EClaw
    │   (Balanced, practical)
    │
    │
@@ -27,13 +27,13 @@ Capability
    └──────── Low Complexity ───────── High Complexity →
 ```
 
-This balance allows MicroClaw to provide real-world functionality while remaining maintainable and easy to understand.
+This balance allows EClaw to provide real-world functionality while remaining maintainable and easy to understand.
 
 ---
 
 ## At a Glance
 
-| Dimension              | OpenClaw                         | **MicroClaw**              | NanoClaw                 |
+| Dimension              | OpenClaw                         | **EClaw**              | NanoClaw                 |
 | ---------------------- | -------------------------------- | -------------------------- | ------------------------ |
 | **Philosophy**         | Enterprise-grade platform        | **Balanced middle ground** | Minimalist personal tool |
 | **Lines of Code**      | ~585K TS + Swift/Kotlin          | **~33K TS**                | ~4.3K TS                 |
@@ -52,15 +52,15 @@ This balance allows MicroClaw to provide real-world functionality while remainin
 ### Installation
 
 ```bash
-git clone https://github.com/wubo3x/microclaw.git
-cd microclaw
+git clone https://github.com/wubo3x/eclaw.git
+cd eclaw
 claude
 ```
 
 
 ## Design Goals
 
-MicroClaw is designed around three core principles:
+EClaw is designed around three core principles:
 
 ### Preserve Essential Capabilities
 
@@ -91,7 +91,7 @@ MicroClaw is designed around three core principles:
 
 ---
 
-## Who MicroClaw Is For
+## Who EClaw Is For
 
 * Independent developers building agent tools
 * Small teams deploying assistants
@@ -102,7 +102,7 @@ MicroClaw is designed around three core principles:
 
 ## Philosophy
 
-MicroClaw aims to strike a balance between capability and simplicity:
+EClaw aims to strike a balance between capability and simplicity:
 
 * Powerful enough for real-world use
 * Small enough to understand

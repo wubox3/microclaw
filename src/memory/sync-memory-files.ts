@@ -155,9 +155,12 @@ function insertChunks(db: SqliteDb, fileId: number, content: string, insertChunk
 
   for (const chunk of chunks) {
     const pos = content.indexOf(chunk, searchFrom);
+    if (pos < 0) {
+      log.warn(`Chunk not found in content (searchFrom=${searchFrom}, chunkLen=${chunk.length})`);
+    }
     const startLine = pos >= 0
       ? content.slice(0, pos).split("\n").length - 1
-      : 0;
+      : searchFrom > 0 ? content.slice(0, searchFrom).split("\n").length - 1 : 0;
     const chunkLineCount = chunk.split("\n").length;
     const hash = hashContent(chunk);
     insertChunkStmt.run(fileId, chunk, startLine, startLine + chunkLineCount - 1, hash);

@@ -9,10 +9,10 @@ function enhanceBrowserFetchError(url: string, err: unknown, timeoutMs: number):
     msgLower.includes("aborterror");
   if (looksLikeTimeout) {
     return new Error(
-      `Can't reach the MicroClaw browser control service (timed out after ${timeoutMs}ms). Ensure the browser server is running.`,
+      `Can't reach the EClaw browser control service (timed out after ${timeoutMs}ms). Ensure the browser server is running.`,
     );
   }
-  return new Error(`Can't reach the MicroClaw browser control service. (${msg})`);
+  return new Error(`Can't reach the EClaw browser control service. (${msg})`);
 }
 
 async function fetchHttpJson<T>(

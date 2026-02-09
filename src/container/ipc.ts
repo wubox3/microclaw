@@ -1,5 +1,5 @@
 /**
- * IPC Watcher for MicroClaw
+ * IPC Watcher for EClaw
  * Polls container IPC directories for messages and processes them
  */
 import fs from "fs";

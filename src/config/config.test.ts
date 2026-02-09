@@ -26,7 +26,7 @@ beforeEach(() => {
 describe("resolveDataDir", () => {
   it("returns default when no config provided", () => {
     const result = resolveDataDir({});
-    expect(result).toContain(".microclaw");
+    expect(result).toContain(".eclaw");
   });
 
   it("returns custom dataDir from config", () => {
@@ -75,7 +75,7 @@ describe("loadConfig", () => {
 
   it("parses valid YAML config", () => {
     mockExistsSync.mockImplementation((p) =>
-      String(p).endsWith("microclaw.config.yaml"),
+      String(p).endsWith("eclaw.config.yaml"),
     );
     mockReadFileSync.mockReturnValue("web:\n  port: 4000\n");
     const config = loadConfig("/test");
@@ -84,7 +84,7 @@ describe("loadConfig", () => {
 
   it("parses valid JSON config", () => {
     mockExistsSync.mockImplementation((p) =>
-      String(p).endsWith("microclaw.config.json"),
+      String(p).endsWith("eclaw.config.json"),
     );
     mockReadFileSync.mockReturnValue('{"web":{"port":5000}}');
     const config = loadConfig("/test");
@@ -93,7 +93,7 @@ describe("loadConfig", () => {
 
   it("throws on invalid YAML", () => {
     mockExistsSync.mockImplementation((p) =>
-      String(p).endsWith("microclaw.config.yaml"),
+      String(p).endsWith("eclaw.config.yaml"),
     );
     mockReadFileSync.mockReturnValue("{ invalid:: yaml ::");
     expect(() => loadConfig("/test")).toThrow("Failed to parse");
@@ -101,7 +101,7 @@ describe("loadConfig", () => {
 
   it("throws on invalid JSON", () => {
     mockExistsSync.mockImplementation((p) =>
-      String(p).endsWith("microclaw.config.json"),
+      String(p).endsWith("eclaw.config.json"),
     );
     mockReadFileSync.mockReturnValue("{invalid json}");
     expect(() => loadConfig("/test")).toThrow("Failed to parse");
@@ -109,7 +109,7 @@ describe("loadConfig", () => {
 
   it("validates config is an object, not array", () => {
     mockExistsSync.mockImplementation((p) =>
-      String(p).endsWith("microclaw.config.json"),
+      String(p).endsWith("eclaw.config.json"),
     );
     mockReadFileSync.mockReturnValue("[1, 2, 3]");
     expect(() => loadConfig("/test")).toThrow("Config must be an object");
@@ -117,7 +117,7 @@ describe("loadConfig", () => {
 
   it("validates web must be an object", () => {
     mockExistsSync.mockImplementation((p) =>
-      String(p).endsWith("microclaw.config.json"),
+      String(p).endsWith("eclaw.config.json"),
     );
     mockReadFileSync.mockReturnValue('{"web":"invalid"}');
     expect(() => loadConfig("/test")).toThrow("'web' must be an object");
@@ -125,7 +125,7 @@ describe("loadConfig", () => {
 
   it("validates agent must be an object", () => {
     mockExistsSync.mockImplementation((p) =>
-      String(p).endsWith("microclaw.config.json"),
+      String(p).endsWith("eclaw.config.json"),
     );
     mockReadFileSync.mockReturnValue('{"agent":42}');
     expect(() => loadConfig("/test")).toThrow("'agent' must be an object");
@@ -133,7 +133,7 @@ describe("loadConfig", () => {
 
   it("validates memory must be an object", () => {
     mockExistsSync.mockImplementation((p) =>
-      String(p).endsWith("microclaw.config.json"),
+      String(p).endsWith("eclaw.config.json"),
     );
     mockReadFileSync.mockReturnValue('{"memory":true}');
     expect(() => loadConfig("/test")).toThrow("'memory' must be an object");
@@ -141,7 +141,7 @@ describe("loadConfig", () => {
 
   it("validates container must be an object", () => {
     mockExistsSync.mockImplementation((p) =>
-      String(p).endsWith("microclaw.config.json"),
+      String(p).endsWith("eclaw.config.json"),
     );
     mockReadFileSync.mockReturnValue('{"container":"nope"}');
     expect(() => loadConfig("/test")).toThrow("'container' must be an object");
@@ -149,7 +149,7 @@ describe("loadConfig", () => {
 
   it("validates web.port must be a number", () => {
     mockExistsSync.mockImplementation((p) =>
-      String(p).endsWith("microclaw.config.json"),
+      String(p).endsWith("eclaw.config.json"),
     );
     mockReadFileSync.mockReturnValue('{"web":{"port":"abc"}}');
     expect(() => loadConfig("/test")).toThrow("'web.port' must be a number");
@@ -157,7 +157,7 @@ describe("loadConfig", () => {
 
   it("validates agent.provider must be a string", () => {
     mockExistsSync.mockImplementation((p) =>
-      String(p).endsWith("microclaw.config.json"),
+      String(p).endsWith("eclaw.config.json"),
     );
     mockReadFileSync.mockReturnValue('{"agent":{"provider":123}}');
     expect(() => loadConfig("/test")).toThrow("'agent.provider' must be a string");
@@ -165,7 +165,7 @@ describe("loadConfig", () => {
 
   it("returns null/undefined values as empty config", () => {
     mockExistsSync.mockImplementation((p) =>
-      String(p).endsWith("microclaw.config.yaml"),
+      String(p).endsWith("eclaw.config.yaml"),
     );
     mockReadFileSync.mockReturnValue("---\n");
     const config = loadConfig("/test");
@@ -176,14 +176,14 @@ describe("loadConfig", () => {
     mockExistsSync.mockReturnValue(false);
     loadConfig("/test");
     const calls = mockExistsSync.mock.calls.map((c) => String(c[0]));
-    expect(calls[0]).toContain("microclaw.config.yaml");
-    expect(calls[1]).toContain("microclaw.config.yml");
-    expect(calls[2]).toContain("microclaw.config.json");
+    expect(calls[0]).toContain("eclaw.config.yaml");
+    expect(calls[1]).toContain("eclaw.config.yml");
+    expect(calls[2]).toContain("eclaw.config.json");
   });
 
   it("throws on read error", () => {
     mockExistsSync.mockImplementation((p) =>
-      String(p).endsWith("microclaw.config.yaml"),
+      String(p).endsWith("eclaw.config.yaml"),
     );
     mockReadFileSync.mockImplementation(() => {
       throw new Error("EACCES permission denied");

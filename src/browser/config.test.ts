@@ -114,10 +114,10 @@ describe("resolveBrowserConfig", () => {
     expect(resolved.remoteCdpTimeoutMs).toBe(1500);
   });
 
-  it("creates default microclaw profile when none configured", () => {
+  it("creates default eclaw profile when none configured", () => {
     const resolved = resolveBrowserConfig(undefined);
-    expect(resolved.profiles.microclaw).toBeDefined();
-    expect(resolved.profiles.microclaw.cdpPort).toBeTypeOf("number");
+    expect(resolved.profiles.eclaw).toBeDefined();
+    expect(resolved.profiles.eclaw.cdpPort).toBeTypeOf("number");
   });
 
   it("creates chrome extension profile automatically", () => {
@@ -173,7 +173,7 @@ describe("resolveProfile", () => {
     expect(profile).not.toBeNull();
     expect(profile!.cdpPort).toBe(18800);
     expect(profile!.color).toBe("#0066CC");
-    expect(profile!.driver).toBe("microclaw");
+    expect(profile!.driver).toBe("eclaw");
   });
 
   it("resolves profile with cdpUrl", () => {

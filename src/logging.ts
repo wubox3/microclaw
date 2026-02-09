@@ -30,4 +30,4 @@ export function createLogger(name: string, minLevel?: LogLevel): Logger<unknown>
   });
 }
 
-export const logger = createLogger("microclaw");
+export const logger = createLogger("eclaw");

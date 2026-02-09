@@ -2,7 +2,7 @@ export type BrowserProfileConfig = {
   cdpPort?: number;
   cdpUrl?: string;
   color?: string;
-  driver?: "microclaw" | "extension";
+  driver?: "eclaw" | "extension";
 };
 
 export type BrowserConfig = {
@@ -21,10 +21,10 @@ export type BrowserConfig = {
   profiles?: Record<string, BrowserProfileConfig>;
 };
 
-export type MicroClawConfig = {
+export type EClawConfig = {
   browser?: BrowserConfig;
   [key: string]: unknown;
 };
 
 // Alias for compatibility with openclaw config references
-export type OpenClawConfig = MicroClawConfig;
+export type OpenClawConfig = EClawConfig;

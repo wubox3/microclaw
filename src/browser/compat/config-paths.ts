@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 export type PortRange = { start: number; end: number };
 
-export const CONFIG_DIR = join(homedir(), ".microclaw");
+export const CONFIG_DIR = join(homedir(), ".eclaw");
 
 export function resolveGatewayPort(_config?: unknown): number | undefined {
   return undefined;

@@ -24,8 +24,8 @@ const CHAT_CHANNEL_META: Record<ChatChannelId, ChannelMeta> = {
   whatsapp: {
     id: "whatsapp",
     label: "WhatsApp",
-    selectionLabel: "WhatsApp (QR link)",
-    blurb: "Works with your own number via WhatsApp Web.",
+    selectionLabel: "WhatsApp (QR or pairing code)",
+    blurb: "Works with your own number via QR scan or phone pairing code.",
   },
   discord: {
     id: "discord",

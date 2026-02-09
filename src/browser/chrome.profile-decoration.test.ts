@@ -22,7 +22,7 @@ vi.mock("node:fs", () => {
 import fs from "node:fs";
 import {
   isProfileDecorated,
-  decorateMicroClawProfile,
+  decorateEClawProfile,
   ensureProfileCleanExit,
 } from "./chrome.profile-decoration.js";
 
@@ -34,28 +34,28 @@ beforeEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// decorateMicroClawProfile
+// decorateEClawProfile
 // ---------------------------------------------------------------------------
 
-describe("decorateMicroClawProfile", () => {
+describe("decorateEClawProfile", () => {
   const userDataDir = "/tmp/chrome-profile";
   const localStatePath = path.join(userDataDir, "Local State");
   const prefsPath = path.join(userDataDir, "Default", "Preferences");
 
   it("writes Local State and Preferences with default name and color", () => {
-    decorateMicroClawProfile(userDataDir);
+    decorateEClawProfile(userDataDir);
 
     expect(fs.writeFileSync).toHaveBeenCalled();
     expect(store.has(localStatePath)).toBe(true);
     expect(store.has(prefsPath)).toBe(true);
 
     const localState = JSON.parse(store.get(localStatePath)!);
-    expect(localState.profile.info_cache.Default.name).toBe("microclaw");
+    expect(localState.profile.info_cache.Default.name).toBe("eclaw");
     expect(localState.profile.info_cache.Default.profile_color).toBe("#FF4500");
   });
 
   it("uses custom name and color when provided", () => {
-    decorateMicroClawProfile(userDataDir, { name: "test-bot", color: "#00FF00" });
+    decorateEClawProfile(userDataDir, { name: "test-bot", color: "#00FF00" });
 
     const localState = JSON.parse(store.get(localStatePath)!);
     expect(localState.profile.info_cache.Default.name).toBe("test-bot");
@@ -66,7 +66,7 @@ describe("decorateMicroClawProfile", () => {
   });
 
   it("writes color int fields for valid hex color", () => {
-    decorateMicroClawProfile(userDataDir);
+    decorateEClawProfile(userDataDir);
 
     const localState = JSON.parse(store.get(localStatePath)!);
     expect(typeof localState.profile.info_cache.Default.profile_color_seed).toBe("number");
@@ -80,17 +80,17 @@ describe("decorateMicroClawProfile", () => {
     store.set(localStatePath, JSON.stringify({ existing_key: "preserved" }));
     (fs.existsSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => store.has(p));
 
-    decorateMicroClawProfile(userDataDir);
+    decorateEClawProfile(userDataDir);
 
     const localState = JSON.parse(store.get(localStatePath)!);
     expect(localState.existing_key).toBe("preserved");
-    expect(localState.profile.info_cache.Default.name).toBe("microclaw");
+    expect(localState.profile.info_cache.Default.name).toBe("eclaw");
   });
 
   it("writes marker file", () => {
-    decorateMicroClawProfile(userDataDir);
+    decorateEClawProfile(userDataDir);
 
-    const markerPath = path.join(userDataDir, ".microclaw-profile-decorated");
+    const markerPath = path.join(userDataDir, ".eclaw-profile-decorated");
     expect(store.has(markerPath)).toBe(true);
   });
 });
@@ -105,36 +105,36 @@ describe("isProfileDecorated", () => {
   const prefsPath = path.join(userDataDir, "Default", "Preferences");
 
   function setupDecorated(name: string, colorHex: string) {
-    decorateMicroClawProfile(userDataDir, { name, color: colorHex });
+    decorateEClawProfile(userDataDir, { name, color: colorHex });
     // Reset existsSync to use the store
     (fs.existsSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => store.has(p));
   }
 
   it("returns true when Local State and Preferences match", () => {
-    setupDecorated("microclaw", "#FF4500");
-    expect(isProfileDecorated(userDataDir, "microclaw", "#FF4500")).toBe(true);
+    setupDecorated("eclaw", "#FF4500");
+    expect(isProfileDecorated(userDataDir, "eclaw", "#FF4500")).toBe(true);
   });
 
   it("returns false when name differs", () => {
-    setupDecorated("microclaw", "#FF4500");
+    setupDecorated("eclaw", "#FF4500");
     expect(isProfileDecorated(userDataDir, "different-name", "#FF4500")).toBe(false);
   });
 
   it("returns false when color differs", () => {
-    setupDecorated("microclaw", "#FF4500");
-    expect(isProfileDecorated(userDataDir, "microclaw", "#00FF00")).toBe(false);
+    setupDecorated("eclaw", "#FF4500");
+    expect(isProfileDecorated(userDataDir, "eclaw", "#00FF00")).toBe(false);
   });
 
   it("handles missing files gracefully", () => {
     (fs.existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
     // With no files, color int check returns false
-    expect(isProfileDecorated(userDataDir, "microclaw", "#FF4500")).toBe(false);
+    expect(isProfileDecorated(userDataDir, "eclaw", "#FF4500")).toBe(false);
   });
 
   it("returns nameOk for invalid hex color (non #RRGGBB)", () => {
-    setupDecorated("microclaw", "#FF4500");
+    setupDecorated("eclaw", "#FF4500");
     // Invalid hex means desiredColorInt is null, so only name check matters
-    expect(isProfileDecorated(userDataDir, "microclaw", "not-a-color")).toBe(true);
+    expect(isProfileDecorated(userDataDir, "eclaw", "not-a-color")).toBe(true);
   });
 });
 
@@ -170,12 +170,12 @@ describe("ensureProfileCleanExit", () => {
 // parseHexRgbToSignedArgbInt (tested via public API)
 // ---------------------------------------------------------------------------
 
-describe("parseHexRgbToSignedArgbInt (via decorateMicroClawProfile)", () => {
+describe("parseHexRgbToSignedArgbInt (via decorateEClawProfile)", () => {
   const userDataDir = "/tmp/chrome-profile";
   const localStatePath = path.join(userDataDir, "Local State");
 
   it("#FF4500 produces correct signed ARGB int", () => {
-    decorateMicroClawProfile(userDataDir, { color: "#FF4500" });
+    decorateEClawProfile(userDataDir, { color: "#FF4500" });
     const localState = JSON.parse(store.get(localStatePath)!);
     const colorInt = localState.profile.info_cache.Default.profile_color_seed;
     // 0xFFFF4500 as unsigned = 4294934784, as signed = -32512
@@ -184,7 +184,7 @@ describe("parseHexRgbToSignedArgbInt (via decorateMicroClawProfile)", () => {
   });
 
   it("#000000 produces correct signed ARGB int", () => {
-    decorateMicroClawProfile(userDataDir, { color: "#000000" });
+    decorateEClawProfile(userDataDir, { color: "#000000" });
     const localState = JSON.parse(store.get(localStatePath)!);
     const colorInt = localState.profile.info_cache.Default.profile_color_seed;
     // 0xFF000000 = 4278190080 → signed = -16777216
@@ -192,7 +192,7 @@ describe("parseHexRgbToSignedArgbInt (via decorateMicroClawProfile)", () => {
   });
 
   it("#FFFFFF produces correct signed ARGB int", () => {
-    decorateMicroClawProfile(userDataDir, { color: "#FFFFFF" });
+    decorateEClawProfile(userDataDir, { color: "#FFFFFF" });
     const localState = JSON.parse(store.get(localStatePath)!);
     const colorInt = localState.profile.info_cache.Default.profile_color_seed;
     // 0xFFFFFFFF = 4294967295 → signed = -1
@@ -200,7 +200,7 @@ describe("parseHexRgbToSignedArgbInt (via decorateMicroClawProfile)", () => {
   });
 
   it("invalid hex does not write color int fields", () => {
-    decorateMicroClawProfile(userDataDir, { color: "invalid" });
+    decorateEClawProfile(userDataDir, { color: "invalid" });
     const localState = JSON.parse(store.get(localStatePath)!);
     expect(localState.profile.info_cache.Default.profile_color_seed).toBeUndefined();
   });

@@ -1,4 +1,4 @@
-import type { MicroClawConfig } from "../../config/types.js";
+import type { EClawConfig } from "../../config/types.js";
 import type { ChannelId, ChannelAccountSnapshot, ChannelGroupContext, NormalizedChatType } from "./types.core.js";
 
 export type GatewayInboundMessage = {
@@ -18,23 +18,23 @@ export type ChannelOutboundContext = {
 };
 
 export type ChannelConfigAdapter<ResolvedAccount = unknown> = {
-  listAccounts?: (cfg: MicroClawConfig) => string[];
-  resolveAccount?: (params: { cfg: MicroClawConfig; accountId?: string | null }) => ResolvedAccount;
-  isConfigured?: (cfg: MicroClawConfig, accountId?: string | null) => boolean;
-  isEnabled?: (cfg: MicroClawConfig, accountId?: string | null) => boolean;
+  listAccounts?: (cfg: EClawConfig) => string[];
+  resolveAccount?: (params: { cfg: EClawConfig; accountId?: string | null }) => ResolvedAccount;
+  isConfigured?: (cfg: EClawConfig, accountId?: string | null) => boolean;
+  isEnabled?: (cfg: EClawConfig, accountId?: string | null) => boolean;
 };
 
 export type ChannelOutboundAdapter = {
   textChunkLimit?: number;
   sendText?: (params: {
-    config: MicroClawConfig;
+    config: EClawConfig;
     accountId?: string;
     to: string;
     text: string;
     chatType?: NormalizedChatType;
   }) => Promise<{ ok: boolean; messageId?: string }>;
   sendMedia?: (params: {
-    config: MicroClawConfig;
+    config: EClawConfig;
     accountId?: string;
     to: string;
     media: Buffer;
@@ -45,27 +45,27 @@ export type ChannelOutboundAdapter = {
 
 export type ChannelGatewayAdapter<ResolvedAccount = unknown> = {
   startAccount?: (params: {
-    config: MicroClawConfig;
+    config: EClawConfig;
     accountId: string;
     account: ResolvedAccount;
     onMessage?: (msg: GatewayInboundMessage) => Promise<void>;
   }) => Promise<unknown>;
   stopAccount?: (params: {
-    config: MicroClawConfig;
+    config: EClawConfig;
     accountId: string;
   }) => Promise<void>;
 };
 
 export type ChannelSecurityAdapter<ResolvedAccount = unknown> = {
   collectWarnings?: (params: {
-    config: MicroClawConfig;
+    config: EClawConfig;
     accountId?: string;
   }) => Promise<string[]> | string[];
 };
 
 export type ChannelGroupAdapter = {
   resolveRequireMention?: (params: {
-    config: MicroClawConfig;
+    config: EClawConfig;
     accountId?: string;
     groupContext: ChannelGroupContext;
   }) => boolean;
@@ -84,7 +84,7 @@ export type ChannelStreamingAdapter = {
 
 export type ChannelThreadingAdapter = {
   resolveReplyToMode?: (params: {
-    cfg: MicroClawConfig;
+    cfg: EClawConfig;
     accountId?: string;
     chatType?: NormalizedChatType;
   }) => string;

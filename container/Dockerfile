@@ -1,4 +1,4 @@
-# MicroClaw Agent Container
+# EClaw Agent Container
 # Runs Claude Agent SDK in isolated Docker container
 
 FROM node:22-slim

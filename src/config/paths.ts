@@ -1,6 +1,6 @@
 import { resolve, join } from "node:path";
 import os from "node:os";
-import type { MicroClawConfig } from "./types.js";
+import type { EClawConfig } from "./types.js";
 import { createLogger } from "../logging.js";
 
 const log = createLogger("paths");
@@ -33,6 +33,8 @@ export type ResolvedPaths = {
   readonly skillsDir: string;
   /** Absolute cron store directory */
   readonly cronStorePath: string;
+  /** Absolute path to ASAP jobs JSON file */
+  readonly asapStorePath: string;
 };
 
 /**
@@ -40,20 +42,20 @@ export type ResolvedPaths = {
  * Captures process.cwd() exactly once so all paths are consistent
  * even if the working directory changes later.
  */
-export function resolvePaths(config: MicroClawConfig): ResolvedPaths {
+export function resolvePaths(config: EClawConfig): ResolvedPaths {
   const projectRoot = resolve(process.cwd());
 
   const dataDir = config.memory?.dataDir
     ? expandPath(config.memory.dataDir, projectRoot)
-    : join(projectRoot, ".microclaw");
+    : join(projectRoot, ".eclaw");
 
-  const skillsDir = config.skills?.directory
-    ? expandPath(config.skills.directory, projectRoot)
-    : join(projectRoot, "skills");
+  const skillsDir = join(projectRoot, "skills");
 
   const cronStorePath = config.cron?.store
     ? expandPath(config.cron.store, projectRoot)
     : join(dataDir, "cron");
 
-  return Object.freeze({ projectRoot, dataDir, skillsDir, cronStorePath });
+  const asapStorePath = join(dataDir, "asap-jobs.json");
+
+  return Object.freeze({ projectRoot, dataDir, skillsDir, cronStorePath, asapStorePath });
 }

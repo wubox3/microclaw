@@ -1,26 +1,26 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { BrowserProfileConfig } from "./types.js";
-import type { MicroClawConfig } from "./types.js";
+import type { EClawConfig } from "./types.js";
 import type { BrowserRouteContext, ProfileStatus } from "./server-context.js";
 import { deriveDefaultBrowserCdpPortRange } from "./compat/config-paths.js";
 
-// Stub config access - profiles are managed in-memory for microclaw
-let cachedConfig: MicroClawConfig = {};
+// Stub config access - profiles are managed in-memory for eclaw
+let cachedConfig: EClawConfig = {};
 
-export function setBrowserConfigRef(config: MicroClawConfig): void {
+export function setBrowserConfigRef(config: EClawConfig): void {
   cachedConfig = config;
 }
 
-function loadConfig(): MicroClawConfig {
+function loadConfig(): EClawConfig {
   return cachedConfig;
 }
 
-async function writeConfigFile(_config: MicroClawConfig): Promise<void> {
-  // In microclaw, profile changes are ephemeral (not persisted to config file).
+async function writeConfigFile(_config: EClawConfig): Promise<void> {
+  // In eclaw, profile changes are ephemeral (not persisted to config file).
   // The in-memory state is updated directly via the server-context.
 }
-import { resolveMicroClawUserDataDir } from "./chrome.js";
+import { resolveEClawUserDataDir } from "./chrome.js";
 import { parseHttpUrl, resolveProfile } from "./config.js";
 import { DEFAULT_BROWSER_DEFAULT_PROFILE_NAME } from "./constants.js";
 import {
@@ -36,7 +36,7 @@ export type CreateProfileParams = {
   name: string;
   color?: string;
   cdpUrl?: string;
-  driver?: "microclaw" | "extension";
+  driver?: "eclaw" | "extension";
 };
 
 export type CreateProfileResult = {
@@ -123,7 +123,7 @@ export function createBrowserProfilesService(ctx: BrowserRouteContext) {
       };
     }
 
-    const nextConfig: MicroClawConfig = {
+    const nextConfig: EClawConfig = {
       ...cfg,
       browser: {
         ...cfg.browser,
@@ -194,7 +194,7 @@ export function createBrowserProfilesService(ctx: BrowserRouteContext) {
         // ignore
       }
 
-      const userDataDir = resolveMicroClawUserDataDir(name);
+      const userDataDir = resolveEClawUserDataDir(name);
       const profileDir = path.dirname(userDataDir);
       if (fs.existsSync(profileDir)) {
         await movePathToTrash(profileDir);
@@ -203,7 +203,7 @@ export function createBrowserProfilesService(ctx: BrowserRouteContext) {
     }
 
     const { [name]: _removed, ...remainingProfiles } = profiles;
-    const nextConfig: MicroClawConfig = {
+    const nextConfig: EClawConfig = {
       ...cfg,
       browser: {
         ...cfg.browser,

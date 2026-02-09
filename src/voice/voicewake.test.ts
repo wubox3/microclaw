@@ -33,7 +33,7 @@ afterEach(() => {
 describe("defaultVoiceWakeTriggers", () => {
   it("returns default triggers", () => {
     const triggers = defaultVoiceWakeTriggers();
-    expect(triggers).toEqual(["microclaw", "claude", "computer"]);
+    expect(triggers).toEqual(["eclaw", "claude", "computer"]);
   });
 
   it("returns a new array each time", () => {
@@ -51,7 +51,7 @@ describe("defaultVoiceWakeTriggers", () => {
 describe("loadVoiceWakeConfig", () => {
   it("returns defaults when no config file exists", async () => {
     const config = await loadVoiceWakeConfig(testDir);
-    expect(config.triggers).toEqual(["microclaw", "claude", "computer"]);
+    expect(config.triggers).toEqual(["eclaw", "claude", "computer"]);
     expect(config.updatedAtMs).toBe(0);
   });
 
@@ -81,7 +81,7 @@ describe("setVoiceWakeTriggers", () => {
 
   it("falls back to defaults when all triggers are empty", async () => {
     const config = await setVoiceWakeTriggers(["", "  "], testDir);
-    expect(config.triggers).toEqual(["microclaw", "claude", "computer"]);
+    expect(config.triggers).toEqual(["eclaw", "claude", "computer"]);
   });
 
   it("persists triggers across loads", async () => {
@@ -110,7 +110,7 @@ describe("setVoiceWakeTriggers", () => {
   });
 
   it("lowercases all triggers", async () => {
-    const config = await setVoiceWakeTriggers(["MicroClaw", "CLAUDE", "Computer"], testDir);
-    expect(config.triggers).toEqual(["microclaw", "claude", "computer"]);
+    const config = await setVoiceWakeTriggers(["EClaw", "CLAUDE", "Computer"], testDir);
+    expect(config.triggers).toEqual(["eclaw", "claude", "computer"]);
   });
 });

@@ -1,8 +1,8 @@
 import crypto from "node:crypto";
 
 /**
- * Simplified cron session for microclaw.
- * Microclaw doesn't have openclaw's session store; we just generate a unique session ID.
+ * Simplified cron session for eclaw.
+ * Eclaw doesn't have openclaw's session store; we just generate a unique session ID.
  */
 export function resolveCronSessionId(params: {
   jobId: string;

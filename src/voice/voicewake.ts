@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { VoiceWakeConfig } from "./types.js";
 
-const DEFAULT_TRIGGERS = ["microclaw", "claude", "computer"];
+const DEFAULT_TRIGGERS = ["eclaw", "claude", "computer"];
 const MAX_TRIGGERS = 50;
 
 function sanitizeTriggers(triggers: string[] | undefined | null): string[] {

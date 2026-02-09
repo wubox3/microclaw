@@ -1,4 +1,4 @@
-import type { MicroClawConfig } from "../config/types.js";
+import type { EClawConfig } from "../config/types.js";
 import type { AuthCredentials } from "../infra/auth.js";
 import type { MemorySearchManager, UserProfile, ProgrammingSkills, PlanningPreferences, ProgrammingPlanning, EventPlanning, Workflow, Tasks } from "../memory/types.js";
 import type { AgentMessage, AgentResponse, AgentTool } from "./types.js";
@@ -13,13 +13,14 @@ import { createLogger } from "../logging.js";
 const log = createLogger("agent");
 
 export type AgentContext = {
-  config: MicroClawConfig;
+  config: EClawConfig;
   auth: AuthCredentials;
   memoryManager?: MemorySearchManager;
   additionalTools?: AgentTool[];
   containerEnabled?: boolean;
   canvasEnabled?: boolean;
   sessions?: Map<string, string>;
+  skillsPrompt?: string;
 };
 
 export type Agent = {
@@ -144,7 +145,7 @@ export function createAgent(context: AgentContext): Agent {
 async function runContainerChat(params: {
   messages: AgentMessage[];
   channelId: string;
-  config: MicroClawConfig;
+  config: EClawConfig;
   sessions: Map<string, string>;
 }): Promise<AgentResponse> {
   const { messages, channelId, config, sessions } = params;
@@ -244,6 +245,7 @@ async function runDirectChat(params: {
     eventPlanning,
     workflow,
     tasks,
+    skillsPrompt: context.skillsPrompt,
   });
 
   const systemMessages = messages.filter((m) => m.role === "system");

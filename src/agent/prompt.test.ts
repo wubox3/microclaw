@@ -30,7 +30,7 @@ function makeMemoryResult(overrides: Partial<MemorySearchResult> = {}): MemorySe
 describe("buildSystemPrompt", () => {
   it("includes default system prompt when no custom prompt", () => {
     const prompt = buildSystemPrompt({ config: {} });
-    expect(prompt).toContain("MicroClaw");
+    expect(prompt).toContain("EClaw");
     expect(prompt).toContain("helpful AI assistant");
   });
 

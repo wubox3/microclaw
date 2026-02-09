@@ -1,5 +1,5 @@
 /**
- * Container Runner for MicroClaw
+ * Container Runner for EClaw
  * Spawns agent execution in Docker containers and handles I/O
  */
 import { execFile, spawn } from "child_process";
@@ -143,7 +143,7 @@ export async function runContainerAgent(
   const mounts = buildVolumeMounts(input.channelId, config);
   const safeName = sanitizeChannelId(input.channelId);
   const shortName = safeName.slice(0, 40);
-  const containerName = `microclaw-${shortName}-${Date.now()}-${randomBytes(3).toString("hex")}`;
+  const containerName = `eclaw-${shortName}-${Date.now()}-${randomBytes(3).toString("hex")}`;
   const dockerArgs = buildDockerArgs(mounts, containerName, image);
 
   log.info(

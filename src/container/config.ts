@@ -11,7 +11,7 @@ function parseIntSafe(value: string | undefined, fallback: number, min = 1): num
 }
 
 export const CONTAINER_IMAGE =
-  process.env.CONTAINER_IMAGE || "microclaw-agent:latest";
+  process.env.CONTAINER_IMAGE || "eclaw-agent:latest";
 
 export const CONTAINER_TIMEOUT = parseIntSafe(
   process.env.CONTAINER_TIMEOUT,
@@ -25,14 +25,14 @@ export const CONTAINER_MAX_OUTPUT_SIZE = parseIntSafe(
 
 export const IPC_POLL_INTERVAL = 1000;
 
-export const OUTPUT_START_MARKER = "---MICROCLAW_OUTPUT_START---";
-export const OUTPUT_END_MARKER = "---MICROCLAW_OUTPUT_END---";
+export const OUTPUT_START_MARKER = "---ECLAW_OUTPUT_START---";
+export const OUTPUT_END_MARKER = "---ECLAW_OUTPUT_END---";
 
 export const DATA_DIR = path.resolve(PROJECT_ROOT, "data");
 
 export const MOUNT_ALLOWLIST_PATH = path.join(
   HOME_DIR,
   ".config",
-  "microclaw",
+  "eclaw",
   "mount-allowlist.json",
 );

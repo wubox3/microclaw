@@ -170,7 +170,7 @@ test.describe('Static Files', () => {
     expect(contentType).toContain('text/html')
 
     const body = await res.text()
-    expect(body).toContain('MicroClaw')
+    expect(body).toContain('EClaw')
     expect(body).toContain('id="app"')
   })
 

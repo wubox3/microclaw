@@ -1,15 +1,15 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { parse as parseYaml } from "yaml";
-import type { MicroClawConfig } from "./types.js";
+import type { EClawConfig } from "./types.js";
 
 const CONFIG_FILENAMES = [
-  "microclaw.config.yaml",
-  "microclaw.config.yml",
-  "microclaw.config.json",
+  "eclaw.config.yaml",
+  "eclaw.config.yml",
+  "eclaw.config.json",
 ];
 
-function validateConfig(value: unknown): MicroClawConfig {
+function validateConfig(value: unknown): EClawConfig {
   if (value === null || value === undefined) {
     return {};
   }
@@ -70,10 +70,10 @@ function validateConfig(value: unknown): MicroClawConfig {
       throw new Error("container.timeout must be at least 1000ms");
     }
   }
-  return value as MicroClawConfig;
+  return value as EClawConfig;
 }
 
-export function loadConfig(dir?: string): MicroClawConfig {
+export function loadConfig(dir?: string): EClawConfig {
   const baseDir = dir ?? process.cwd();
 
   for (const filename of CONFIG_FILENAMES) {
@@ -100,14 +100,14 @@ export function loadConfig(dir?: string): MicroClawConfig {
   return {};
 }
 
-export function resolveDataDir(config: MicroClawConfig): string {
-  return config.memory?.dataDir ?? join(process.cwd(), ".microclaw");
+export function resolveDataDir(config: EClawConfig): string {
+  return config.memory?.dataDir ?? join(process.cwd(), ".eclaw");
 }
 
-export function resolvePort(config: MicroClawConfig): number {
+export function resolvePort(config: EClawConfig): number {
   return config.web?.port ?? 3000;
 }
 
-export function resolveHost(config: MicroClawConfig): string {
+export function resolveHost(config: EClawConfig): string {
   return config.web?.host ?? "localhost";
 }

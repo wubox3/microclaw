@@ -12,11 +12,11 @@
     "noEmitOnError": true,
     "outDir": "dist",
     "resolveJsonModule": true,
-    "rootDir": "src",
+    "rootDir": ".",
     "skipLibCheck": true,
     "strict": true,
     "target": "es2023"
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
+  "include": ["src/**/*", "skills/*/src/**/*"],
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "skills/**/*.test.ts", "skills/*/index.ts"]
 }

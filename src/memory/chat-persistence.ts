@@ -58,9 +58,12 @@ export function createChatPersistence(params: {
           let searchFrom = 0;
           for (const chunk of chunks) {
             const pos = exchangeContent.indexOf(chunk, searchFrom);
+            if (pos < 0) {
+              log.warn(`Chunk not found in exchange content (searchFrom=${searchFrom}, chunkLen=${chunk.length})`);
+            }
             const startLine = pos >= 0
               ? exchangeContent.slice(0, pos).split("\n").length - 1
-              : 0;
+              : searchFrom > 0 ? exchangeContent.slice(0, searchFrom).split("\n").length - 1 : 0;
             const chunkLineCount = chunk.split("\n").length;
             const chunkHash = hashContent(chunk);
             db.prepare(

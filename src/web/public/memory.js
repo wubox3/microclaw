@@ -1,4 +1,4 @@
-// MicroClaw Memory Editor
+// EClaw Memory Editor
 (function () {
   'use strict';
 
@@ -33,9 +33,9 @@
     'programming-planning': {
       strings: [],
       arrays: [
-        'confirmedPlans', 'modifiedPatterns', 'discardedReasons',
-        'planStructure', 'scopePreferences', 'detailLevel',
-        'reviewPatterns', 'implementationFlow', 'planningInsights',
+        'structurePreferences', 'detailLevelPreferences', 'valuedPlanElements',
+        'architectureApproaches', 'scopePreferences', 'presentationFormat',
+        'approvedPlanPatterns', 'discardedReasons', 'planningInsights',
       ],
     },
     'event-planning': {
@@ -79,10 +79,10 @@
     toolsAndLibraries: 'Tools & Libraries', approvedPatterns: 'Approved Patterns',
     buildAndDeployment: 'Build & Deploy', editorAndEnvironment: 'Editor & Environment',
     keyInsights: 'Key Insights',
-    confirmedPlans: 'Confirmed Plans', modifiedPatterns: 'Modification Patterns',
-    discardedReasons: 'Discard Reasons', planStructure: 'Plan Structure',
-    scopePreferences: 'Scope Preferences', detailLevel: 'Detail Level',
-    reviewPatterns: 'Review Patterns', implementationFlow: 'Implementation Flow',
+    structurePreferences: 'Structure Preferences', detailLevelPreferences: 'Detail Level Preferences',
+    valuedPlanElements: 'Valued Plan Elements', architectureApproaches: 'Architecture Approaches',
+    scopePreferences: 'Scope Preferences', presentationFormat: 'Presentation Format',
+    approvedPlanPatterns: 'Approved Plan Patterns', discardedReasons: 'Discard Reasons',
     planningInsights: 'Planning Insights',
     preferredTimes: 'Preferred Times', preferredDays: 'Preferred Days',
     recurringSchedules: 'Recurring Schedules', venuePreferences: 'Venue Preferences',
@@ -590,5 +590,5 @@
     }
   }
 
-  window.MicroClawMemory = { init: init };
+  window.EClawMemory = { init: init };
 })();

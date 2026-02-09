@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import { join, resolve as resolvePath } from "node:path";
 import { tmpdir } from "node:os";
 
-const MEDIA_DIR = join(tmpdir(), "microclaw", "media");
+const MEDIA_DIR = join(tmpdir(), "eclaw", "media");
 
 type Sharp = typeof import("sharp");
 

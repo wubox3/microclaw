@@ -1,4 +1,4 @@
-// MicroClaw Chat UI
+// EClaw Chat UI
 (function() {
   'use strict';
 
@@ -186,8 +186,8 @@
           }
 
           // Notify voice module of assistant response for TTS
-          if (window.MicroClawVoice && window.MicroClawVoice.onAssistantMessage) {
-            window.MicroClawVoice.onAssistantMessage(data.text);
+          if (window.EClawVoice && window.EClawVoice.onAssistantMessage) {
+            window.EClawVoice.onAssistantMessage(data.text);
           }
         } else if (data.type === 'channel_message') {
           // Real-time message from a channel gateway (iMessage, Telegram, etc.)
@@ -225,12 +225,12 @@
         } else if (data.type === 'canvas_present' || data.type === 'canvas_hide' ||
                    data.type === 'canvas_update' ||
                    data.type === 'canvas_a2ui' || data.type === 'canvas_a2ui_reset') {
-          if (window.MicroClawCanvas && window.MicroClawCanvas.handleMessage) {
-            window.MicroClawCanvas.handleMessage(data);
+          if (window.EClawCanvas && window.EClawCanvas.handleMessage) {
+            window.EClawCanvas.handleMessage(data);
           }
         } else if (data.type === 'cron_status') {
-          if (window.MicroClawCron && window.MicroClawCron.handleMessage) {
-            window.MicroClawCron.handleMessage(data);
+          if (window.EClawCron && window.EClawCron.handleMessage) {
+            window.EClawCron.handleMessage(data);
           }
         } else if (data.type === 'error') {
           hideTyping();
@@ -289,11 +289,11 @@
   }
 
   // Expose sendMessage for voice module
-  window.MicroClaw = window.MicroClaw || {};
-  window.MicroClaw.sendMessage = sendMessage;
+  window.EClaw = window.EClaw || {};
+  window.EClaw.sendMessage = sendMessage;
 
   // Expose sendCanvasAction for canvas module
-  window.MicroClaw.sendCanvasAction = function(actionData) {
+  window.EClaw.sendCanvasAction = function(actionData) {
     if (ws && isConnected) {
       ws.send(JSON.stringify(actionData));
     }
@@ -328,22 +328,32 @@
   connectWebSocket();
 
   // Initialize canvas module
-  if (window.MicroClawCanvas && window.MicroClawCanvas.init) {
-    window.MicroClawCanvas.init();
+  if (window.EClawCanvas && window.EClawCanvas.init) {
+    window.EClawCanvas.init();
   }
 
   // Initialize voice module
-  if (window.MicroClawVoice && window.MicroClawVoice.init) {
-    window.MicroClawVoice.init();
+  if (window.EClawVoice && window.EClawVoice.init) {
+    window.EClawVoice.init();
   }
 
   // Initialize cron module
-  if (window.MicroClawCron && window.MicroClawCron.init) {
-    window.MicroClawCron.init();
+  if (window.EClawCron && window.EClawCron.init) {
+    window.EClawCron.init();
+  }
+
+  // Initialize calendar module
+  if (window.EClawCalendar && window.EClawCalendar.init) {
+    window.EClawCalendar.init();
+  }
+
+  // Initialize ASAP queue module
+  if (window.EClawAsap && window.EClawAsap.init) {
+    window.EClawAsap.init();
   }
 
   // Initialize memory editor module
-  if (window.MicroClawMemory && window.MicroClawMemory.init) {
-    window.MicroClawMemory.init();
+  if (window.EClawMemory && window.EClawMemory.init) {
+    window.EClawMemory.init();
   }
 })();

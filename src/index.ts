@@ -10,7 +10,8 @@ import { formatError } from "./infra/errors.js";
 import { createLogger } from "./logging.js";
 import { loadConfig, resolvePort, resolveHost } from "./config/config.js";
 import { resolvePaths } from "./config/paths.js";
-import { loadSkills } from "./skills/loader.js";
+import { buildWorkspaceSkillSnapshot } from "./skills/workspace.js";
+import { ensureSkillsWatcher } from "./skills/refresh.js";
 import { createMemoryManager } from "./memory/manager.js";
 import { createAgent } from "./agent/agent.js";
 import { createLlmClient } from "./agent/create-client.js";
@@ -21,15 +22,15 @@ import { createCanvasState } from "./canvas-host/types.js";
 import { createCanvasTool } from "./agent/canvas-tool.js";
 import { startBrowserServer, stopBrowserServer } from "./browser/server.js";
 import { createBrowserTool } from "./browser/browser-tool.js";
+import { startWhatsAppGateway } from "./channels/whatsapp/gateway.js";
 import { CronService } from "./cron/service.js";
 import { defaultCronJobsPath } from "./cron/store.js";
+import { AsapRunner } from "./jobs/runner.js";
 import { runCronIsolatedAgentTurn } from "./cron/isolated-agent.js";
 import { appendCronRunLog, resolveCronRunLogPath } from "./cron/run-log.js";
 import { createCronTool } from "./agent/cron-tool.js";
 import type { MemorySearchManager } from "./memory/types.js";
 import type { AgentTool } from "./agent/types.js";
-import type { SkillToolFactory } from "./skills/types.js";
-import type { ChannelPlugin, GatewayInboundMessage } from "./channels/plugins/types.js";
 import { createVibecodingManager } from "./agent/vibecoding-tool.js";
 
 const log = createLogger("main");
@@ -75,7 +76,7 @@ async function main(): Promise<void> {
   // 1. Load environment
   loadDotenv();
 
-  log.info("Starting MicroClaw...");
+  log.info("Starting EClaw...");
 
   // 2. Load config and resolve all paths upfront
   const config = loadConfig();
@@ -117,15 +118,11 @@ async function main(): Promise<void> {
 
   log.info(`Data directory: ${dataDir}`);
 
-  // 4. Load skills
-  const skillRegistry = await loadSkills({ config, skillsDir: paths.skillsDir });
-  log.info(`Loaded ${skillRegistry.skills.length} skills`);
-  for (const diag of skillRegistry.diagnostics) {
-    if (diag.level === "error") {
-      log.error(`Skill ${diag.skillId}: ${diag.message}`);
-    } else {
-      log.info(`Skill ${diag.skillId}: ${diag.message}`);
-    }
+  // 4. Load skills (SKILL.md-based system)
+  const skillSnapshot = buildWorkspaceSkillSnapshot(process.cwd(), { config });
+  log.info(`Loaded ${skillSnapshot.skills.length} skills`);
+  for (const skill of skillSnapshot.skills) {
+    log.info(`Skill: ${skill.name}`);
   }
 
   // 5. Initialize memory system
@@ -157,7 +154,7 @@ async function main(): Promise<void> {
   const webMonitor = createWebMonitor();
   const canvasState = createCanvasState();
 
-  // 8. Adapt skill-registered tools to agent tool format
+  // 8. Register additional agent tools (canvas, browser)
   const additionalTools: AgentTool[] = [];
 
   // Add canvas tool
@@ -180,32 +177,6 @@ async function main(): Promise<void> {
     }
   }
 
-  const frozenConfig = structuredClone(config);
-  Object.freeze(frozenConfig);
-
-  for (const reg of skillRegistry.tools) {
-    if ("factory" in reg.tool && (reg.tool as SkillToolFactory).factory) {
-      // Factory tools need runtime context; skip for now
-      continue;
-    }
-    const skillTool = reg.tool as import("./skills/types.js").AgentTool;
-    if (typeof skillTool.name !== "string" || typeof skillTool.execute !== "function") {
-      log.warn(`Skipping malformed skill tool from ${reg.skillId}`);
-      continue;
-    }
-    additionalTools.push({
-      name: skillTool.name,
-      description: skillTool.description,
-      input_schema: (skillTool.parameters && typeof skillTool.parameters === "object" && "type" in skillTool.parameters) ? skillTool.parameters : { type: "object", properties: {} },
-      execute: (params, runtimeCtx) => skillTool.execute(params, {
-        sessionKey: "",
-        channelId: runtimeCtx?.channelId ?? "web",
-        chatId: "",
-        config: frozenConfig,
-      }),
-    });
-  }
-
   // 9. Create agent (cron tool added after agent creation)
   const agent = createAgent({
     config,
@@ -214,6 +185,7 @@ async function main(): Promise<void> {
     containerEnabled,
     canvasEnabled: true,
     additionalTools: additionalTools.length > 0 ? additionalTools : undefined,
+    skillsPrompt: skillSnapshot.prompt || undefined,
   });
   log.info("Agent initialized");
 
@@ -226,31 +198,34 @@ async function main(): Promise<void> {
     const runProfileExtraction = () => {
       if (extractionInProgress) return;
       extractionInProgress = true;
-      memoryManager!.updateUserProfile(profileLlmClient)
-        .catch((err) => {
-          log.warn(`User profile extraction failed: ${formatError(err)}`);
-        })
-        .then(() => memoryManager!.updateProgrammingSkills(profileLlmClient))
-        .catch((err) => {
-          log.warn(`Programming skills extraction failed: ${formatError(err)}`);
-        })
-        .then(() => memoryManager!.updateProgrammingPlanning(profileLlmClient))
-        .catch((err) => {
-          log.warn(`Programming planning extraction failed: ${formatError(err)}`);
-        })
-        .then(() => memoryManager!.updateEventPlanning(profileLlmClient))
-        .catch((err) => {
-          log.warn(`Event planning extraction failed: ${formatError(err)}`);
-        })
-        .then(() => memoryManager!.updateWorkflow(profileLlmClient))
-        .catch((err) => {
-          log.warn(`Workflow extraction failed: ${formatError(err)}`);
-        })
-        .then(() => memoryManager!.updateTasks(profileLlmClient))
-        .catch((err) => {
-          log.warn(`Tasks extraction failed: ${formatError(err)}`);
-        })
-        .finally(() => { extractionInProgress = false; });
+      const mgr = memoryManager!;
+      const run = async () => {
+        try {
+          await mgr.updateUserProfile(profileLlmClient).catch((err) => {
+            log.warn(`User profile extraction failed: ${formatError(err)}`);
+          });
+          await mgr.updateProgrammingSkills(profileLlmClient).catch((err) => {
+            log.warn(`Programming skills extraction failed: ${formatError(err)}`);
+          });
+          await mgr.updateProgrammingPlanning(profileLlmClient).catch((err) => {
+            log.warn(`Programming planning extraction failed: ${formatError(err)}`);
+          });
+          await mgr.updateEventPlanning(profileLlmClient).catch((err) => {
+            log.warn(`Event planning extraction failed: ${formatError(err)}`);
+          });
+          await mgr.updateWorkflow(profileLlmClient).catch((err) => {
+            log.warn(`Workflow extraction failed: ${formatError(err)}`);
+          });
+          await mgr.updateTasks(profileLlmClient).catch((err) => {
+            log.warn(`Tasks extraction failed: ${formatError(err)}`);
+          });
+        } finally {
+          extractionInProgress = false;
+        }
+      };
+      run().catch((err) => {
+        log.error(`Extraction run failed unexpectedly: ${formatError(err)}`);
+      });
     };
     // Run once on startup (non-blocking)
     runProfileExtraction();
@@ -273,7 +248,7 @@ async function main(): Promise<void> {
     storePath: cronStorePath,
     cronEnabled,
     enqueueSystemEvent: (text, opts) => {
-      // For microclaw, system events are handled by sending through agent.chat
+      // For eclaw, system events are handled by sending through agent.chat
       log.info(`Cron system event${opts?.agentId ? ` [${opts.agentId}]` : ""}: ${text.slice(0, 100)}`);
       // Broadcast to web UI
       webMonitor.broadcast(JSON.stringify({
@@ -287,7 +262,7 @@ async function main(): Promise<void> {
       }));
     },
     requestHeartbeatNow: () => {
-      // No-op for microclaw (no heartbeat system)
+      // No-op for eclaw (no heartbeat system)
     },
     runIsolatedAgentJob: async (params) => {
       const result = await runCronIsolatedAgentTurn({
@@ -334,254 +309,16 @@ async function main(): Promise<void> {
   agent.addTool(createCronTool({ cronService, storePath: cronStorePath }));
   log.info("Cron tool registered");
 
-  // 9b. Start channel gateway lifecycles
-  const activeGateways: Array<{ channelId: string; accountId: string; plugin: ChannelPlugin }> = [];
-  const processingGatewayChats = new Set<string>();
-  // Track recently sent outbound texts to avoid re-processing agent replies as new messages
-  const recentOutboundTexts = new Map<string, Set<string>>();
-  const OUTBOUND_ECHO_TTL_MS = 30_000;
-  // Queue for gateway messages received while a chat is still processing
-  const pendingGatewayMessages = new Map<string, Array<GatewayInboundMessage>>();
+  // 9c. Start WhatsApp gateway (wacli-based)
+  const whatsAppHandle = startWhatsAppGateway({ config, agent, webMonitor, memoryManager });
+  if (whatsAppHandle) {
+    cleanupFns.push(() => { whatsAppHandle.stop(); });
+  }
 
-  for (const reg of skillRegistry.channels) {
-    const plugin = reg.plugin as ChannelPlugin;
-    if (!plugin.gateway?.startAccount) continue;
-
-    const channelId = plugin.id;
-    const isConfigured = plugin.config.isConfigured?.(config) ?? false;
-    const isEnabled = plugin.config.isEnabled?.(config) ?? true;
-
-    if (!isConfigured || !isEnabled) {
-      log.info(`Gateway skipped for ${channelId}: configured=${isConfigured}, enabled=${isEnabled}`);
-      continue;
-    }
-
-    const accountId = config.channels?.[channelId as keyof typeof config.channels]?.accountId ?? "default";
-
-    const handleGatewayMessage = async (msg: GatewayInboundMessage): Promise<void> => {
-      const chatKey = `${channelId}:${msg.chatId}`;
-      const isFromSelf = msg.from === "me";
-
-      // Broadcast to webchat clients so all messages appear in the channel view
-      webMonitor.broadcast(JSON.stringify({
-        type: "channel_message",
-        channelId,
-        from: msg.from,
-        text: msg.text,
-        timestamp: msg.timestamp,
-        senderName: msg.senderName ?? msg.from,
-        isFromSelf,
-      }));
-
-      // Detect outbound echoes: agent replies show up as is_from_me in chat.db
-      if (isFromSelf) {
-        const echoSet = recentOutboundTexts.get(msg.chatId);
-        if (echoSet?.has(msg.text)) {
-          echoSet.delete(msg.text);
-          // Still persist the assistant side of the exchange
-          if (memoryManager) {
-            memoryManager.saveExchange({
-              channelId,
-              userMessage: "",
-              assistantMessage: msg.text,
-              timestamp: msg.timestamp,
-            }).catch((err) => {
-              log.warn(`Failed to persist outbound echo for ${channelId}: ${formatError(err)}`);
-            });
-          }
-          return;
-        }
-      }
-
-      // Per-chat concurrency guard with message queueing
-      if (processingGatewayChats.has(chatKey)) {
-        const queue = pendingGatewayMessages.get(chatKey) ?? [];
-        if (queue.length < 5) { // cap queue to prevent unbounded growth
-          pendingGatewayMessages.set(chatKey, [...queue, msg]);
-        } else {
-          log.warn(`Dropping message for ${chatKey}: queue full`);
-        }
-        return;
-      }
-      processingGatewayChats.add(chatKey);
-
-      try {
-        // Intercept vibecoding commands before agent processing
-        if (msg.text.startsWith("vibecoding ")) {
-          // Show canvas and set loading state
-          canvasState.update((s) => ({ ...s, visible: true }));
-          webMonitor.broadcast(JSON.stringify({ type: "canvas_present" }));
-          webMonitor.broadcast(JSON.stringify({
-            type: "canvas_update",
-            html: vibecodingCanvasHtml(msg.text, "Running..."),
-          }));
-
-          const output = await vibecodingManager.handleCommand({
-            chatKey,
-            prompt: msg.text,
-          });
-
-          // Update canvas with final output
-          const canvasHtml = vibecodingCanvasHtml(msg.text, output);
-          canvasState.update((s) => ({ ...s, lastHtml: canvasHtml }));
-          webMonitor.broadcast(JSON.stringify({ type: "canvas_update", html: canvasHtml }));
-
-          // Send reply via outbound adapter
-          if (plugin.outbound?.sendText) {
-            const MAX_ECHO_ENTRIES = 500;
-            if (recentOutboundTexts.size > MAX_ECHO_ENTRIES) {
-              const keys = [...recentOutboundTexts.keys()];
-              for (let i = 0; i < keys.length - MAX_ECHO_ENTRIES; i++) {
-                recentOutboundTexts.delete(keys[i]);
-              }
-            }
-            const echoSet = recentOutboundTexts.get(msg.chatId) ?? new Set<string>();
-            echoSet.add(output);
-            recentOutboundTexts.set(msg.chatId, echoSet);
-            setTimeout(() => {
-              echoSet.delete(output);
-              if (echoSet.size === 0) recentOutboundTexts.delete(msg.chatId);
-            }, OUTBOUND_ECHO_TTL_MS);
-
-            await plugin.outbound.sendText({
-              config,
-              accountId,
-              to: msg.chatId,
-              text: output,
-              chatType: msg.chatType,
-            });
-          }
-
-          // Broadcast to web UI
-          webMonitor.broadcast(JSON.stringify({
-            type: "channel_message",
-            channelId,
-            from: "assistant",
-            text: output,
-            timestamp: Date.now(),
-            senderName: "Vibecoding",
-            isFromSelf: true,
-          }));
-
-          // Persist vibecoding exchange
-          if (memoryManager) {
-            memoryManager.saveExchange({
-              channelId,
-              userMessage: msg.text,
-              assistantMessage: output,
-              timestamp: msg.timestamp,
-            }).catch((err) => {
-              log.warn(`Failed to persist vibecoding exchange for ${channelId}: ${formatError(err)}`);
-            });
-          }
-          return;
-        }
-
-        // Load recent chat history
-        const historyMessages: Array<{ role: "user" | "assistant"; content: string; timestamp: number }> = [];
-        if (memoryManager) {
-          try {
-            const history = await memoryManager.loadChatHistory({ channelId, limit: 50 });
-            for (const h of history) {
-              historyMessages.push({ role: h.role, content: h.content, timestamp: h.timestamp });
-            }
-          } catch {
-            // History loading is non-fatal
-          }
-        }
-
-        // Get agent response
-        const response = await agent.chat({
-          messages: [
-            ...historyMessages,
-            { role: "user", content: msg.text, timestamp: msg.timestamp },
-          ],
-          channelId,
-        });
-
-        // Send reply via outbound adapter
-        if (response.text && plugin.outbound?.sendText) {
-          // Track outbound text so we can filter the echo when it comes back via poll
-          const MAX_ECHO_ENTRIES = 500;
-          if (recentOutboundTexts.size > MAX_ECHO_ENTRIES) {
-            // Clear oldest entries
-            const keys = [...recentOutboundTexts.keys()];
-            for (let i = 0; i < keys.length - MAX_ECHO_ENTRIES; i++) {
-              recentOutboundTexts.delete(keys[i]);
-            }
-          }
-          const echoSet = recentOutboundTexts.get(msg.chatId) ?? new Set<string>();
-          echoSet.add(response.text);
-          recentOutboundTexts.set(msg.chatId, echoSet);
-          setTimeout(() => {
-            echoSet.delete(response.text);
-            if (echoSet.size === 0) recentOutboundTexts.delete(msg.chatId);
-          }, OUTBOUND_ECHO_TTL_MS);
-
-          await plugin.outbound.sendText({
-            config,
-            accountId,
-            to: msg.chatId,
-            text: response.text,
-            chatType: msg.chatType,
-          });
-
-          // Broadcast agent reply to web UI so it appears in the channel view
-          webMonitor.broadcast(JSON.stringify({
-            type: "channel_message",
-            channelId,
-            from: "assistant",
-            text: response.text,
-            timestamp: Date.now(),
-            senderName: "MicroClaw",
-            isFromSelf: true,
-          }));
-        }
-
-        // Persist exchange
-        if (memoryManager) {
-          memoryManager.saveExchange({
-            channelId,
-            userMessage: msg.text,
-            assistantMessage: response.text,
-            timestamp: msg.timestamp,
-          }).catch((err) => {
-            log.warn(`Failed to persist exchange for ${channelId}: ${formatError(err)}`);
-          });
-        }
-      } catch (err) {
-        log.error(`Gateway message handling failed for ${chatKey}: ${formatError(err)}`);
-      } finally {
-        processingGatewayChats.delete(chatKey);
-        const queued = pendingGatewayMessages.get(chatKey);
-        if (queued && queued.length > 0) {
-          const [next, ...rest] = queued;
-          if (rest.length === 0) {
-            pendingGatewayMessages.delete(chatKey);
-          } else {
-            pendingGatewayMessages.set(chatKey, rest);
-          }
-          setImmediate(() => { handleGatewayMessage(next).catch((err) => {
-            log.error(`Queued gateway message failed for ${chatKey}: ${formatError(err)}`);
-          }); });
-        }
-      }
-    };
-
-    const onMessage = (msg: GatewayInboundMessage): Promise<void> => handleGatewayMessage(msg);
-
-    try {
-      await plugin.gateway.startAccount({
-        config,
-        accountId,
-        account: undefined,
-        onMessage,
-      });
-      activeGateways.push({ channelId, accountId, plugin });
-      log.info(`Gateway started: ${channelId}`);
-    } catch (err) {
-      log.error(`Failed to start gateway for ${channelId}: ${formatError(err)}`);
-    }
+  // 9b. Start skills file watcher
+  if (config.skills?.load?.watch !== false) {
+    ensureSkillsWatcher({ workspaceDir: process.cwd(), config });
+    log.info("Skills file watcher started");
   }
 
   // 10. Start IPC watcher if container mode active
@@ -613,6 +350,24 @@ async function main(): Promise<void> {
     });
   }
 
+  // 10a. Create ASAP job runner
+  const asapRunner = new AsapRunner({
+    storePath: paths.asapStorePath,
+    enqueueSystemEvent: (text) => {
+      log.info(`ASAP system event: ${text.slice(0, 100)}`);
+      webMonitor.broadcast(JSON.stringify({
+        type: "channel_message",
+        channelId: "asap",
+        from: "system",
+        text,
+        timestamp: Date.now(),
+        senderName: "ASAP Queue",
+        isFromSelf: false,
+      }));
+    },
+  });
+  log.info("ASAP job runner initialized");
+
   // 11. Create web routes
   const app = createWebRoutes({
     config,
@@ -623,6 +378,7 @@ async function main(): Promise<void> {
     cronService,
     cronStorePath,
     vibecodingManager,
+    asapRunner,
   });
 
   // 12. Start server
@@ -655,24 +411,17 @@ async function main(): Promise<void> {
       }
     }
 
-    // Stop channel gateways (await all in parallel)
-    await Promise.allSettled(
-      activeGateways.map(async (gw) => {
-        try {
-          await gw.plugin.gateway?.stopAccount?.({ config, accountId: gw.accountId });
-          log.info(`Gateway stopped: ${gw.channelId}`);
-        } catch (err) {
-          log.error(`Failed to stop gateway ${gw.channelId}: ${formatError(err)}`);
-        }
-      }),
-    );
-
     // Stop cron scheduler
     try {
       cronService.stop();
       log.info("Cron scheduler stopped");
     } catch (err) {
       log.error(`Failed to stop cron scheduler: ${formatError(err)}`);
+    }
+
+    // Stop WhatsApp gateway
+    if (whatsAppHandle) {
+      whatsAppHandle.stop();
     }
 
     if (profileInterval) {
@@ -967,7 +716,7 @@ async function main(): Promise<void> {
     }
   });
 
-  log.info(`MicroClaw running at http://${host}:${port}`);
+  log.info(`EClaw running at http://${host}:${port}`);
 
   if (isDev()) {
     log.info("Development mode enabled");

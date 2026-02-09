@@ -1,9 +1,9 @@
 ---
 name: setup
-description: Run initial MicroClaw setup. Use when user wants to install dependencies, authenticate Claude, configure the assistant, build containers, or start the service. Triggers on "setup", "install", "configure microclaw", or first-time setup requests.
+description: Run initial EClaw setup. Use when user wants to install dependencies, authenticate Claude, configure the assistant, build containers, or start the service. Triggers on "setup", "install", "configure eclaw", or first-time setup requests.
 ---
 
-# MicroClaw Setup
+# EClaw Setup
 
 Run all commands automatically. Only pause when user action is required (providing credentials, scanning QR codes).
 
@@ -24,11 +24,11 @@ echo "Platform: $(uname -s)"
 which docker && docker info >/dev/null 2>&1 && echo "Docker: installed and running" || echo "Docker: not installed or not running"
 ```
 
-MicroClaw's container mode is **opt-in** (disabled by default). Ask the user:
+EClaw's container mode is **opt-in** (disabled by default). Ask the user:
 
 > Do you want to enable **container isolation** for agent execution?
 >
-> 1. **No** (default) - Agents run directly in the MicroClaw process. Simpler, faster startup.
+> 1. **No** (default) - Agents run directly in the EClaw process. Simpler, faster startup.
 > 2. **Yes** - Agents run in isolated Docker containers. More secure, requires Docker.
 
 ### If they choose No
@@ -112,19 +112,19 @@ KEY=$(grep "^ANTHROPIC_API_KEY=" .env | cut -d= -f2)
 
 If the user chose container isolation in Step 2:
 
-Build the MicroClaw agent container:
+Build the EClaw agent container:
 
 ```bash
 ./container/build.sh
 ```
 
-This creates the `microclaw-agent:latest` image with Node.js, Claude Code CLI, and the agent runner.
+This creates the `eclaw-agent:latest` image with Node.js, Claude Code CLI, and the agent runner.
 
 Verify the build succeeded:
 
 ```bash
-docker images | grep microclaw-agent
-echo '{}' | docker run -i --entrypoint /bin/echo microclaw-agent:latest "Container OK" || echo "Container build failed"
+docker images | grep eclaw-agent
+echo '{}' | docker run -i --entrypoint /bin/echo eclaw-agent:latest "Container OK" || echo "Container build failed"
 ```
 
 ## 5. Create Configuration File
@@ -146,7 +146,7 @@ If container mode was NOT chosen, skip config file creation (defaults are fine).
 If container mode WAS chosen, create a minimal config:
 
 ```bash
-cat > microclaw.config.yaml << 'EOF'
+cat > eclaw.config.yaml << 'EOF'
 container:
   enabled: true
 EOF
@@ -157,7 +157,7 @@ EOF
 Ask follow-up questions and create the config:
 
 ```bash
-cat > microclaw.config.yaml << 'EOF'
+cat > eclaw.config.yaml << 'EOF'
 web:
   port: 3000
   host: localhost
@@ -183,7 +183,7 @@ Adjust values based on their answers.
 Only relevant if container mode is enabled.
 
 Ask the user:
-> Do you want the agent to be able to access any directories **outside** the MicroClaw project when running in containers?
+> Do you want the agent to be able to access any directories **outside** the EClaw project when running in containers?
 >
 > Examples: Git repositories, project folders, documents you want Claude to work on.
 >
@@ -215,13 +215,13 @@ For each directory they provide, ask:
 Create the allowlist file based on their answers:
 
 ```bash
-mkdir -p ~/.config/microclaw
+mkdir -p ~/.config/eclaw
 ```
 
 Then write the JSON file. Example for a user who wants `~/projects` (read-write) and `~/docs` (read-only):
 
 ```bash
-cat > ~/.config/microclaw/mount-allowlist.json << 'EOF'
+cat > ~/.config/eclaw/mount-allowlist.json << 'EOF'
 {
   "allowedRoots": [
     {
@@ -243,7 +243,7 @@ EOF
 Verify the file:
 
 ```bash
-cat ~/.config/microclaw/mount-allowlist.json
+cat ~/.config/eclaw/mount-allowlist.json
 ```
 
 Tell the user:
@@ -254,12 +254,12 @@ Tell the user:
 > **Security notes:**
 > - Sensitive paths (`.ssh`, `.gnupg`, `.aws`, credentials) are always blocked
 > - This config file is stored outside the project, so agents cannot modify it
-> - Changes require restarting MicroClaw
+> - Changes require restarting EClaw
 
 ## 7. Configure launchd Service (macOS)
 
 Ask the user:
-> Do you want MicroClaw to start automatically on login?
+> Do you want EClaw to start automatically on login?
 >
 > 1. **Yes** (recommended) - Runs as a launchd service, starts on boot, restarts on crash
 > 2. **No** - You'll start it manually with `pnpm start`
@@ -267,7 +267,7 @@ Ask the user:
 ### If No
 
 Tell the user:
-> You can start MicroClaw manually anytime with:
+> You can start EClaw manually anytime with:
 > ```
 > pnpm start
 > ```
@@ -287,13 +287,13 @@ NODE_PATH=$(which node)
 PROJECT_PATH=$(pwd)
 HOME_PATH=$HOME
 
-cat > ~/Library/LaunchAgents/com.microclaw.plist << EOF
+cat > ~/Library/LaunchAgents/com.eclaw.plist << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.microclaw</string>
+    <string>com.eclaw</string>
     <key>ProgramArguments</key>
     <array>
         <string>${NODE_PATH}</string>
@@ -315,9 +315,9 @@ cat > ~/Library/LaunchAgents/com.microclaw.plist << EOF
         <string>${HOME_PATH}</string>
     </dict>
     <key>StandardOutPath</key>
-    <string>${PROJECT_PATH}/logs/microclaw.log</string>
+    <string>${PROJECT_PATH}/logs/eclaw.log</string>
     <key>StandardErrorPath</key>
-    <string>${PROJECT_PATH}/logs/microclaw.error.log</string>
+    <string>${PROJECT_PATH}/logs/eclaw.error.log</string>
 </dict>
 </plist>
 EOF
@@ -331,12 +331,12 @@ Start the service:
 
 ```bash
 mkdir -p logs
-launchctl load ~/Library/LaunchAgents/com.microclaw.plist
+launchctl load ~/Library/LaunchAgents/com.eclaw.plist
 ```
 
 Verify it's running:
 ```bash
-launchctl list | grep microclaw
+launchctl list | grep eclaw
 ```
 
 ### Linux Alternative (systemd)
@@ -347,9 +347,9 @@ If the user is on Linux:
 NODE_PATH=$(which node)
 PROJECT_PATH=$(pwd)
 
-cat > ~/.config/systemd/user/microclaw.service << EOF
+cat > ~/.config/systemd/user/eclaw.service << EOF
 [Unit]
-Description=MicroClaw AI Assistant
+Description=EClaw AI Assistant
 After=network.target
 
 [Service]
@@ -366,19 +366,19 @@ EOF
 
 mkdir -p logs
 systemctl --user daemon-reload
-systemctl --user enable microclaw
-systemctl --user start microclaw
+systemctl --user enable eclaw
+systemctl --user start eclaw
 ```
 
 Verify:
 ```bash
-systemctl --user status microclaw
+systemctl --user status eclaw
 ```
 
 ## 8. Test
 
 Tell the user:
-> MicroClaw should now be running. Open your browser to:
+> EClaw should now be running. Open your browser to:
 > ```
 > http://localhost:3000
 > ```
@@ -386,7 +386,7 @@ Tell the user:
 
 Check the logs:
 ```bash
-tail -f logs/microclaw.log
+tail -f logs/eclaw.log
 ```
 
 If not using launchd/systemd, start manually:
@@ -398,16 +398,16 @@ Then verify in the browser.
 
 ## Troubleshooting
 
-**Service not starting**: Check `logs/microclaw.error.log`
+**Service not starting**: Check `logs/eclaw.error.log`
 
 **Container agent fails**:
 - Ensure Docker is running: `docker info`
-- Check container image exists: `docker images | grep microclaw-agent`
+- Check container image exists: `docker images | grep eclaw-agent`
 - Rebuild if needed: `./container/build.sh`
 
 **No response in web UI**:
 - Check that the server is running on the correct port
-- Check `logs/microclaw.log` for errors
+- Check `logs/eclaw.log` for errors
 - Verify authentication is configured: `grep -E "ANTHROPIC_API_KEY|ANTHROPIC_AUTH_TOKEN" .env`
 
 **Authentication errors**:
@@ -416,15 +416,15 @@ Then verify in the browser.
 - For API key: check at https://console.anthropic.com/
 
 **Memory system issues**:
-- Check that the data directory exists: `ls -la .microclaw/`
-- Reset memory: `rm -rf .microclaw/` (will be recreated on next start)
+- Check that the data directory exists: `ls -la .eclaw/`
+- Reset memory: `rm -rf .eclaw/` (will be recreated on next start)
 
 **Unload macOS service**:
 ```bash
-launchctl unload ~/Library/LaunchAgents/com.microclaw.plist
+launchctl unload ~/Library/LaunchAgents/com.eclaw.plist
 ```
 
 **Stop Linux service**:
 ```bash
-systemctl --user stop microclaw
+systemctl --user stop eclaw
 ```

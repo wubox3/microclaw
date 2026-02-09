@@ -72,8 +72,8 @@ export function createOpenRouterClient(
     baseURL: "https://openrouter.ai/api/v1",
     apiKey: options.apiKey,
     defaultHeaders: {
-      "HTTP-Referer": "https://github.com/wubox3/microclaw",
-      "X-Title": "MicroClaw",
+      "HTTP-Referer": "https://github.com/wubox3/eclaw",
+      "X-Title": "EClaw",
     },
   });
 
@@ -171,10 +171,11 @@ export function createOpenRouterClient(
           }
         }
       } catch (error) {
-        // Ensure stream consumers receive message_stop even on error
-        yield { type: "message_stop" };
         const detail = error instanceof Error ? error.message : String(error);
-        throw new Error(`OpenRouter stream iteration failed: ${detail}`);
+        log.error(`OpenRouter stream iteration failed: ${detail}`);
+        // Yield message_stop so consumers know the stream is done
+        yield { type: "message_stop" };
+        return;
       }
 
       yield { type: "message_stop" };

@@ -83,7 +83,7 @@ export async function responseBodyViaPlaywright(opts: {
       cleanup();
       reject(
         new Error(
-          `Response not found for url pattern "${pattern}". Run '${formatCliCommand("microclaw browser requests")}' to inspect recent network activity.`,
+          `Response not found for url pattern "${pattern}". Run '${formatCliCommand("eclaw browser requests")}' to inspect recent network activity.`,
         ),
       );
     }, timeout);

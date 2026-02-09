@@ -79,7 +79,7 @@ export function getUsedPorts(
 }
 
 export const PROFILE_COLORS = [
-  "#FF4500", // Orange-red (microclaw default)
+  "#FF4500", // Orange-red (eclaw default)
   "#0066CC", // Blue
   "#00AA00", // Green
   "#9933FF", // Purple

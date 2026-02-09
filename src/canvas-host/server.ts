@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { lstat, open } from "node:fs/promises";
-import { resolve, normalize, extname } from "node:path";
+import path, { resolve, normalize, extname } from "node:path";
 import { constants } from "node:fs";
 import { generateA2uiPage } from "./a2ui-page.js";
 
@@ -38,7 +38,7 @@ export function createCanvasRoutes(dataDir: string): Hono {
     });
   });
 
-  // Serve files from ~/.microclaw/canvas/ with path traversal protection
+  // Serve files from ~/.eclaw/canvas/ with path traversal protection
   app.get("/files/*", async (c) => {
     const rawPath = c.req.path.replace(/^\/files\//, "");
     let decodedPath: string;
@@ -54,8 +54,9 @@ export function createCanvasRoutes(dataDir: string): Hono {
     const fullPath = resolve(canvasDir, decodedPath);
     const normalizedFull = normalize(fullPath);
 
-    // Ensure resolved path is within canvas directory
-    if (!normalizedFull.startsWith(normalize(canvasDir) + "/")) {
+    // Ensure resolved path is within canvas directory (cross-platform safe)
+    const relPath = path.relative(normalize(canvasDir), normalizedFull);
+    if (relPath.startsWith("..") || path.isAbsolute(relPath)) {
       return c.json({ error: "Path traversal denied" }, 403);
     }
 

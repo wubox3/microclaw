@@ -1,5 +1,5 @@
 {
-  "name": "microclaw",
+  "name": "eclaw",
   "version": "0.1.0",
   "description": "Multi-channel AI assistant with hybrid memory search",
   "type": "module",
@@ -15,7 +15,11 @@
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:report": "playwright show-report",
     "typecheck": "tsc --noEmit",
-    "skill:install": "tsx src/skills/install-skill.ts"
+    "skill:install": "tsx src/skills/cli/install.ts",
+    "skill:search": "tsx src/skills/cli/search.ts",
+    "skill:update": "tsx src/skills/cli/update.ts",
+    "skill:list": "tsx src/skills/cli/list.ts",
+    "skill:install-git": "tsx src/skills/install-skill.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
@@ -23,6 +27,7 @@
     "@hono/node-server": "^1.14.1",
     "@slack/bolt": "^4.6.0",
     "@whiskeysockets/baileys": "7.0.0-rc.9",
+    "chokidar": "^5.0.0",
     "croner": "^10.0.1",
     "discord.js": "^14.25.1",
     "dotenv": "^17.2.4",

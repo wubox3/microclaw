@@ -8,8 +8,8 @@ import {
 } from "./config-paths.js";
 
 describe("CONFIG_DIR", () => {
-  it("contains .microclaw", () => {
-    expect(CONFIG_DIR).toContain(".microclaw");
+  it("contains .eclaw", () => {
+    expect(CONFIG_DIR).toContain(".eclaw");
   });
 
   it("is an absolute path", () => {

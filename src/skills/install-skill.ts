@@ -1,7 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
-import path, { resolve, basename } from "node:path";
-import { readSkillManifest, validateManifest } from "./manifest.js";
+import path, { basename } from "node:path";
 
 export const VALID_DIR_NAME = /^(?!\.)(?!\.\.$)[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 export const VALID_GIT_URL = /^(https?:\/\/[^\s"'`]+$|git@[^\s:"'`]+:[^\s"'`]+$|git:\/\/[^\s"'`]+$)$/;
@@ -72,73 +71,3 @@ export function rollback(skillsRoot: string, targetDir: string): void {
   }
 }
 
-async function run(): Promise<void> {
-  const { url, name } = parseArgs(process.argv);
-  const dirName = name ?? deriveNameFromUrl(url);
-
-  if (!VALID_DIR_NAME.test(dirName)) {
-    console.error("Error: derived directory name contains invalid characters — use --name to override");
-    process.exit(1);
-  }
-
-  const skillsRoot = resolve(process.cwd(), "skills");
-  const targetDir = resolve(skillsRoot, dirName);
-
-  if (!isWithinDir(skillsRoot, targetDir)) {
-    console.error("Error: skill name resolves outside the skills directory");
-    process.exit(1);
-  }
-
-  if (existsSync(targetDir)) {
-    console.error(`Error: skill directory already exists: ${targetDir.replace(process.cwd() + "/", "")}`);
-    process.exit(1);
-  }
-
-  console.error(`Cloning ${url} into skills/${dirName}...`);
-  try {
-    cloneRepo(url, targetDir);
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  }
-
-  const manifest = await readSkillManifest(targetDir);
-  if (!manifest) {
-    console.error("Error: no valid microclaw.skill.json found in repository");
-    rollback(skillsRoot, targetDir);
-    process.exit(1);
-  }
-
-  const errors = validateManifest(manifest);
-  if (errors.length > 0) {
-    console.error("Manifest validation failed:");
-    for (const err of errors) {
-      console.error(`  - ${err}`);
-    }
-    rollback(skillsRoot, targetDir);
-    process.exit(1);
-  }
-
-  const entryFile = manifest.entry ?? "index.ts";
-  const entryPoint = resolve(targetDir, entryFile);
-
-  if (!isWithinDir(targetDir, entryPoint)) {
-    console.error(`Error: entry point escapes skill directory: ${entryFile}`);
-    rollback(skillsRoot, targetDir);
-    process.exit(1);
-  }
-
-  if (!existsSync(entryPoint)) {
-    console.error(`Error: entry point not found: ${entryFile}`);
-    rollback(skillsRoot, targetDir);
-    process.exit(1);
-  }
-
-  console.error(`Installed skill "${manifest.name}" (${manifest.id}) into skills/${dirName}`);
-}
-
-// Only run when executed directly, not when imported by tests
-const isDirectExecution = (process.argv[1]?.endsWith("install-skill.ts") || process.argv[1]?.endsWith("install-skill.js")) ?? false;
-if (isDirectExecution) {
-  run();
-}

@@ -8,14 +8,14 @@ import { waitForConnection } from './helpers.js'
 test.describe('Page Load', () => {
   test('has correct title', async ({ page }) => {
     await page.goto('/')
-    await expect(page).toHaveTitle('MicroClaw')
+    await expect(page).toHaveTitle('EClaw')
   })
 
-  test('displays the MicroClaw logo', async ({ page }) => {
+  test('displays the EClaw logo', async ({ page }) => {
     await page.goto('/')
     const logo = page.locator('.logo')
     await expect(logo).toBeVisible()
-    await expect(logo).toHaveText('MicroClaw')
+    await expect(logo).toHaveText('EClaw')
   })
 
   test('renders the sidebar with channel list', async ({ page }) => {
@@ -135,8 +135,8 @@ test.describe('Send Message', () => {
 
   test('user can type in the message input', async ({ page }) => {
     const input = page.locator('#message-input')
-    await input.fill('Hello MicroClaw')
-    await expect(input).toHaveValue('Hello MicroClaw')
+    await input.fill('Hello EClaw')
+    await expect(input).toHaveValue('Hello EClaw')
   })
 
   test('clicking Send adds user message bubble to chat', async ({ page }) => {

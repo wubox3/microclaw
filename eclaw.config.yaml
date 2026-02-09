@@ -1,0 +1,29 @@
+voice:
+  tts:
+    enabled: true
+
+channels:
+  discord:
+    enabled: true
+    token: ""
+    allowFrom: []
+
+  telegram:
+    enabled: true
+    token: ""
+    allowFrom: []
+
+  signal:
+    enabled: true
+    accountId: ""
+    allowFrom: []
+
+  googlechat:
+    enabled: true
+    token: ""
+    allowFrom: []
+
+  whatsapp:
+    enabled: true
+    accountId: ""
+    allowFrom: []

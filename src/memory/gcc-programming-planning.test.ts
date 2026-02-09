@@ -48,14 +48,14 @@ function createMockLlmClient(responseText: string): LlmClient {
 
 function minimalPlanning(overrides: Partial<ProgrammingPlanning> = {}): ProgrammingPlanning {
   return {
-    confirmedPlans: [],
-    modifiedPatterns: [],
-    discardedReasons: [],
-    planStructure: [],
+    structurePreferences: [],
+    detailLevelPreferences: [],
+    valuedPlanElements: [],
+    architectureApproaches: [],
     scopePreferences: [],
-    detailLevel: [],
-    reviewPatterns: [],
-    implementationFlow: [],
+    presentationFormat: [],
+    approvedPlanPatterns: [],
+    discardedReasons: [],
     planningInsights: [],
     lastUpdated: "2026-01-01T00:00:00.000Z",
     ...overrides,
@@ -253,8 +253,8 @@ describe("createProgrammingPlanningManager", () => {
     it("persists and retrieves preferences", () => {
       const mgr = createGccProgrammingPlanningManager(db, createGccStore(db));
       const prefs = minimalPlanning({
-        planStructure: ["numbered steps"],
-        detailLevel: ["file-by-file changes"],
+        structurePreferences: ["numbered steps"],
+        detailLevelPreferences: ["file-by-file changes"],
       });
       mgr.savePlanning(prefs);
       const loaded = mgr.getPlanning();
@@ -263,10 +263,10 @@ describe("createProgrammingPlanningManager", () => {
 
     it("overwrites existing preferences on save", () => {
       const mgr = createGccProgrammingPlanningManager(db, createGccStore(db));
-      mgr.savePlanning(minimalPlanning({ planStructure: ["phased"] }));
+      mgr.savePlanning(minimalPlanning({ structurePreferences: ["phased"] }));
       mgr.savePlanning(
         minimalPlanning({
-          planStructure: ["numbered steps"],
+          structurePreferences: ["numbered steps"],
           lastUpdated: "2026-02-01T00:00:00.000Z",
         }),
       );
@@ -276,7 +276,7 @@ describe("createProgrammingPlanningManager", () => {
 
     it("uses in-memory cache after first read", () => {
       const mgr = createGccProgrammingPlanningManager(db, createGccStore(db));
-      const prefs = minimalPlanning({ planStructure: ["task breakdown"] });
+      const prefs = minimalPlanning({ structurePreferences: ["task breakdown"] });
       mgr.savePlanning(prefs);
 
       const first = mgr.getPlanning();
@@ -290,13 +290,13 @@ describe("createProgrammingPlanningManager", () => {
     it("round-trips all fields", () => {
       const mgr = createGccProgrammingPlanningManager(db, createGccStore(db));
       const prefs = minimalPlanning({
-        planStructure: ["numbered steps"],
-        detailLevel: ["file-by-file changes"],
-        reviewPatterns: ["test plan section"],
-        implementationFlow: ["modular boundaries"],
+        structurePreferences: ["numbered steps"],
+        detailLevelPreferences: ["file-by-file changes"],
+        valuedPlanElements: ["test plan section"],
+        architectureApproaches: ["modular boundaries"],
         scopePreferences: ["small focused PRs"],
-        confirmedPlans: ["markdown headers"],
-        modifiedPatterns: ["phased approach with tests"],
+        presentationFormat: ["markdown headers"],
+        approvedPlanPatterns: ["phased approach with tests"],
         planningInsights: ["Prefers incremental changes"],
       });
       mgr.savePlanning(prefs);
@@ -332,13 +332,13 @@ describe("createProgrammingPlanningManager", () => {
         { user: "I committed and pushed", assistant: "Great!" },
       ]);
       const llmResponse = JSON.stringify({
-        planStructure: ["numbered steps", "phased approach"],
-        detailLevel: ["file-by-file changes"],
-        reviewPatterns: ["checkbox task list"],
-        implementationFlow: [],
+        structurePreferences: ["numbered steps", "phased approach"],
+        detailLevelPreferences: ["file-by-file changes"],
+        valuedPlanElements: ["checkbox task list"],
+        architectureApproaches: [],
         scopePreferences: [],
-        confirmedPlans: ["markdown headers"],
-        modifiedPatterns: ["phased approach with file-level changes"],
+        presentationFormat: ["markdown headers"],
+        approvedPlanPatterns: ["phased approach with file-level changes"],
         planningInsights: ["Prefers structured plans with clear phases"],
       });
       const mgr = createGccProgrammingPlanningManager(db, createGccStore(db));
@@ -360,13 +360,13 @@ describe("createProgrammingPlanningManager", () => {
         { user: "I pushed the code", assistant: "Done!" },
       ]);
       const llmResponse = JSON.stringify({
-        planStructure: [],
-        detailLevel: [],
-        reviewPatterns: [],
-        implementationFlow: [],
+        structurePreferences: [],
+        detailLevelPreferences: [],
+        valuedPlanElements: [],
+        architectureApproaches: [],
         scopePreferences: [],
-        confirmedPlans: [],
-        modifiedPatterns: [],
+        presentationFormat: [],
+        approvedPlanPatterns: [],
         planningInsights: [],
       });
       const client = createMockLlmClient(llmResponse);
@@ -383,8 +383,8 @@ describe("createProgrammingPlanningManager", () => {
       const mgr = createGccProgrammingPlanningManager(db, createGccStore(db));
       mgr.savePlanning(
         minimalPlanning({
-          planStructure: ["numbered steps"],
-          modifiedPatterns: ["phased approach"],
+          structurePreferences: ["numbered steps"],
+          approvedPlanPatterns: ["phased approach"],
         }),
       );
 
@@ -393,13 +393,13 @@ describe("createProgrammingPlanningManager", () => {
         { user: "Looks good", assistant: "Implementing..." },
       ]);
       const llmResponse = JSON.stringify({
-        planStructure: ["task breakdown"],
-        detailLevel: ["code snippets"],
-        reviewPatterns: [],
-        implementationFlow: [],
+        structurePreferences: ["task breakdown"],
+        detailLevelPreferences: ["code snippets"],
+        valuedPlanElements: [],
+        architectureApproaches: [],
         scopePreferences: [],
-        confirmedPlans: [],
-        modifiedPatterns: [],
+        presentationFormat: [],
+        approvedPlanPatterns: [],
         planningInsights: [],
       });
       const client = createMockLlmClient(llmResponse);
@@ -413,20 +413,20 @@ describe("createProgrammingPlanningManager", () => {
 
     it("deduplicates case-insensitively", async () => {
       const mgr = createGccProgrammingPlanningManager(db, createGccStore(db));
-      mgr.savePlanning(minimalPlanning({ planStructure: ["Numbered Steps"] }));
+      mgr.savePlanning(minimalPlanning({ structurePreferences: ["Numbered Steps"] }));
 
       seedExchanges(db, [
         { user: "Plan something", assistant: makePlanText() },
         { user: "Approved", assistant: "Done." },
       ]);
       const llmResponse = JSON.stringify({
-        planStructure: ["numbered steps"],
-        detailLevel: [],
-        reviewPatterns: [],
-        implementationFlow: [],
+        structurePreferences: ["numbered steps"],
+        detailLevelPreferences: [],
+        valuedPlanElements: [],
+        architectureApproaches: [],
         scopePreferences: [],
-        confirmedPlans: [],
-        modifiedPatterns: [],
+        presentationFormat: [],
+        approvedPlanPatterns: [],
         planningInsights: [],
       });
       const client = createMockLlmClient(llmResponse);
@@ -438,7 +438,7 @@ describe("createProgrammingPlanningManager", () => {
     it("caps standard arrays at 20 items", async () => {
       const mgr = createGccProgrammingPlanningManager(db, createGccStore(db));
       const existing = Array.from({ length: 18 }, (_, i) => `Pref ${i}`);
-      mgr.savePlanning(minimalPlanning({ planStructure: existing }));
+      mgr.savePlanning(minimalPlanning({ structurePreferences: existing }));
 
       seedExchanges(db, [
         { user: "Plan it", assistant: makePlanText() },
@@ -446,13 +446,13 @@ describe("createProgrammingPlanningManager", () => {
       ]);
       const newItems = ["New A", "New B", "New C", "New D"];
       const llmResponse = JSON.stringify({
-        planStructure: newItems,
-        detailLevel: [],
-        reviewPatterns: [],
-        implementationFlow: [],
+        structurePreferences: newItems,
+        detailLevelPreferences: [],
+        valuedPlanElements: [],
+        architectureApproaches: [],
         scopePreferences: [],
-        confirmedPlans: [],
-        modifiedPatterns: [],
+        presentationFormat: [],
+        approvedPlanPatterns: [],
         planningInsights: [],
       });
       const client = createMockLlmClient(llmResponse);
@@ -464,7 +464,7 @@ describe("createProgrammingPlanningManager", () => {
     it("caps approvedPlanPatterns at 30 items", async () => {
       const mgr = createGccProgrammingPlanningManager(db, createGccStore(db));
       const existing = Array.from({ length: 28 }, (_, i) => `Pattern ${i}`);
-      mgr.savePlanning(minimalPlanning({ modifiedPatterns: existing }));
+      mgr.savePlanning(minimalPlanning({ approvedPlanPatterns: existing }));
 
       seedExchanges(db, [
         { user: "Plan", assistant: makePlanText() },
@@ -472,13 +472,13 @@ describe("createProgrammingPlanningManager", () => {
       ]);
       const newPatterns = ["New A", "New B", "New C", "New D"];
       const llmResponse = JSON.stringify({
-        planStructure: [],
-        detailLevel: [],
-        reviewPatterns: [],
-        implementationFlow: [],
+        structurePreferences: [],
+        detailLevelPreferences: [],
+        valuedPlanElements: [],
+        architectureApproaches: [],
         scopePreferences: [],
-        confirmedPlans: [],
-        modifiedPatterns: newPatterns,
+        presentationFormat: [],
+        approvedPlanPatterns: newPatterns,
         planningInsights: [],
       });
       const client = createMockLlmClient(llmResponse);
@@ -537,13 +537,13 @@ describe("createProgrammingPlanningManager", () => {
         { user: "Perfect", assistant: "Done." },
       ]);
       const llmResponse = JSON.stringify({
-        planStructure: [],
-        detailLevel: [],
-        reviewPatterns: [],
-        implementationFlow: [],
+        structurePreferences: [],
+        detailLevelPreferences: [],
+        valuedPlanElements: [],
+        architectureApproaches: [],
         scopePreferences: [],
-        confirmedPlans: [],
-        modifiedPatterns: [],
+        presentationFormat: [],
+        approvedPlanPatterns: [],
         planningInsights: [],
       });
       const client = createMockLlmClient(llmResponse);
@@ -563,13 +563,13 @@ describe("createProgrammingPlanningManager", () => {
         { user: "Approved", assistant: "Done." },
       ]);
       const llmResponse = JSON.stringify({
-        planStructure: [],
-        detailLevel: [],
-        reviewPatterns: [],
-        implementationFlow: [],
+        structurePreferences: [],
+        detailLevelPreferences: [],
+        valuedPlanElements: [],
+        architectureApproaches: [],
         scopePreferences: [],
-        confirmedPlans: [],
-        modifiedPatterns: [],
+        presentationFormat: [],
+        approvedPlanPatterns: [],
         planningInsights: [],
       });
       const client = createMockLlmClient(llmResponse);
@@ -591,13 +591,13 @@ describe("createProgrammingPlanningManager", () => {
 describe("formatProgrammingPlanningForPrompt", () => {
   it("formats a full preferences object", () => {
     const prefs = minimalPlanning({
-      planStructure: ["numbered steps", "phased approach"],
-      detailLevel: ["file-by-file changes", "code snippets"],
-      reviewPatterns: ["test plan section", "verification steps"],
-      implementationFlow: ["modular boundaries"],
+      structurePreferences: ["numbered steps", "phased approach"],
+      detailLevelPreferences: ["file-by-file changes", "code snippets"],
+      valuedPlanElements: ["test plan section", "verification steps"],
+      architectureApproaches: ["modular boundaries"],
       scopePreferences: ["small focused PRs"],
-      confirmedPlans: ["markdown headers", "tables"],
-      modifiedPatterns: [
+      presentationFormat: ["markdown headers", "tables"],
+      approvedPlanPatterns: [
         "Phased approach with test verification per phase",
         "File-level change list with before/after context",
       ],
@@ -619,7 +619,7 @@ describe("formatProgrammingPlanningForPrompt", () => {
     expect(result).toContain("Planning insights:");
     expect(result).toContain("  - Prefers incremental changes");
     expect(result).toContain("  - Values test coverage plans");
-    expect(result).toContain("End Programming Planning Preferences");
+    expect(result).toContain("End Planning Preferences");
   });
 
   it("omits empty fields", () => {
@@ -641,7 +641,7 @@ describe("formatProgrammingPlanningForPrompt", () => {
 
   it("truncates long array values", () => {
     const prefs = minimalPlanning({
-      planStructure: [
+      structurePreferences: [
         "A".repeat(200),
         "B".repeat(200),
         "C".repeat(200),

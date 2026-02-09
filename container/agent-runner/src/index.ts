@@ -1,5 +1,5 @@
 /**
- * MicroClaw Agent Runner
+ * EClaw Agent Runner
  * Runs inside a Docker container, receives config via stdin, outputs result to stdout
  */
 
@@ -20,8 +20,8 @@ interface ContainerOutput {
   error?: string;
 }
 
-const OUTPUT_START_MARKER = "---MICROCLAW_OUTPUT_START---";
-const OUTPUT_END_MARKER = "---MICROCLAW_OUTPUT_END---";
+const OUTPUT_START_MARKER = "---ECLAW_OUTPUT_START---";
+const OUTPUT_END_MARKER = "---ECLAW_OUTPUT_END---";
 
 async function readStdin(): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -86,13 +86,13 @@ async function main(): Promise<void> {
           "Grep",
           "WebSearch",
           "WebFetch",
-          "mcp__microclaw__*",
+          "mcp__eclaw__*",
         ],
         permissionMode: "bypassPermissions",
         allowDangerouslySkipPermissions: true,
         settingSources: ["project"],
         mcpServers: {
-          microclaw: ipcMcp,
+          eclaw: ipcMcp,
         },
       },
     })) {

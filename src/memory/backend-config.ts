@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { MicroClawConfig } from "../config/types.js";
+import type { EClawConfig } from "../config/types.js";
 
 export type MemoryBackendConfig = {
   dataDir: string;
@@ -10,7 +10,7 @@ export type MemoryBackendConfig = {
   maxResults: number;
 };
 
-export function resolveMemoryBackendConfig(config: MicroClawConfig, dataDir: string): MemoryBackendConfig {
+export function resolveMemoryBackendConfig(config: EClawConfig, dataDir: string): MemoryBackendConfig {
   return {
     dataDir,
     dbPath: join(dataDir, "memory.db"),

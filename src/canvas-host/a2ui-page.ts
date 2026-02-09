@@ -8,7 +8,7 @@ export function generateA2uiPage(): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MicroClaw Canvas</title>
+<title>EClaw Canvas</title>
 <style>
   :root {
     --primary: #E87B35;

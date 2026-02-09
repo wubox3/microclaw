@@ -1,10 +1,10 @@
 /**
- * Mount Security Module for MicroClaw
+ * Mount Security Module for EClaw
  *
  * Validates additional mounts against an allowlist stored OUTSIDE the project root.
  * This prevents container agents from modifying security configuration.
  *
- * Allowlist location: ~/.config/microclaw/mount-allowlist.json
+ * Allowlist location: ~/.config/eclaw/mount-allowlist.json
  */
 import fs from "fs";
 import os from "os";

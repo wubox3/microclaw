@@ -131,13 +131,13 @@ export function registerBrowserAgentDebugRoutes(
         return;
       }
       const id = crypto.randomUUID();
-      const dir = "/tmp/microclaw";
+      const dir = "/tmp/eclaw";
       await fs.mkdir(dir, { recursive: true });
       const rawTrace = out.trim() || path.join(dir, `browser-trace-${id}.zip`);
       const resolvedTrace = path.resolve(rawTrace);
-      // Allowlist: only permit output under /tmp/microclaw to prevent arbitrary file writes
+      // Allowlist: only permit output under /tmp/eclaw to prevent arbitrary file writes
       if (resolvedTrace.includes("\0") || !resolvedTrace.startsWith(`${dir}/`)) {
-        res.status(400).json({ ok: false, error: "Trace output path must be under /tmp/microclaw/" });
+        res.status(400).json({ ok: false, error: "Trace output path must be under /tmp/eclaw/" });
         return;
       }
       const tracePath = resolvedTrace;

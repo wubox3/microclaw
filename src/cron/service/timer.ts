@@ -154,7 +154,7 @@ export async function executeJob(
         return;
       }
       state.deps.enqueueSystemEvent(text, { agentId: job.agentId });
-      // For microclaw, we use next-heartbeat mode (simplified: just enqueue + request heartbeat)
+      // For eclaw, we use next-heartbeat mode (simplified: just enqueue + request heartbeat)
       state.deps.requestHeartbeatNow({ reason: `cron:${job.id}` });
       await finish("ok", undefined, text);
       return;

@@ -17,8 +17,8 @@ const DEFAULT_MAX_TOKENS = 4096;
 
 const OAUTH_BETA_HEADERS = {
   "anthropic-beta": "claude-code-20250219,oauth-2025-04-20",
-  "user-agent": "microclaw/1.0.0",
-  "x-app": "microclaw",
+  "user-agent": "eclaw/1.0.0",
+  "x-app": "eclaw",
 };
 
 function toAnthropicMessages(messages: LlmMessage[]): Anthropic.Messages.MessageParam[] {

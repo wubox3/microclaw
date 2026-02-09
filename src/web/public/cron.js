@@ -1,4 +1,4 @@
-// MicroClaw Cron Job Manager
+// EClaw Cron Job Manager
 (function() {
   'use strict';
 
@@ -411,7 +411,7 @@
     }
   }
 
-  window.MicroClawCron = {
+  window.EClawCron = {
     init: init,
     handleMessage: handleMessage,
   };

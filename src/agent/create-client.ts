@@ -1,4 +1,4 @@
-import type { MicroClawConfig } from "../config/types.js";
+import type { EClawConfig } from "../config/types.js";
 import type { AuthCredentials } from "../infra/auth.js";
 import type { LlmClient } from "./llm-client.js";
 import { createAnthropicClient } from "./client.js";
@@ -6,7 +6,7 @@ import { createOpenRouterClient } from "./openrouter-client.js";
 import { requireEnv } from "../infra/env.js";
 
 export type CreateLlmClientParams = {
-  config: MicroClawConfig;
+  config: EClawConfig;
   auth: AuthCredentials;
 };
 

@@ -1,6 +1,6 @@
 import { mkdirSync, existsSync, realpathSync } from "node:fs";
 import { resolve as resolvePath } from "node:path";
-import type { MicroClawConfig } from "../config/types.js";
+import type { EClawConfig } from "../config/types.js";
 import type { AuthCredentials } from "../infra/auth.js";
 import type { MemorySearchManager, MemorySearchParams, MemorySearchResult, MemoryProviderStatus, MemoryRecordCounts, UserProfile, ProgrammingSkills, PlanningPreferences, ProgrammingPlanning, EventPlanning, Workflow, Tasks } from "./types.js";
 import { createUserProfileManager } from "./user-profile.js";
@@ -25,7 +25,7 @@ import { syncMemoryFiles } from "./sync-memory-files.js";
 const memLog = createLogger("memory-manager");
 
 export function createMemoryManager(params: {
-  config: MicroClawConfig;
+  config: EClawConfig;
   dataDir: string;
   auth: AuthCredentials;
 }): MemorySearchManager {
@@ -80,14 +80,14 @@ export function createMemoryManager(params: {
     if (legacyPlanning && !gccStore.getHeadSnapshot("programming_planning")) {
       // Map old PlanningPreferences fields to new ProgrammingPlanning
       const migratedPlanning: Record<string, unknown> = {
-        confirmedPlans: legacyPlanning.approvedPlanPatterns ?? [],
-        modifiedPatterns: [],
-        discardedReasons: [],
-        planStructure: legacyPlanning.structurePreferences ?? [],
+        structurePreferences: legacyPlanning.structurePreferences ?? [],
+        detailLevelPreferences: legacyPlanning.detailLevelPreferences ?? [],
+        valuedPlanElements: legacyPlanning.valuedPlanElements ?? [],
+        architectureApproaches: legacyPlanning.architectureApproaches ?? [],
         scopePreferences: legacyPlanning.scopePreferences ?? [],
-        detailLevel: legacyPlanning.detailLevelPreferences ?? [],
-        reviewPatterns: [],
-        implementationFlow: [],
+        presentationFormat: legacyPlanning.presentationFormat ?? [],
+        approvedPlanPatterns: legacyPlanning.approvedPlanPatterns ?? [],
+        discardedReasons: [],
         planningInsights: legacyPlanning.planningInsights ?? [],
         lastUpdated: legacyPlanning.lastUpdated,
       };

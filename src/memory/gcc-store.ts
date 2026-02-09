@@ -135,13 +135,27 @@ export function createGccStore(db: SqliteDb): GccStore {
   }
 
   function parseCommitRow(row: Record<string, unknown>): GccCommit {
+    let delta: GccDelta;
+    let snapshot: Record<string, unknown>;
+    try {
+      delta = JSON.parse(row.delta as string) as GccDelta;
+    } catch {
+      log.warn(`Corrupt delta JSON in commit ${row.hash}, using empty delta`);
+      delta = { added: {}, removed: {} };
+    }
+    try {
+      snapshot = JSON.parse(row.snapshot as string) as Record<string, unknown>;
+    } catch {
+      log.warn(`Corrupt snapshot JSON in commit ${row.hash}, using empty snapshot`);
+      snapshot = {};
+    }
     return {
       hash: row.hash as string,
       memoryType: row.memory_type as GccMemoryType,
       branchName: row.branch_name as string,
       parentHash: (row.parent_hash as string) || null,
-      delta: JSON.parse(row.delta as string) as GccDelta,
-      snapshot: JSON.parse(row.snapshot as string) as Record<string, unknown>,
+      delta,
+      snapshot,
       message: row.message as string,
       confidence: row.confidence as GccConfidence,
       createdAt: row.created_at as string,
@@ -309,7 +323,13 @@ export function createGccStore(db: SqliteDb): GccStore {
     const rows = getCommitsByBranchStmt.all(type, branchName, limit ?? 50) as Array<Record<string, unknown>>;
 
     return rows.map((row) => {
-      const delta = JSON.parse(row.delta as string) as GccDelta;
+      let delta: GccDelta;
+      try {
+        delta = JSON.parse(row.delta as string) as GccDelta;
+      } catch {
+        log.warn(`Corrupt delta JSON in log entry ${row.hash}, using empty delta`);
+        delta = { added: {}, removed: {} };
+      }
       const counts = countDeltaItems(delta);
       return {
         hash: row.hash as string,

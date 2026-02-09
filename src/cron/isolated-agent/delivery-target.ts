@@ -8,9 +8,9 @@ export type DeliveryTarget = {
 };
 
 /**
- * Simplified delivery target resolution for microclaw.
+ * Simplified delivery target resolution for eclaw.
  * In openclaw this resolves against session stores and channel registries.
- * For microclaw we just pass through the requested channel and target.
+ * For eclaw we just pass through the requested channel and target.
  */
 export function resolveDeliveryTarget(
   jobPayload: {

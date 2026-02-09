@@ -1,21 +1,84 @@
 import { Hono } from "hono";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
-import { resolve, basename } from "node:path";
-import type { MicroClawConfig } from "../config/types.js";
+import path, { resolve, basename } from "node:path";
+import type { EClawConfig } from "../config/types.js";
 import type { MemorySearchManager } from "../memory/types.js";
 import type { Agent } from "../agent/agent.js";
 import type { WebMonitor } from "../channels/web/monitor.js";
 import type { CronService } from "../cron/service.js";
 import type { VibecodingManager } from "../agent/vibecoding-tool.js";
+import type { AsapRunner } from "../jobs/runner.js";
 import { normalizeCronJobCreate, normalizeCronJobPatch } from "../cron/normalize.js";
 import { readCronRunLogEntries, resolveCronRunLogPath } from "../cron/run-log.js";
+import { projectFutureRuns } from "../cron/calendar.js";
 import { listChatChannels } from "../channels/registry.js";
 import { textToSpeech, resolveTtsConfig } from "../voice/tts.js";
 import { loadVoiceWakeConfig, setVoiceWakeTriggers } from "../voice/voicewake.js";
 import { createCanvasRoutes } from "../canvas-host/server.js";
 import { createLogger } from "../logging.js";
+import { z } from "zod";
 
 const log = createLogger("web-routes");
+
+const stringArraySchema = z.array(z.string().max(200)).max(20).default([]);
+
+const workflowSchema = z.object({
+  decompositionPatterns: stringArraySchema,
+  taskSizingPreferences: stringArraySchema,
+  prioritizationApproach: stringArraySchema,
+  sequencingPatterns: stringArraySchema,
+  dependencyHandling: stringArraySchema,
+  estimationStyle: stringArraySchema,
+  toolsAndProcesses: stringArraySchema,
+  workflowInsights: stringArraySchema,
+  lastUpdated: z.string().optional(),
+});
+
+const tasksSchema = z.object({
+  activeTasks: stringArraySchema,
+  completedTasks: stringArraySchema,
+  blockedTasks: stringArraySchema,
+  upcomingTasks: stringArraySchema,
+  currentGoals: stringArraySchema,
+  projectContext: stringArraySchema,
+  deadlines: stringArraySchema,
+  taskInsights: stringArraySchema,
+  lastUpdated: z.string().optional(),
+});
+
+const optStr = z.string().max(200).optional();
+const userProfileSchema = z.object({
+  name: optStr, location: optStr, timezone: optStr, occupation: optStr, communicationStyle: optStr,
+  interests: stringArraySchema, preferences: stringArraySchema, favoriteFoods: stringArraySchema,
+  restaurants: stringArraySchema, coffeePlaces: stringArraySchema, clubs: stringArraySchema,
+  shoppingPlaces: stringArraySchema, workPlaces: stringArraySchema, dailyPlaces: stringArraySchema,
+  exerciseRoutes: stringArraySchema, keyFacts: stringArraySchema,
+  lastUpdated: z.string().optional(),
+});
+
+const programmingSkillsSchema = z.object({
+  languages: stringArraySchema, frameworks: stringArraySchema, architecturePatterns: stringArraySchema,
+  codingStylePreferences: stringArraySchema, testingApproach: stringArraySchema,
+  toolsAndLibraries: stringArraySchema, approvedPatterns: stringArraySchema,
+  buildAndDeployment: stringArraySchema, editorAndEnvironment: stringArraySchema,
+  keyInsights: stringArraySchema, lastUpdated: z.string().optional(),
+});
+
+const programmingPlanningSchema = z.object({
+  structurePreferences: stringArraySchema, detailLevelPreferences: stringArraySchema,
+  valuedPlanElements: stringArraySchema, architectureApproaches: stringArraySchema,
+  scopePreferences: stringArraySchema, presentationFormat: stringArraySchema,
+  approvedPlanPatterns: stringArraySchema, discardedReasons: stringArraySchema,
+  planningInsights: stringArraySchema, lastUpdated: z.string().optional(),
+});
+
+const eventPlanningSchema = z.object({
+  preferredTimes: stringArraySchema, preferredDays: stringArraySchema,
+  recurringSchedules: stringArraySchema, venuePreferences: stringArraySchema,
+  calendarHabits: stringArraySchema, planningStyle: stringArraySchema,
+  eventTypes: stringArraySchema, schedulingInsights: stringArraySchema,
+  lastUpdated: z.string().optional(),
+});
 
 function escapeHtml(text: string): string {
   return text
@@ -38,7 +101,7 @@ const safeErrorMessage = (err: unknown, fallback: string): string => {
 };
 
 export type WebAppDeps = {
-  config: MicroClawConfig;
+  config: EClawConfig;
   agent: Agent;
   memoryManager?: MemorySearchManager;
   webMonitor: WebMonitor;
@@ -46,6 +109,7 @@ export type WebAppDeps = {
   cronService?: CronService;
   cronStorePath?: string;
   vibecodingManager?: VibecodingManager;
+  asapRunner?: AsapRunner;
 };
 
 export function createWebRoutes(deps: WebAppDeps): Hono {
@@ -123,18 +187,21 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     if (!deps.memoryManager) {
       return c.json({ success: false, error: "Memory not configured" }, 503);
     }
-    let body: Record<string, unknown>;
+    let body: unknown;
     try {
       body = await c.req.json();
     } catch {
       return c.json({ success: false, error: "Invalid JSON body" }, 400);
     }
-    if (typeof body !== "object" || body === null) {
-      return c.json({ success: false, error: "Body must be an object" }, 400);
+    const parsed = userProfileSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ success: false, error: `Validation failed: ${parsed.error.message}` }, 400);
     }
     try {
-      const profile = body as import("../memory/types.js").UserProfile;
-      profile.lastUpdated = new Date().toISOString();
+      const profile: import("../memory/types.js").UserProfile = {
+        ...parsed.data,
+        lastUpdated: new Date().toISOString(),
+      };
       deps.memoryManager.saveUserProfile(profile);
       return c.json({ success: true, data: deps.memoryManager.getUserProfile() });
     } catch (err) {
@@ -155,18 +222,21 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     if (!deps.memoryManager) {
       return c.json({ success: false, error: "Memory not configured" }, 503);
     }
-    let body: Record<string, unknown>;
+    let body: unknown;
     try {
       body = await c.req.json();
     } catch {
       return c.json({ success: false, error: "Invalid JSON body" }, 400);
     }
-    if (typeof body !== "object" || body === null) {
-      return c.json({ success: false, error: "Body must be an object" }, 400);
+    const parsed = programmingSkillsSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ success: false, error: `Validation failed: ${parsed.error.message}` }, 400);
     }
     try {
-      const skills = body as import("../memory/types.js").ProgrammingSkills;
-      skills.lastUpdated = new Date().toISOString();
+      const skills: import("../memory/types.js").ProgrammingSkills = {
+        ...parsed.data,
+        lastUpdated: new Date().toISOString(),
+      };
       deps.memoryManager.saveProgrammingSkills(skills);
       return c.json({ success: true, data: deps.memoryManager.getProgrammingSkills() });
     } catch (err) {
@@ -187,18 +257,21 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     if (!deps.memoryManager) {
       return c.json({ success: false, error: "Memory not configured" }, 503);
     }
-    let body: Record<string, unknown>;
+    let body: unknown;
     try {
       body = await c.req.json();
     } catch {
       return c.json({ success: false, error: "Invalid JSON body" }, 400);
     }
-    if (typeof body !== "object" || body === null) {
-      return c.json({ success: false, error: "Body must be an object" }, 400);
+    const parsed = programmingPlanningSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ success: false, error: `Validation failed: ${parsed.error.message}` }, 400);
     }
     try {
-      const planning = body as import("../memory/types.js").ProgrammingPlanning;
-      planning.lastUpdated = new Date().toISOString();
+      const planning: import("../memory/types.js").ProgrammingPlanning = {
+        ...parsed.data,
+        lastUpdated: new Date().toISOString(),
+      };
       deps.memoryManager.saveProgrammingPlanning(planning);
       return c.json({ success: true, data: deps.memoryManager.getProgrammingPlanning() });
     } catch (err) {
@@ -219,18 +292,21 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     if (!deps.memoryManager) {
       return c.json({ success: false, error: "Memory not configured" }, 503);
     }
-    let body: Record<string, unknown>;
+    let body: unknown;
     try {
       body = await c.req.json();
     } catch {
       return c.json({ success: false, error: "Invalid JSON body" }, 400);
     }
-    if (typeof body !== "object" || body === null) {
-      return c.json({ success: false, error: "Body must be an object" }, 400);
+    const parsed = eventPlanningSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ success: false, error: `Validation failed: ${parsed.error.message}` }, 400);
     }
     try {
-      const planning = body as import("../memory/types.js").EventPlanning;
-      planning.lastUpdated = new Date().toISOString();
+      const planning: import("../memory/types.js").EventPlanning = {
+        ...parsed.data,
+        lastUpdated: new Date().toISOString(),
+      };
       deps.memoryManager.saveEventPlanning(planning);
       return c.json({ success: true, data: deps.memoryManager.getEventPlanning() });
     } catch (err) {
@@ -251,18 +327,21 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     if (!deps.memoryManager) {
       return c.json({ success: false, error: "Memory not configured" }, 503);
     }
-    let body: Record<string, unknown>;
+    let body: unknown;
     try {
       body = await c.req.json();
     } catch {
       return c.json({ success: false, error: "Invalid JSON body" }, 400);
     }
-    if (typeof body !== "object" || body === null) {
-      return c.json({ success: false, error: "Body must be an object" }, 400);
+    const parsed = workflowSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ success: false, error: `Validation failed: ${parsed.error.message}` }, 400);
     }
     try {
-      const workflow = body as import("../memory/types.js").Workflow;
-      workflow.lastUpdated = new Date().toISOString();
+      const workflow: import("../memory/types.js").Workflow = {
+        ...parsed.data,
+        lastUpdated: new Date().toISOString(),
+      };
       deps.memoryManager.saveWorkflow(workflow);
       return c.json({ success: true, data: deps.memoryManager.getWorkflow() });
     } catch (err) {
@@ -283,18 +362,21 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     if (!deps.memoryManager) {
       return c.json({ success: false, error: "Memory not configured" }, 503);
     }
-    let body: Record<string, unknown>;
+    let body: unknown;
     try {
       body = await c.req.json();
     } catch {
       return c.json({ success: false, error: "Invalid JSON body" }, 400);
     }
-    if (typeof body !== "object" || body === null) {
-      return c.json({ success: false, error: "Body must be an object" }, 400);
+    const parsed = tasksSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ success: false, error: `Validation failed: ${parsed.error.message}` }, 400);
     }
     try {
-      const tasks = body as import("../memory/types.js").Tasks;
-      tasks.lastUpdated = new Date().toISOString();
+      const tasks: import("../memory/types.js").Tasks = {
+        ...parsed.data,
+        lastUpdated: new Date().toISOString(),
+      };
       deps.memoryManager.saveTasks(tasks);
       return c.json({ success: true, data: deps.memoryManager.getTasks() });
     } catch (err) {
@@ -548,7 +630,8 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
     }
     const soundsDir = resolve(deps.dataDir, "sounds");
     const soundPath = resolve(soundsDir, raw + ".mp3");
-    if (!soundPath.startsWith(soundsDir + "/")) {
+    const rel = path.relative(soundsDir, soundPath);
+    if (rel.startsWith("..") || path.isAbsolute(rel)) {
       return c.json({ success: false, error: "Invalid sound name" }, 400);
     }
     if (!existsSync(soundPath)) {
@@ -806,6 +889,119 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
         return c.json({ success: false, error: "Failed to send wake event" }, 500);
       }
     });
+
+    app.get("/api/cron/calendar", async (c) => {
+      const daysParam = c.req.query("days");
+      const days = Math.max(1, Math.min(Number(daysParam) || 60, 90));
+      try {
+        const jobs = await cronService.list();
+        const runs = projectFutureRuns(jobs, days);
+        return c.json({
+          success: true,
+          data: {
+            runs,
+            jobs: jobs.map((j) => ({
+              id: j.id,
+              name: j.name,
+              enabled: j.enabled,
+              schedule: j.schedule,
+            })),
+          },
+        });
+      } catch (err) {
+        log.error(`Calendar failed: ${err instanceof Error ? err.message : String(err)}`);
+        return c.json({ success: false, error: "Failed to compute calendar" }, 500);
+      }
+    });
+  }
+
+  // ASAP Queue routes
+  if (deps.asapRunner) {
+    const asapRunner = deps.asapRunner;
+
+    app.get("/api/asap/jobs", async (c) => {
+      try {
+        const jobs = await asapRunner.list();
+        return c.json({ success: true, data: jobs });
+      } catch (err) {
+        log.error(`ASAP list failed: ${err instanceof Error ? err.message : String(err)}`);
+        return c.json({ success: false, error: "Failed to list ASAP jobs" }, 500);
+      }
+    });
+
+    app.post("/api/asap/jobs", async (c) => {
+      let body: Record<string, unknown>;
+      try {
+        body = await c.req.json();
+      } catch {
+        return c.json({ success: false, error: "Invalid JSON body" }, 400);
+      }
+      if (typeof body.name !== "string" || body.name.trim().length === 0 || body.name.length > 200) {
+        return c.json({ success: false, error: "name must be a non-empty string (max 200 chars)" }, 400);
+      }
+      if (typeof body.description !== "string" || body.description.trim().length === 0 || body.description.length > 10000) {
+        return c.json({ success: false, error: "description must be a non-empty string (max 10000 chars)" }, 400);
+      }
+      try {
+        const job = await asapRunner.enqueue(body.name.trim(), body.description.trim());
+        return c.json({ success: true, data: job }, 201);
+      } catch (err) {
+        log.error(`ASAP create failed: ${err instanceof Error ? err.message : String(err)}`);
+        return c.json({ success: false, error: safeErrorMessage(err, "Failed to create ASAP job") }, 500);
+      }
+    });
+
+    app.patch("/api/asap/jobs/:id", async (c) => {
+      const id = c.req.param("id");
+      if (!id || !/^[a-f0-9-]+$/i.test(id)) {
+        return c.json({ success: false, error: "Invalid job ID" }, 400);
+      }
+      let body: Record<string, unknown>;
+      try {
+        body = await c.req.json();
+      } catch {
+        return c.json({ success: false, error: "Invalid JSON body" }, 400);
+      }
+      const VALID_STATUSES = new Set(["pending", "running", "done", "failed"]);
+      if (typeof body.status !== "string" || !VALID_STATUSES.has(body.status)) {
+        return c.json({ success: false, error: "status must be one of: pending, running, done, failed" }, 400);
+      }
+      try {
+        await asapRunner.updateStatus(id, { status: body.status as "pending" | "running" | "done" | "failed" });
+        return c.json({ success: true });
+      } catch (err) {
+        log.error(`ASAP update failed: ${err instanceof Error ? err.message : String(err)}`);
+        return c.json({ success: false, error: safeErrorMessage(err, "Failed to update ASAP job") }, 400);
+      }
+    });
+
+    app.delete("/api/asap/jobs/:id", async (c) => {
+      const id = c.req.param("id");
+      if (!id || !/^[a-f0-9-]+$/i.test(id)) {
+        return c.json({ success: false, error: "Invalid job ID" }, 400);
+      }
+      try {
+        await asapRunner.remove(id);
+        return c.json({ success: true });
+      } catch (err) {
+        log.error(`ASAP remove failed: ${err instanceof Error ? err.message : String(err)}`);
+        return c.json({ success: false, error: safeErrorMessage(err, "Failed to remove ASAP job") }, 400);
+      }
+    });
+
+    app.post("/api/asap/jobs/:id/run", async (c) => {
+      const id = c.req.param("id");
+      if (!id || !/^[a-f0-9-]+$/i.test(id)) {
+        return c.json({ success: false, error: "Invalid job ID" }, 400);
+      }
+      try {
+        await asapRunner.forceRun(id);
+        return c.json({ success: true });
+      } catch (err) {
+        log.error(`ASAP run failed: ${err instanceof Error ? err.message : String(err)}`);
+        return c.json({ success: false, error: safeErrorMessage(err, "Failed to run ASAP job") }, 400);
+      }
+    });
   }
 
   // Mount canvas routes
@@ -836,6 +1032,8 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
   const canvasJsPath = resolve(publicDir, "canvas.js");
   const cronJsPath = resolve(publicDir, "cron.js");
   const memoryJsPath = resolve(publicDir, "memory.js");
+  const calendarJsPath = resolve(publicDir, "calendar.js");
+  const asapJsPath = resolve(publicDir, "asap.js");
   const htmlPath = resolve(publicDir, "index.html");
 
   const cssContent = safeReadFile(cssPath);
@@ -845,6 +1043,8 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
   const canvasJsContent = safeReadFile(canvasJsPath);
   const cronJsContent = safeReadFile(cronJsPath);
   const memoryJsContent = safeReadFile(memoryJsPath);
+  const calendarJsContent = safeReadFile(calendarJsPath);
+  const asapJsContent = safeReadFile(asapJsPath);
   const htmlContent = safeReadFile(htmlPath);
 
   const STATIC_CACHE = "public, max-age=300";
@@ -875,6 +1075,14 @@ export function createWebRoutes(deps: WebAppDeps): Hono {
 
   app.get("/memory.js", (c) => {
     return c.text(getStaticContent(memoryJsPath, memoryJsContent), 200, { "Content-Type": "application/javascript", "Cache-Control": STATIC_CACHE });
+  });
+
+  app.get("/calendar.js", (c) => {
+    return c.text(getStaticContent(calendarJsPath, calendarJsContent), 200, { "Content-Type": "application/javascript", "Cache-Control": STATIC_CACHE });
+  });
+
+  app.get("/asap.js", (c) => {
+    return c.text(getStaticContent(asapJsPath, asapJsContent), 200, { "Content-Type": "application/javascript", "Cache-Control": STATIC_CACHE });
   });
 
   app.get("/", (c) => {

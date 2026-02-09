@@ -9,6 +9,8 @@ export type ChannelConfig = {
   accountId?: string;
   token?: string;
   allowFrom?: string[];
+  binPath?: string;
+  provider?: string;
 };
 
 export type MemoryConfig = {
@@ -32,7 +34,27 @@ export type AgentConfig = {
 
 export type SkillConfig = {
   enabled?: boolean;
-  directory?: string;
+  apiKey?: string;
+  env?: Record<string, string>;
+  config?: Record<string, unknown>;
+};
+
+export type SkillsLoadConfig = {
+  extraDirs?: string[];
+  watch?: boolean;
+  watchDebounceMs?: number;
+};
+
+export type SkillsInstallConfig = {
+  preferBrew?: boolean;
+  nodeManager?: "npm" | "pnpm" | "yarn" | "bun";
+};
+
+export type SkillsConfig = {
+  allowBundled?: string[];
+  load?: SkillsLoadConfig;
+  install?: SkillsInstallConfig;
+  entries?: Record<string, SkillConfig>;
 };
 
 export type WebConfig = {
@@ -78,11 +100,11 @@ export type CronConfig = {
   maxConcurrentRuns?: number;
 };
 
-export type MicroClawConfig = {
+export type EClawConfig = {
   channels?: Partial<Record<ChatChannelId, ChannelConfig>>;
   memory?: MemoryConfig;
   agent?: AgentConfig;
-  skills?: SkillConfig;
+  skills?: SkillsConfig;
   web?: WebConfig;
   container?: ContainerConfigOptions;
   voice?: VoiceConfig;

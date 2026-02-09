@@ -79,7 +79,7 @@ type ConnectedTarget = {
 };
 
 const relayLog = createSubsystemLogger("browser").child("extension-relay");
-const RELAY_AUTH_HEADER = "x-microclaw-relay-token";
+const RELAY_AUTH_HEADER = "x-eclaw-relay-token";
 
 function headerValue(value: string | string[] | undefined): string | undefined {
   if (!value) {
@@ -292,9 +292,9 @@ export async function ensureChromeExtensionRelayServer(opts: {
       case "Browser.getVersion":
         return {
           protocolVersion: "1.3",
-          product: "Chrome/MicroClaw-Extension-Relay",
+          product: "Chrome/EClaw-Extension-Relay",
           revision: "0",
-          userAgent: "MicroClaw-Extension-Relay",
+          userAgent: "EClaw-Extension-Relay",
           jsVersion: "V8",
         };
       case "Browser.setDownloadBehavior":
@@ -398,7 +398,7 @@ export async function ensureChromeExtensionRelayServer(opts: {
       (req.method === "GET" || req.method === "PUT")
     ) {
       const payload: Record<string, unknown> = {
-        Browser: "MicroClaw/extension-relay",
+        Browser: "EClaw/extension-relay",
         "Protocol-Version": "1.3",
       };
       // Only advertise the WS URL if a real extension is connected.
@@ -506,14 +506,14 @@ export async function ensureChromeExtensionRelayServer(opts: {
       // Validate extension ID format (32 lowercase alpha chars a-p per Chrome's encoding)
       const extensionIdRegex = /^[a-p]{32}$/;
       const originExtensionId = origin.slice("chrome-extension://".length).replace(/\/$/, "");
-      const expectedExtensionId = process.env.MICROCLAW_EXTENSION_ID?.trim();
+      const expectedExtensionId = process.env.ECLAW_EXTENSION_ID?.trim();
       if (expectedExtensionId) {
         if (!extensionIdRegex.test(originExtensionId) || originExtensionId !== expectedExtensionId) {
           rejectUpgrade(socket, 403, "Forbidden: extension ID mismatch");
           return;
         }
       } else {
-        relayLog.warn("MICROCLAW_EXTENSION_ID not set - any Chrome extension can connect to relay");
+        relayLog.warn("ECLAW_EXTENSION_ID not set - any Chrome extension can connect to relay");
       }
       if (extensionWs) {
         rejectUpgrade(socket, 409, "Extension already connected");

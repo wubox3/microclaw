@@ -80,7 +80,7 @@ describe("fetchBrowserJson", () => {
   it("throws enhanced error on HTTP error", async () => {
     mockErrorResponse(500, "Internal Server Error");
     await expect(fetchBrowserJson("/agent/status")).rejects.toThrow(
-      "Can't reach the MicroClaw browser control service",
+      "Can't reach the EClaw browser control service",
     );
   });
 
@@ -138,7 +138,7 @@ describe("fetchBrowserJson", () => {
   it("wraps non-timeout errors", async () => {
     mockFetch.mockRejectedValueOnce(new Error("ECONNREFUSED"));
     await expect(fetchBrowserJson("/test")).rejects.toThrow(
-      "Can't reach the MicroClaw browser control service",
+      "Can't reach the EClaw browser control service",
     );
   });
 });

@@ -1,7 +1,0 @@
-{
-  "id": "googlechat",
-  "name": "Google Chat Channel",
-  "description": "Google Workspace Chat app with HTTP webhook",
-  "version": "0.1.0",
-  "entry": "index.ts"
-}

@@ -1,4 +1,4 @@
-// MicroClaw Voice Module - Simple on/off toggle with talk mode
+// EClaw Voice Module - Simple on/off toggle with talk mode
 (function() {
   'use strict';
 
@@ -22,7 +22,7 @@
   var listenGeneration = 0;
 
   // ─── Sound Effects (loaded from sound-fx.js) ───
-  var SoundFX = window.MicroClawSoundFX || { init: function() {}, play: function() {} };
+  var SoundFX = window.EClawSoundFX || { init: function() {}, play: function() {} };
 
   // ─── DOM Elements (set in init) ───
   var micBtn = null;
@@ -220,8 +220,8 @@
       }
     }, 30000);
 
-    if (window.MicroClaw && window.MicroClaw.sendMessage) {
-      window.MicroClaw.sendMessage(text);
+    if (window.EClaw && window.EClaw.sendMessage) {
+      window.EClaw.sendMessage(text);
     }
   }
 
@@ -510,7 +510,7 @@
   }
 
   // ─── Public API ───
-  window.MicroClawVoice = {
+  window.EClawVoice = {
     init: function() {
       micBtn = document.getElementById('mic-btn');
       voiceToggle = document.getElementById('voice-toggle');

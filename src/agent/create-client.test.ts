@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createLlmClient } from "./create-client.js";
-import type { MicroClawConfig } from "../config/types.js";
+import type { EClawConfig } from "../config/types.js";
 import type { AuthCredentials } from "../infra/auth.js";
 
 // ---------------------------------------------------------------------------
@@ -35,8 +35,8 @@ const defaultAuth: AuthCredentials = {
 };
 
 function makeConfig(
-  agentOverrides: MicroClawConfig["agent"] = {},
-): MicroClawConfig {
+  agentOverrides: EClawConfig["agent"] = {},
+): EClawConfig {
   return { agent: agentOverrides };
 }
 

@@ -1,5 +1,5 @@
 /**
- * IPC-based MCP Server for MicroClaw
+ * IPC-based MCP Server for EClaw
  * Writes messages to files for the host process to pick up via polling
  */
 
@@ -34,7 +34,7 @@ export function createIpcMcp(ctx: IpcMcpContext) {
   const { channelId, chatId } = ctx;
 
   return createSdkMcpServer({
-    name: "microclaw",
+    name: "eclaw",
     version: "1.0.0",
     tools: [
       tool(

@@ -1,4 +1,4 @@
-import type { MicroClawConfig } from "../config/types.js";
+import type { EClawConfig } from "../config/types.js";
 import type { TtsResult, TtsProvider, ResolvedTtsConfig } from "./types.js";
 import { createLogger } from "../logging.js";
 
@@ -32,7 +32,7 @@ function isKnownVoice(voice: string): boolean {
   return (KNOWN_VOICES as readonly string[]).includes(voice);
 }
 
-export function resolveTtsConfig(config: MicroClawConfig): ResolvedTtsConfig {
+export function resolveTtsConfig(config: EClawConfig): ResolvedTtsConfig {
   const raw = config.voice?.tts ?? {};
   return {
     enabled: raw.enabled ?? true,
@@ -61,8 +61,8 @@ function buildHeaders(provider: TtsProvider, apiKey: string): Record<string, str
   };
 
   if (provider === "openrouter") {
-    headers["HTTP-Referer"] = "https://github.com/wubox3/microclaw";
-    headers["X-Title"] = "MicroClaw";
+    headers["HTTP-Referer"] = "https://github.com/wubox3/eclaw";
+    headers["X-Title"] = "EClaw";
   }
 
   return headers;
@@ -128,7 +128,7 @@ async function callTtsApi(params: {
 
 export async function textToSpeech(params: {
   text: string;
-  config: MicroClawConfig;
+  config: EClawConfig;
   voice?: string;
 }): Promise<TtsResult> {
   const resolved = resolveTtsConfig(params.config);

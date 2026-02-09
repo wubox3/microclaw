@@ -1,4 +1,4 @@
-// MicroClaw Canvas Panel
+// EClaw Canvas Panel
 (function() {
   'use strict';
 
@@ -62,8 +62,8 @@
 
       if (data.type === 'canvas_action') {
         // Forward action from iframe to server via WebSocket
-        if (window.MicroClaw && window.MicroClaw.sendCanvasAction) {
-          window.MicroClaw.sendCanvasAction(data);
+        if (window.EClaw && window.EClaw.sendCanvasAction) {
+          window.EClaw.sendCanvasAction(data);
         }
       }
     });
@@ -149,7 +149,7 @@
     });
   }
 
-  window.MicroClawCanvas = {
+  window.EClawCanvas = {
     init: init,
     show: show,
     hide: hide,

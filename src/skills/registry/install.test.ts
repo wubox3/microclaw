@@ -20,13 +20,15 @@ import { installSkillFromRegistry, updateSkill, updateAllSkills } from "./instal
 import { readLockFile, writeLockFile, addLockEntry } from "./lockfile.js";
 import type { LockFile } from "./types.js";
 
+const TEST_ZIP_PASSWORD = "test-secret-pw";
+
 function createTestZip(skillName: string): Buffer {
   const tmpDir = path.join(TMP_ROOT, "zip-build");
   mkdirSync(tmpDir, { recursive: true });
   writeFileSync(path.join(tmpDir, "SKILL.md"), `---\nname: ${skillName}\n---\nA skill`);
 
   const zipPath = path.join(TMP_ROOT, "build.zip");
-  execFileSync("zip", ["-r", zipPath, "."], { cwd: tmpDir, stdio: "pipe" });
+  execFileSync("zip", ["-r", "-P", TEST_ZIP_PASSWORD, zipPath, "."], { cwd: tmpDir, stdio: "pipe" });
   const buf = readFileSync(zipPath);
 
   rmSync(tmpDir, { recursive: true, force: true });
@@ -51,7 +53,10 @@ describe("installSkillFromRegistry", () => {
       description: "A calendar skill",
       latestVersion: "1.0.0",
     });
-    vi.mocked(downloadSkillZip).mockResolvedValueOnce(createTestZip("Calendar"));
+    vi.mocked(downloadSkillZip).mockResolvedValueOnce({
+      zipBuffer: createTestZip("Calendar"),
+      zipPassword: TEST_ZIP_PASSWORD,
+    });
 
     const result = await installSkillFromRegistry({
       slug: "calendar",
@@ -76,7 +81,10 @@ describe("installSkillFromRegistry", () => {
       description: "A calendar skill",
       latestVersion: "2.0.0",
     });
-    vi.mocked(downloadSkillZip).mockResolvedValueOnce(createTestZip("Calendar"));
+    vi.mocked(downloadSkillZip).mockResolvedValueOnce({
+      zipBuffer: createTestZip("Calendar"),
+      zipPassword: TEST_ZIP_PASSWORD,
+    });
 
     const result = await installSkillFromRegistry({
       slug: "calendar",
@@ -118,7 +126,10 @@ describe("installSkillFromRegistry", () => {
       description: "A calendar skill",
       latestVersion: "1.0.0",
     });
-    vi.mocked(downloadSkillZip).mockResolvedValueOnce(createTestZip("Calendar"));
+    vi.mocked(downloadSkillZip).mockResolvedValueOnce({
+      zipBuffer: createTestZip("Calendar"),
+      zipPassword: TEST_ZIP_PASSWORD,
+    });
 
     const result = await installSkillFromRegistry({
       slug: "calendar",
@@ -137,7 +148,10 @@ describe("installSkillFromRegistry", () => {
       description: "Broken skill",
       latestVersion: "1.0.0",
     });
-    vi.mocked(downloadSkillZip).mockResolvedValueOnce(Buffer.from("not-a-zip"));
+    vi.mocked(downloadSkillZip).mockResolvedValueOnce({
+      zipBuffer: Buffer.from("not-a-zip"),
+      zipPassword: TEST_ZIP_PASSWORD,
+    });
 
     await expect(
       installSkillFromRegistry({
@@ -206,7 +220,10 @@ describe("updateSkill", () => {
         description: "A calendar skill",
         latestVersion: "2.0.0",
       });
-    vi.mocked(downloadSkillZip).mockResolvedValueOnce(createTestZip("Calendar v2"));
+    vi.mocked(downloadSkillZip).mockResolvedValueOnce({
+      zipBuffer: createTestZip("Calendar v2"),
+      zipPassword: TEST_ZIP_PASSWORD,
+    });
 
     const result = await updateSkill({
       slug: "calendar",

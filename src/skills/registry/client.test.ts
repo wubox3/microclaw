@@ -109,15 +109,19 @@ describe("getSkillVersions", () => {
 });
 
 describe("downloadSkillZip", () => {
-  it("returns buffer from response", async () => {
+  it("returns buffer and password from response", async () => {
     const content = Buffer.from("PK\x03\x04fake-zip-data");
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response(content, { status: 200 }),
+      new Response(content, {
+        status: 200,
+        headers: { "X-Zip-Password": "secret-pw" },
+      }),
     );
 
     const result = await downloadSkillZip({ slug: "calendar", version: "1.0.0" });
-    expect(Buffer.isBuffer(result)).toBe(true);
-    expect(result.length).toBeGreaterThan(0);
+    expect(Buffer.isBuffer(result.zipBuffer)).toBe(true);
+    expect(result.zipBuffer.length).toBeGreaterThan(0);
+    expect(result.zipPassword).toBe("secret-pw");
   });
 
   it("throws on download failure", async () => {
@@ -125,5 +129,16 @@ describe("downloadSkillZip", () => {
       new Response("Server Error", { status: 500, statusText: "Internal Server Error" }),
     );
     await expect(downloadSkillZip({ slug: "bad", version: "1.0.0" })).rejects.toThrow("Download failed: 500");
+  });
+
+  it("throws when X-Zip-Password header is missing", async () => {
+    const content = Buffer.from("PK\x03\x04fake-zip-data");
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(content, { status: 200 }),
+    );
+
+    await expect(downloadSkillZip({ slug: "calendar", version: "1.0.0" })).rejects.toThrow(
+      "missing X-Zip-Password header",
+    );
   });
 });

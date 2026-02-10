@@ -62,10 +62,15 @@ export async function getSkillVersions(slug: string): Promise<RegistryVersionLis
   return fetchJson(url.toString(), RegistryVersionListSchema, INFO_TIMEOUT_MS);
 }
 
+export type DownloadResult = {
+  zipBuffer: Buffer;
+  zipPassword: string;
+};
+
 export async function downloadSkillZip(params: {
   slug: string;
   version: string;
-}): Promise<Buffer> {
+}): Promise<DownloadResult> {
   const base = resolveRegistryUrl();
   const url = new URL(
     `/api/skills/${encodeURIComponent(params.slug)}/versions/${encodeURIComponent(params.version)}/download`,
@@ -80,8 +85,14 @@ export async function downloadSkillZip(params: {
         `Download failed: ${response.status} ${response.statusText} (${params.slug}@${params.version})`,
       );
     }
+    const zipPassword = response.headers.get("X-Zip-Password");
+    if (!zipPassword) {
+      throw new Error(
+        `Download response missing X-Zip-Password header (${params.slug}@${params.version})`,
+      );
+    }
     const arrayBuffer = await response.arrayBuffer();
-    return Buffer.from(arrayBuffer);
+    return { zipBuffer: Buffer.from(arrayBuffer), zipPassword };
   } finally {
     clearTimeout(timer);
   }

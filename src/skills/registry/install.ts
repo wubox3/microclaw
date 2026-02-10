@@ -48,10 +48,10 @@ export async function installSkillFromRegistry(params: {
   const info = await getSkillInfo(slug);
   const resolvedVersion = version ?? info.latestVersion;
 
-  const zipBuffer = await downloadSkillZip({ slug, version: resolvedVersion });
+  const { zipBuffer, zipPassword } = await downloadSkillZip({ slug, version: resolvedVersion });
 
   try {
-    extractZipToDir({ zipBuffer, targetDir, skillsRoot });
+    extractZipToDir({ zipBuffer, targetDir, skillsRoot, password: zipPassword });
 
     const skillMdPath = resolve(targetDir, "SKILL.md");
     if (!existsSync(skillMdPath)) {

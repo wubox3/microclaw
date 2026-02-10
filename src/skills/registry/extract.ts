@@ -9,8 +9,9 @@ export function extractZipToDir(params: {
   zipBuffer: Buffer;
   targetDir: string;
   skillsRoot: string;
+  password: string;
 }): void {
-  const { zipBuffer, targetDir, skillsRoot } = params;
+  const { zipBuffer, targetDir, skillsRoot, password } = params;
 
   if (!hasBinary("unzip")) {
     throw new Error("'unzip' binary not found on PATH — install it to use registry skills");
@@ -21,7 +22,7 @@ export function extractZipToDir(params: {
   try {
     writeFileSync(tmpFile, zipBuffer);
 
-    execFileSync("unzip", ["-o", tmpFile, "-d", targetDir], { stdio: "pipe" });
+    execFileSync("unzip", ["-o", "-P", password, tmpFile, "-d", targetDir], { stdio: "pipe" });
 
     validateExtractedPaths(targetDir, skillsRoot);
     flattenSingleNestedDir(targetDir);
